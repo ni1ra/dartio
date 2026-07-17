@@ -24,9 +24,10 @@ Build and release a fresh Dartio `v1.0.0` using Navi UI `v1.0.0`, Neon PostgreSQ
   - [ ] Implement local friend play and server-authoritative online room foundations with reconnect.
   - [ ] Implement accessible keyboard/touch alternatives and correction flows.
 - [ ] Voice scoring
-  - [ ] Implement push-to-talk and opt-in always-on session modes.
-  - [ ] Use OpenAI transcription with structured command parsing for every game mode.
-  - [ ] Implement confirmation, ambiguity, correction, privacy, and failure states.
+  - [x] Implement push-to-talk and opt-in always-on session modes.
+  - [x] Use OpenAI transcription with structured command parsing through the current shared game-command path.
+  - [x] Implement confirmation, ambiguity, correction, privacy, and failure states.
+  - [ ] Extend and prove the shared voice-command path across every remaining game mode.
 - [ ] Checkout intelligence
   - [ ] Implement dynamic professional routes, alternate paths, setup shots, bogey detection, and dart-count context.
   - [ ] Support player preferences and explain route changes after each dart.
@@ -37,13 +38,14 @@ Build and release a fresh Dartio `v1.0.0` using Navi UI `v1.0.0`, Neon PostgreSQ
   - [x] Verify deep black, bright silver, and blood red themes across mobile, tablet, and desktop for the Cycle 1 paths.
 - [ ] Membership and Stripe
   - [x] Define free and paid plans, entitlements, trials/discount policy, annual/monthly pricing, cancellation, and grace behavior.
-  - [ ] Implement Stripe Checkout, Customer Portal, idempotent webhooks, entitlement projection, and recovery states.
+  - [x] Implement Stripe Checkout, Customer Portal, idempotent webhooks, entitlement projection, and recovery states.
     - [x] Implement authenticated Pro/Club monthly/annual Checkout, Portal session endpoint, idempotent webhook projection, and recovery UI.
-    - [ ] Configure and prove Customer Portal plus the complete sandbox subscription lifecycle.
-  - [ ] Verify sandbox transactions and webhook replay before any live activation.
+    - [x] Configure and prove Customer Portal plus Checkout, signed projection, scheduled cancellation, and reactivation in sandbox.
+  - [x] Verify a sandbox Pro annual transaction and real signed webhook updates before any live activation.
+  - [ ] Connect projected entitlements to every paid product feature and verify fail-closed consumption.
 - [ ] Neon and operations
   - [x] Implement and deploy the initial migrations, constraints, indexes, and ownership model.
-  - [x] Deploy identity and billing lifecycle migrations `0003` and `0004` to Preview and Main.
+  - [x] Deploy identity and billing lifecycle migrations `0003` through `0005` to Preview and Main.
   - [ ] Implement observable error handling, analytics events, and rollback paths.
   - [x] Connect GitHub CI and Vercel preview/production environments.
 - [ ] Phase closure
