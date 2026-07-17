@@ -1,0 +1,12 @@
+.navi-segmented.darts-thrown,
+.navi-segmented.dart-multiplier {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  width: 100%;
+}
+
+.navi-segmented.darts-thrown button,
+.navi-segmented.dart-multiplier button {
+  justify-content: center;
+  min-height: 44px;
+}
