@@ -9,9 +9,9 @@ Build and release a fresh Dartio `v1.0.0` using Navi UI `v1.0.0`, Neon PostgreSQ
 ## Workstreams
 
 - [ ] Repository and system contracts
-  - [ ] Initialize a fresh Next.js/TypeScript repository with no legacy source.
+  - [x] Initialize a fresh Next.js/TypeScript repository with no legacy source.
   - [ ] Lock game engine, persistence, auth, billing, voice, multiplayer, and deployment boundaries.
-  - [ ] Verify version and dependency contracts.
+  - [x] Verify version and dependency contracts.
 - [ ] Game domain
   - [ ] Implement X01 options: starting score, legs/sets, straight/double/master in, straight/double/master out, bust rules, and checkout assistance.
   - [ ] Implement Cricket options: standard/cut-throat, points, rounds, and open-number behavior.
@@ -19,8 +19,8 @@ Build and release a fresh Dartio `v1.0.0` using Navi UI `v1.0.0`, Neon PostgreSQ
   - [ ] Implement immutable turn events, undo/correction, complete rules, and perfect companion inputs.
   - [ ] Implement AI levels 1–20 with measured accuracy progression and believable miss distribution.
 - [ ] Match experience
-  - [ ] Implement responsive visual dartboard input and throw visualization.
-  - [ ] Synchronize throws, scoreboards, checkout routes, history, and turn state.
+  - [x] Implement responsive visual dartboard input and throw visualization.
+  - [x] Synchronize throws, scoreboards, checkout routes, history, and turn state for X01.
   - [ ] Implement local friend play and server-authoritative online room foundations with reconnect.
   - [ ] Implement accessible keyboard/touch alternatives and correction flows.
 - [ ] Voice scoring
@@ -33,16 +33,19 @@ Build and release a fresh Dartio `v1.0.0` using Navi UI `v1.0.0`, Neon PostgreSQ
   - [ ] Verify known checkout fixtures and invalid-route rejection.
 - [ ] Product, navigation, and responsive UI
   - [ ] Build the dynamic landing page, game lobby, setup, match, friends, practice, stats, billing, and account paths.
-  - [ ] Use Navi UI as the only component/theme system.
-  - [ ] Verify deep black, bright silver, and blood red themes across mobile, tablet, and desktop.
+  - [x] Use Navi UI as the only component/theme system.
+  - [x] Verify deep black, bright silver, and blood red themes across mobile, tablet, and desktop for the Cycle 1 paths.
 - [ ] Membership and Stripe
-  - [ ] Define free and paid plans, entitlements, trials/discount policy, annual/monthly pricing, cancellation, and grace behavior.
+  - [x] Define free and paid plans, entitlements, trials/discount policy, annual/monthly pricing, cancellation, and grace behavior.
   - [ ] Implement Stripe Checkout, Customer Portal, idempotent webhooks, entitlement projection, and recovery states.
+    - [x] Implement authenticated Pro/Club monthly/annual Checkout, Portal session endpoint, idempotent webhook projection, and recovery UI.
+    - [ ] Configure and prove Customer Portal plus the complete sandbox subscription lifecycle.
   - [ ] Verify sandbox transactions and webhook replay before any live activation.
 - [ ] Neon and operations
-  - [ ] Implement migrations, constraints, indexes, ownership, and least-privilege data access.
+  - [x] Implement and deploy the initial migrations, constraints, indexes, and ownership model.
+  - [x] Deploy identity and billing lifecycle migrations `0003` and `0004` to Preview and Main.
   - [ ] Implement observable error handling, analytics events, and rollback paths.
-  - [ ] Connect GitHub CI and Vercel preview/production environments.
+  - [x] Connect GitHub CI and Vercel preview/production environments.
 - [ ] Phase closure
   - [ ] Run audit, production readiness, bug search, bug fixes, docs drift, and closure.
 
@@ -53,4 +56,3 @@ Build and release a fresh Dartio `v1.0.0` using Navi UI `v1.0.0`, Neon PostgreSQ
 - [ ] Make Dartio `v1.0.0` consume Navi UI `v1.0.0`.
 - [ ] Use Neon, not Supabase.
 - [ ] Deliver production-ready Stripe pricing and a strong dynamic checkout helper with professional paths.
-

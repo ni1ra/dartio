@@ -16,11 +16,16 @@
 - Preview database branch: `vercel-preview` (`br-fragrant-art-af79dyw5`); Neon Auth is provisioned independently on main and preview.
 - Hosting: Vercel team `niras-projects-868b6f5f`.
 - Payments: claimed Stripe sandbox `dartio-stripe`, resource `ir_afV2OHhg6q9l9S78`, connected to Preview and Production.
-- Stripe sandbox account: `acct_1TtyEARjf8C9cHpO`. Pro prices are EUR 7.99 monthly (`price_1TtzgyALEz0P7O2hBlv1fWHW`) and EUR 76.70 annually (`price_1TtzgzALEz0P7O2h82O61RF7`); Club prices are EUR 24 monthly (`price_1Ttzh0ALEz0P7O2hOsw6eCEr`) and EUR 230.40 annually (`price_1Ttzh1ALEz0P7O2harPzXoGH`). All are test-mode, active, tax-inclusive catalog objects.
+- Stripe sandbox account: `acct_1TtxM1ALEz0P7O2h`. Pro prices are EUR 7.99 monthly (`price_1TtzgyALEz0P7O2hBlv1fWHW`) and EUR 76.70 annually (`price_1TtzgzALEz0P7O2h82O61RF7`); Club prices are EUR 24 monthly (`price_1Ttzh0ALEz0P7O2hOsw6eCEr`) and EUR 230.40 annually (`price_1Ttzh1ALEz0P7O2harPzXoGH`). All are test-mode, active, tax-inclusive catalog objects.
 - Voice: OpenAI transcription models are available; secrets stay in environment stores only.
 - GitHub repository `ni1ra/dartio` is connected to Vercel with production branch `main`.
-- Vercel has separate encrypted Production and Preview values for Neon database, Neon Auth, Auth cookie secret, and Pro monthly/annual price IDs. Stripe integration secrets cover both targets; OpenAI currently covers Production only. App origin and webhook signing secret remain deployment-derived gates.
-- Preview migrations `0000` through `0002` were applied through Drizzle on 2026-07-17. External verification: 10 public tables, 3 migration journal rows, both strict dart constraints, normalized-email constraint, and unique user Stripe-customer index.
+- Vercel has encrypted Production and Preview values for Neon database/Auth, Auth cookie secret, Pro and Club monthly/annual price IDs, `NEXT_PUBLIC_APP_URL`, Stripe integration/signing secrets, and `OPENAI_API_KEY`. This was verified by environment name and scope only; no secret value was printed.
+- Preview migrations `0000` through `0004` were applied transactionally on 2026-07-17. External verification: 10 public tables, 5 migration journal rows, strict dart/email constraints, unique user Stripe-customer index, and nullable subscription/webhook lifecycle timestamps.
+- Production migrations `0000` through `0004` were applied transactionally to main on 2026-07-17. External verification matches Preview: 10 public tables, 5 migration journal rows, strict dart/email constraints, winner foreign key, Stripe uniqueness indexes, and nullable lifecycle timestamps.
+- Stripe webhook endpoint `we_1Tu0YUALEz0P7O2hYBwPCQwF` targets `https://dartioopus46.vercel.app/api/billing/webhook`, uses API version `2026-06-24.dahlia`, is active in sandbox, and listens to 18 subscription events. Customer Portal configuration and a complete subscription lifecycle remain unproven release gates.
+- GitHub release source: commit `80770b47d790411f0c5e72c92f9fd1aee326897a`; CI run `29546595422` passed.
+- Current greenfield production deployment: `dpl_8rpA6xD1iydeTrjCm9JpztK4HFBy` at `https://dartioopus46.vercel.app`.
+- Current verified preview deployment: `dpl_EtyTRgKt599di78gAKcogiheVpob` at `https://dartio-h55ts0dj4-niras-projects-868b6f5f.vercel.app`.
 - Supabase is explicitly out of scope.
 - Never store secret values in repository files or documentation.
 
@@ -44,12 +49,12 @@
 ## Rollback
 
 - Vercel retains prior ready production deployments.
-- Current recoverable production target before greenfield promotion: `dpl_2CiBPFdxJzJe6vYwu8vk4QEzLm4x`. It still serves the legacy build and must not be treated as greenfield v1 proof.
+- Recoverable pre-greenfield production target: `dpl_2CiBPFdxJzJe6vYwu8vk4QEzLm4x`. It serves the legacy build and is rollback-only, never greenfield v1 proof.
 - Database changes require forward-safe migrations and an explicit escape path.
 - Stripe remains in sandbox until live transaction proof is explicitly authorized.
 
 ## Known release gates
 
-- Regulation-derived dartboard radii and refreshed three-viewport visual proof are in correction.
+- The regulation dartboard and three-viewport production visual proof passed; future board changes must rerun the same physical T20 and boundary suite.
 - Figma library implementation is externally blocked by the current one-mode/View-seat limitation.
 - Full Dartio v1 functionality remains open beyond Cycle 1: additional game modes, server-authoritative friend rooms/reconnect, real always-on transcription, persisted match/stat flows, and end-to-end Stripe Checkout/Portal/webhook proof.

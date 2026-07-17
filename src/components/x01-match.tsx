@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button, CommandDock, IconButton, Modal, Surface, Tabs, TextField } from "navi-ui";
 import { applyDart, BOARD_CLOCKWISE, BOARD_RADII, checkoutAdvice, chooseAiAim, createX01, dart, notation, representativePoint, scoreBoardPoint, seededRandom, throwAiDart, undoLastDart, type Dart, type InRule, type OutRule, type X01State } from "@/domain";
+import { VoiceControl } from "./voice-control";
 
 const SEGMENTS = BOARD_CLOCKWISE;
 const BOARD_CENTER=160,BOARD_RADIUS=136;
@@ -22,7 +23,7 @@ export function X01Match() {
   const inParam=params.get("in"),outParam=params.get("out"),inRule:InRule=inParam==="double"||inParam==="master"?inParam:"straight",outRule:OutRule=outParam==="straight"||outParam==="master"?outParam:"double",isAi=params.get("opponent")!=="local";
   const [game,setGame]=useState(()=>createX01({startingScore:start,legsToWin:Math.ceil(bestOf/2),setsToWin:1,inRule,outRule},[{id:"you",name:"Player 1"},{id:"ai",name:isAi?"The Navigator":"Player 2"}]));
   const aiTimer=useRef<number|null>(null),aiGeneration=useRef(0);
-  const [scoreInput,setScoreInput]=useState(""), [inputMode,setInputMode]=useState("board"), [listening,setListening]=useState(false), [correction,setCorrection]=useState(false), [message,setMessage]=useState("Your throw · 3 darts");
+  const [scoreInput,setScoreInput]=useState(""), [inputMode,setInputMode]=useState("board"), [correction,setCorrection]=useState(false), [message,setMessage]=useState("Your throw · 3 darts");
   const you=game.scores[0]??start,ai=game.scores[1]??start,darts=game.currentDarts,checkoutScore=game.scores[game.currentPlayer]??start;
   const checkout=useMemo(()=>checkoutAdvice(checkoutScore,Math.max(1,3-darts.length) as 1|2|3,outRule),[checkoutScore,darts.length,outRule]);
   const averages=useMemo(()=>["you","ai"].map(id=>{const turns=game.turns.filter(t=>t.playerId===id&&!t.bust);return turns.length?(turns.reduce((n,t)=>n+t.scoreBefore-t.scoreAfter,0)/turns.length).toFixed(2):null;}),[game.turns]);
@@ -53,7 +54,7 @@ export function X01Match() {
           {inputMode==="darts"&&<div className="quick-darts">{["T20","T19","T18","D20","D16","DB","MISS"].map(label=><button key={label} onClick={()=>{if(label==="DB")addDart(dart(25,2));else if(label==="MISS")addDart(dart(0));else addDart(dart(Number(label.slice(1)) as Dart["segment"],label[0]==="T"?3:label[0]==="D"?2:1));}}>{label}</button>)}</div>}
           <Button className="end-turn" onClick={()=>submitTurn()} disabled={!darts.length}>End visit · {darts.reduce((n,d)=>n+d.score,0)}</Button>
         </Surface>
-        <Surface className={`voice-panel ${listening?"listening":""}`}><button type="button" onClick={()=>setListening(v=>!v)} aria-pressed={listening}><span className="mic">◉</span><span><b>{listening?"Listening…":"Voice scoring"}</b><small>{listening?'Say “sixty” or “undo”':"Always-on mode is off"}</small></span><i>{listening?"ON":"OFF"}</i></button>{listening&&<p role="status">Mic active on this device · speech is processed only for scoring</p>}</Surface>
+        <VoiceControl disabled={(isAi&&game.currentPlayer!==0)||game.status==="complete"} onDart={(segment,multiplier)=>addDart(dart(segment as Dart["segment"],multiplier))} onTurnScore={submitTurn} onUndo={undo} onNextPlayer={()=>submitTurn()} />
       </aside>
       <section className="history-strip"><header><h2>Visit history</h2><button onClick={undo} disabled={!game.past.length}>Undo latest</button></header>{!game.turns.length?<div className="empty-history"><span>↗</span><p>Your first visit will appear here.</p></div>:<ol>{[...game.turns].reverse().slice(0,6).map((turn,i)=><li key={`${turn.playerId}-${i}`}><span>{turn.playerId==="you"?"YOU":"AI"}</span><div>{turn.darts.map((d,j)=><b key={`${notation(d)}-${j}`}>{notation(d)}</b>)}</div><strong>{turn.scoreBefore-turn.scoreAfter}</strong><small>{turn.bust?"BUST":`${turn.scoreAfter} left`}</small></li>)}</ol>}</section>
     </div>

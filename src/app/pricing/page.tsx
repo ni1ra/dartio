@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { Surface } from "navi-ui";
-export const metadata:Metadata={title:"Pricing"};
-const plans=[
-  {name:"Free",price:"0",line:"Everything needed for match night.",features:["Unlimited local scoring","X01 and core party modes","AI levels 1–8","Basic checkout routes","Local match history"],action:"Play free",href:"/play"},
-  {name:"Pro",price:"8",line:"Serious practice, without serious friction.",features:["Every game and practice mode","AI levels 1–20","Pro and personalised checkout paths","Always-on voice scoring","Deep stats and training plans","Online rooms for up to 8 players"],action:"Pro launching soon",href:"#",featured:true},
-  {name:"Club",price:"24",line:"A shared home for teams and venues.",features:["Everything in Pro","12 member seats","Leagues and club leaderboards","Shared boards and session history","Priority support"],action:"Talk to us",href:"mailto:hello@dartio.app"},
-];
-export default function PricingPage(){return <div className="page-frame pricing-page"><header className="page-heading wide"><p className="eyebrow">Simple membership</p><h1>Pay for progress.<br/><em>Not basic scoring.</em></h1><p>Local play stays free. Pro adds coaching intelligence, voice, deeper history, and online rooms—features that keep earning their place.</p></header><div className="billing-note"><span>Monthly</span><b>Annual saves 20%</b><small>No lock-in · cancel from your account · 14-day Pro trial planned</small></div><div className="plan-grid">{plans.map(plan=><Surface className={`plan ${plan.featured?"featured":""}`} key={plan.name}>{plan.featured&&<span className="plan-flag">BEST FOR REGULAR PLAY</span>}<h2>{plan.name}</h2><p>{plan.line}</p><div className="price"><sup>€</sup><strong>{plan.price}</strong><span>/ month<br/>{plan.name!=="Free"&&"billed monthly"}</span></div><ul>{plan.features.map(f=><li key={f}>✓ <span>{f}</span></li>)}</ul>{plan.featured?<span className="button-link button-link-disabled" aria-disabled="true">{plan.action}</span>:<Link className="button-link button-link-secondary" href={plan.href}>{plan.action}</Link>}</Surface>)}</div><p className="pricing-fineprint">Prices shown in EUR and include applicable product access only. Taxes are calculated at checkout. Billing is not activated until Stripe transaction and webhook replay proof passes.</p></div>}
+import { PricingExperience } from "@/components/pricing-experience";
+
+export const metadata: Metadata = { title: "Pricing" };
+
+export default function PricingPage() {
+  return <PricingExperience />;
+}
