@@ -70,6 +70,7 @@ async function persistProjection(db: ReturnType<typeof createDatabase>, projecti
     plan: projection.plan,
     status: projection.status,
     currentPeriodEnd: projection.currentPeriodEnd,
+    cancelAt: projection.cancelAt,
     cancelAtPeriodEnd: projection.cancelAtPeriodEnd,
     updatedAt: sql`now()`,
   } as const;

@@ -29,6 +29,7 @@ function subscription(status: Stripe.Subscription.Status, overrides: Partial<Str
     created: 1_000,
     customer: "cus_1",
     status,
+    cancel_at: null,
     cancel_at_period_end: true,
     metadata: { userId: "user-1", plan: "pro" },
     items: { data: [{ current_period_end: 2_000, price: { id: "price_pro_month" } }, { current_period_end: 2_100, price: { id: "price_pro_year" } }] } as Stripe.ApiList<Stripe.SubscriptionItem>,
@@ -107,7 +108,7 @@ describe("production billing policy", () => {
 
   it.each(["trialing", "active", "past_due", "canceled", "unpaid", "incomplete"] as const)("projects %s exactly", (status) => {
     const projection = projectStripeSubscription(subscription(status), prices);
-    expect(projection).toMatchObject({ status, plan: "pro", cancelAtPeriodEnd: true, stripeCustomerId: "cus_1", stripeSubscriptionId: "sub_1", userId: "user-1" });
+    expect(projection).toMatchObject({ status, plan: "pro", cancelAt: null, cancelAtPeriodEnd: true, stripeCustomerId: "cus_1", stripeSubscriptionId: "sub_1", userId: "user-1" });
     expect(projection.stripeSubscriptionCreatedAt.toISOString()).toBe("1970-01-01T00:16:40.000Z");
     expect(projection.currentPeriodEnd?.toISOString()).toBe("1970-01-01T00:35:00.000Z");
   });
@@ -121,20 +122,52 @@ describe("production billing policy", () => {
   });
   it.each(["paused", "incomplete_expired"] as const)("normalizes terminal Stripe status %s to canceled", (status) => expect(projectStripeSubscription(subscription(status), prices).status).toBe("canceled"));
 
+  it("projects the explicit scheduled cancellation proven by the live Portal flow", () => {
+    const projection = projectStripeSubscription(subscription("trialing", {
+      cancel_at: 1_785_465_732,
+      cancel_at_period_end: false,
+      canceled_at: 1_784_257_395,
+      items: { data: [{ current_period_end: 1_785_465_732, price: { id: "price_pro_month" } }] } as Stripe.ApiList<Stripe.SubscriptionItem>,
+    }), prices);
+    expect(projection.cancelAt?.toISOString()).toBe("2026-07-31T02:42:12.000Z");
+    expect(projection.cancelAtPeriodEnd).toBe(false);
+    expect(projection.currentPeriodEnd?.toISOString()).toBe("2026-07-31T02:42:12.000Z");
+    expect(subscriptionAccess(projection, new Date(1_785_465_732_000 - 1))).toMatchObject({ state: "active", accessEndsAt: projection.cancelAt });
+    expect(subscriptionAccess(projection, new Date(1_785_465_732_000))).toEqual({ state: "inactive", plan: "free", accessEndsAt: null, cancelAtPeriodEnd: false });
+  });
+
   it("keeps active cancel-at-period-end access through the projected period", () => {
-    const input = { plan: "pro", status: "active", currentPeriodEnd: new Date("2030-01-01T00:00:00Z"), cancelAtPeriodEnd: true } as const;
+    const input = { plan: "pro", status: "active", currentPeriodEnd: new Date("2030-01-01T00:00:00Z"), cancelAt: null, cancelAtPeriodEnd: true } as const;
     expect(subscriptionAccess(input, new Date("2029-12-01T00:00:00Z"))).toEqual({ state: "active", plan: "pro", accessEndsAt: input.currentPeriodEnd, cancelAtPeriodEnd: true });
     expect(subscriptionHasEntitlement(input, "voice_always_on")).toBe(true);
+    expect(subscriptionHasEntitlement(input, "voice_always_on", input.currentPeriodEnd)).toBe(false);
+  });
+  it("uses explicit cancel-at even when cancel-at-period-end is false", () => {
+    const cancelAt = new Date("2030-01-01T00:00:00Z");
+    const input = { plan: "pro", status: "trialing", currentPeriodEnd: cancelAt, cancelAt, cancelAtPeriodEnd: false } as const;
+    expect(subscriptionAccess(input, new Date(cancelAt.getTime() - 1))).toEqual({ state: "active", plan: "pro", accessEndsAt: cancelAt, cancelAtPeriodEnd: false });
+    expect(subscriptionHasEntitlement(input, "advanced_ai", cancelAt)).toBe(false);
+  });
+  it("does not mislabel an ordinary renewal boundary as the end of access", () => {
+    const input = { plan: "club", status: "active", currentPeriodEnd: new Date("2030-01-01T00:00:00Z"), cancelAt: null, cancelAtPeriodEnd: false } as const;
+    expect(subscriptionAccess(input, new Date("2031-01-01T00:00:00Z"))).toEqual({ state: "active", plan: "club", accessEndsAt: null, cancelAtPeriodEnd: false });
   });
   it("grants a bounded seven-day past-due grace period and then fails closed", () => {
     const periodEnd = new Date("2030-01-01T00:00:00Z");
-    const input = { plan: "club", status: "past_due", currentPeriodEnd: periodEnd, cancelAtPeriodEnd: false } as const;
+    const input = { plan: "club", status: "past_due", currentPeriodEnd: periodEnd, cancelAt: null, cancelAtPeriodEnd: false } as const;
     const expectedGraceEnd = new Date(periodEnd.getTime() + PAST_DUE_GRACE_DAYS * 86_400_000);
     expect(subscriptionAccess(input, new Date(expectedGraceEnd.getTime() - 1)).state).toBe("grace");
     expect(subscriptionAccess(input, expectedGraceEnd)).toEqual({ state: "inactive", plan: "free", accessEndsAt: null, cancelAtPeriodEnd: false });
   });
+  it("never extends past-due grace beyond an explicit cancellation", () => {
+    const periodEnd = new Date("2030-01-01T00:00:00Z");
+    const cancelAt = new Date("2030-01-03T00:00:00Z");
+    const input = { plan: "pro", status: "past_due", currentPeriodEnd: periodEnd, cancelAt, cancelAtPeriodEnd: false } as const;
+    expect(subscriptionAccess(input, new Date(cancelAt.getTime() - 1))).toMatchObject({ state: "grace", accessEndsAt: cancelAt });
+    expect(subscriptionAccess(input, cancelAt).state).toBe("inactive");
+  });
   it.each(["canceled", "unpaid", "incomplete"] as const)("revokes paid entitlements for terminal %s", (status) => {
-    const input = { plan: "pro", status, currentPeriodEnd: new Date("2030-01-01T00:00:00Z"), cancelAtPeriodEnd: false } as const;
+    const input = { plan: "pro", status, currentPeriodEnd: new Date("2030-01-01T00:00:00Z"), cancelAt: null, cancelAtPeriodEnd: false } as const;
     expect(subscriptionHasEntitlement(input, "advanced_ai", new Date("2029-01-01T00:00:00Z"))).toBe(false);
   });
 

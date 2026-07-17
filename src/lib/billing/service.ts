@@ -8,6 +8,7 @@ export interface SubscriptionProjection {
   readonly stripeSubscriptionCreatedAt: Date;
   readonly status: StoredSubscriptionStatus;
   readonly plan: PaidPlanId;
+  readonly cancelAt: Date | null;
   readonly cancelAtPeriodEnd: boolean;
   readonly currentPeriodEnd: Date | null;
   readonly userId: string | null;
@@ -105,6 +106,7 @@ export function projectStripeSubscription(subscription: Stripe.Subscription, pri
     stripeSubscriptionCreatedAt: new Date(subscription.created * 1000),
     status: normalizeStripeStatus(subscription.status),
     plan,
+    cancelAt: subscription.cancel_at === null ? null : new Date(subscription.cancel_at * 1000),
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
     currentPeriodEnd,
     userId: subscription.metadata.userId || null,
@@ -121,17 +123,24 @@ export type SubscriptionAccess =
   | { readonly state: "grace"; readonly plan: PaidPlanId; readonly accessEndsAt: Date; readonly cancelAtPeriodEnd: boolean }
   | { readonly state: "inactive"; readonly plan: "free"; readonly accessEndsAt: null; readonly cancelAtPeriodEnd: false };
 
-export function subscriptionAccess(input: Pick<SubscriptionProjection, "plan" | "status" | "currentPeriodEnd" | "cancelAtPeriodEnd"> | null | undefined, now = new Date()): SubscriptionAccess {
+type SubscriptionAccessInput = Pick<SubscriptionProjection, "plan" | "status" | "currentPeriodEnd" | "cancelAt" | "cancelAtPeriodEnd">;
+
+export function subscriptionAccess(input: SubscriptionAccessInput | null | undefined, now = new Date()): SubscriptionAccess {
   if (!input) return { state: "inactive", plan: "free", accessEndsAt: null, cancelAtPeriodEnd: false };
-  if (input.status === "trialing" || input.status === "active") return { state: "active", plan: input.plan, accessEndsAt: input.currentPeriodEnd, cancelAtPeriodEnd: input.cancelAtPeriodEnd };
+  const scheduledEnd = input.cancelAt ?? (input.cancelAtPeriodEnd ? input.currentPeriodEnd : null);
+  if (input.status === "trialing" || input.status === "active") {
+    if (scheduledEnd && now >= scheduledEnd) return { state: "inactive", plan: "free", accessEndsAt: null, cancelAtPeriodEnd: false };
+    return { state: "active", plan: input.plan, accessEndsAt: scheduledEnd, cancelAtPeriodEnd: input.cancelAtPeriodEnd };
+  }
   if (input.status === "past_due" && input.currentPeriodEnd) {
     const graceEnd = new Date(input.currentPeriodEnd.getTime() + PAST_DUE_GRACE_DAYS * 86_400_000);
-    if (now < graceEnd) return { state: "grace", plan: input.plan, accessEndsAt: graceEnd, cancelAtPeriodEnd: input.cancelAtPeriodEnd };
+    const accessEnd = scheduledEnd && scheduledEnd < graceEnd ? scheduledEnd : graceEnd;
+    if (now < accessEnd) return { state: "grace", plan: input.plan, accessEndsAt: accessEnd, cancelAtPeriodEnd: input.cancelAtPeriodEnd };
   }
   return { state: "inactive", plan: "free", accessEndsAt: null, cancelAtPeriodEnd: false };
 }
 
-export function subscriptionHasEntitlement(input: Pick<SubscriptionProjection, "plan" | "status" | "currentPeriodEnd" | "cancelAtPeriodEnd"> | null | undefined, entitlement: Entitlement, now = new Date()): boolean {
+export function subscriptionHasEntitlement(input: SubscriptionAccessInput | null | undefined, entitlement: Entitlement, now = new Date()): boolean {
   const access = subscriptionAccess(input, now);
   return access.plan !== "free" && hasEntitlement(access.plan, entitlement);
 }
