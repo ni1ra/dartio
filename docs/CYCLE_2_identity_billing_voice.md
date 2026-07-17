@@ -7,6 +7,7 @@ Derived from: `PHASE_1_v1_foundation.md`
 ## Slice
 
 - [x] Replace the account placeholder with real Neon Auth session, sign-in, sign-out, profile, and recovery states.
+  - [x] Repair the conversion-blocking `/auth/sign-up` 404 by mounting the shared Neon Auth sign-up view with the same verified `/account` redirect.
 - [x] Persist verified Auth identities into Dartio users/profiles without conflating external subjects with internal UUIDs.
 - [x] Make Pro and Club monthly/annual choices actionable through authenticated Stripe Checkout.
 - [ ] Complete Stripe Customer Portal, webhook endpoint/signing secret, entitlement projection, replay, cancellation, grace, and recovery flows.
@@ -18,6 +19,8 @@ Derived from: `PHASE_1_v1_foundation.md`
 - [ ] Run deployed identity, billing, voice, and three-theme browser stories across phone/tablet/desktop.
   - [x] Verify the deployed match and dartboard at 1440×1000, 834×1112, and 390×844: zero horizontal overflow, square/in-bounds SVG, 80 scoring beds, 20 labels, and physical T20 → 60 / 441 at every width.
   - [x] Inspect full-page tablet/mobile match layouts and correct the ultrawide shell cascade so the 92 rem stage centers above 1472 px without changing board geometry.
+  - [x] Verify deployed signed-out Account and Pricing states: local play remains available, Pro/Club actions route to `/auth/sign-in`, and anonymous users cannot create Stripe Checkout sessions.
+  - [x] Inspect the settled Black, Silver, and Blood dartboard themes at desktop width; all retain 80 beds, legible labels/rings, and zero overflow.
   - [ ] Complete the remaining three-theme, identity, and real-microphone deployed stories.
 - [ ] Deploy through preview, verify identity/billing/voice stories, then promote and rerun production proof.
   - [x] Deploy corrected Cycle 2 preview `dpl_CWNL8PeTEGk2W2uVKSsS1EVqgkwZ` from commit `58c80dc` and pass GitHub verification run `29549237725`.
