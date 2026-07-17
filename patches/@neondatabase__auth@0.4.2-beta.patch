@@ -1,0 +1,13 @@
+diff --git a/dist/next/index.d.mts b/dist/next/index.d.mts
+index 77136202c7ddae5c3e14a77fc4dbe8c331a62760..d529a2672709d641701c0425677eec752731260c 100644
+--- a/dist/next/index.d.mts
++++ b/dist/next/index.d.mts
+@@ -6,7 +6,7 @@ import * as better_auth0 from "better-auth";
+ import * as _better_fetch_fetch0 from "@better-fetch/fetch";
+ 
+ //#region src/next/index.d.ts
+-declare function createAuthClient(): {
++declare function createAuthClient(): ReturnType<typeof better_auth_react0.createAuthClient> & {
+   useActiveOrganization: () => {
+     data: better_auth0.Prettify<{
+       id: string;

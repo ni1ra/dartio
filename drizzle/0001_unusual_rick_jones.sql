@@ -1,0 +1,1 @@
+ALTER TABLE "matches" ADD CONSTRAINT "matches_winner_player_id_players_id_fk" FOREIGN KEY ("winner_player_id") REFERENCES "public"."players"("id") ON DELETE set null ON UPDATE no action;
