@@ -23,11 +23,12 @@
 - Vercel has encrypted Production and Preview values for Neon database/Auth, Auth cookie secret, Pro and Club monthly/annual price IDs, `NEXT_PUBLIC_APP_URL`, Stripe integration/signing secrets, and `OPENAI_API_KEY`. This was verified by environment name and scope only; no secret value was printed.
 - Preview migrations `0000` through `0004` were applied transactionally on 2026-07-17. External verification: 10 public tables, 5 migration journal rows, strict dart/email constraints, unique user Stripe-customer index, and nullable subscription/webhook lifecycle timestamps.
 - Production migrations `0000` through `0004` were applied transactionally to main on 2026-07-17. External verification matches Preview: 10 public tables, 5 migration journal rows, strict dart/email constraints, winner foreign key, Stripe uniqueness indexes, and nullable lifecycle timestamps.
-- Stripe webhook endpoint `we_1Tu0YUALEz0P7O2hYBwPCQwF` targets `https://dartioopus46.vercel.app/api/billing/webhook`, uses API version `2026-06-24.dahlia`, is active in sandbox, and listens to 18 subscription events. Customer Portal configuration and a complete subscription lifecycle remain unproven release gates.
+- Stripe webhook endpoint `we_1Tu0YUALEz0P7O2hYBwPCQwF` targets `https://dartioopus46.vercel.app/api/billing/webhook`, uses API version `2026-06-24.dahlia`, is active in sandbox, and listens to 18 subscription events. Customer Portal configuration is proven in sandbox; a complete subscription lifecycle remains an unproven release gate.
 - Stripe Workbench request `req_RxZryIFiSs5OAC` proves the signed-in Pro annual Checkout request selected the configured price, persistent owned customer, 14-day trial, automatic tax, billing-address collection, promotion codes, ownership metadata, and an idempotency key. Stripe rejected session creation only because the sandbox has no valid head-office address. The Tax dashboard currently reports an active Stripe incident and does not advance its valid address form. Live legal business data remains unset.
 - GitHub release source: commit `80770b47d790411f0c5e72c92f9fd1aee326897a`; CI run `29546595422` passed.
 - Current greenfield production deployment: `dpl_8rpA6xD1iydeTrjCm9JpztK4HFBy` at `https://dartioopus46.vercel.app`.
-- Current Cycle 2 preview deployment: `dpl_CWNL8PeTEGk2W2uVKSsS1EVqgkwZ` at `https://dartio-oe7yracfk-niras-projects-868b6f5f.vercel.app`; commit `58c80dc` passed GitHub verification run `29549237725`.
+- Current verified Cycle 2 code preview deployment: `dpl_2gBGvb2drRv8uEiV2dPzZEP1Mntp` at `https://dartio-4bfnwmm4o-niras-projects-868b6f5f.vercel.app`; commit `aaf7299` passed GitHub verification run `29550072226`. This is the rollback target for the subsequent Preview-origin configuration change.
+- Preview has a branch-scoped `NEXT_PUBLIC_APP_URL` override for `cycle-2-identity-billing-voice`, targeting its stable Vercel alias. The global Preview and Production values were not changed.
 - Supabase is explicitly out of scope.
 - Never store secret values in repository files or documentation.
 
@@ -62,3 +63,4 @@
 - Figma library implementation is externally blocked by the current one-mode/View-seat limitation.
 - Full Dartio v1 functionality remains open beyond Cycle 1: additional game modes, server-authoritative friend rooms/reconnect, real always-on transcription, persisted match/stat flows, and end-to-end Stripe Checkout/Portal/webhook proof.
 - Checkout success and Portal return URLs must target the implemented `/account` hub. The nonexistent `/account/billing` target was removed on 2026-07-17 and is covered by the billing policy test.
+- Stripe Customer Portal opened for the authenticated QA identity and returned to `/account` without a route error. Before the branch-scoped origin override, that return resolved to the old main alias and lost the new authenticated account surface; same-origin continuity remains a fresh-preview proof gate.

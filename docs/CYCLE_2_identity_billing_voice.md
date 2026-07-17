@@ -13,7 +13,8 @@ Derived from: `PHASE_1_v1_foundation.md`
 - [ ] Complete Stripe Customer Portal, webhook endpoint/signing secret, entitlement projection, replay, cancellation, grace, and recovery flows.
 - [ ] Verify a complete Stripe sandbox subscription and portal lifecycle before enabling any live-mode price.
   - [x] Verify signed-in Pro annual Checkout request construction, durable Stripe customer ownership, exact EUR price selection, 14-day trial policy, promotion codes, billing-address collection, automatic tax, and idempotency metadata in Stripe Workbench.
-  - [ ] Clear Stripe Tax sandbox head-office configuration, configure Customer Portal, and complete Checkout → signed webhook → entitlement → Portal → cancellation proof.
+  - [x] Configure Customer Portal and verify the authenticated sandbox user can open it and return through the implemented `/account` hub.
+  - [ ] Clear Stripe Tax sandbox head-office configuration and complete Checkout → signed webhook → entitlement → Portal → cancellation proof.
 - [x] Implement push-to-talk transcription with structured score/command parsing and visible confirmation/error states.
 - [x] Implement opt-in always-on voice lifecycle with explicit listening, paused, processing, ambiguity, and privacy states.
 - [x] Make voice input feed the same X01 command path as touch/keyboard input.
@@ -27,6 +28,7 @@ Derived from: `PHASE_1_v1_foundation.md`
   - [ ] Complete the remaining three-theme, identity, and real-microphone deployed stories.
 - [ ] Deploy through preview, verify identity/billing/voice stories, then promote and rerun production proof.
   - [x] Deploy corrected Cycle 2 preview `dpl_CWNL8PeTEGk2W2uVKSsS1EVqgkwZ` from commit `58c80dc` and pass GitHub verification run `29549237725`.
+  - [x] Deploy the billing-return repair as `dpl_2gBGvb2drRv8uEiV2dPzZEP1Mntp` from commit `aaf7299` and pass GitHub verification run `29550072226`.
 - [x] Reconcile Phase 1 and REPO_CONTROL with exact local, Neon, Stripe, and Vercel receipts and remaining gates.
 
 ## Verified receipts — 2026-07-17
@@ -41,7 +43,8 @@ Derived from: `PHASE_1_v1_foundation.md`
 - Neon Auth on preview now trusts `https://dartio-git-cycle-2-identity-bill-2c0634-niras-projects-868b6f5f.vercel.app`. A fresh sandbox identity completed sign-up through the visible Dartio flow, redirected to `/account`, and rendered the verified name, email, active session, billing action, and sign-out action.
 - Signed-in Pro annual Checkout reached Stripe with the expected customer, price, trial, tax, promotion-code, address, metadata, and idempotency policy. Stripe created and persisted customer `cus_Utp4oZKj6432Jx`, then rejected the Checkout session because the sandbox account lacks a valid head-office address (`req_RxZryIFiSs5OAC`). Stripe's Tax settings currently display an active incident banner and do not advance an otherwise valid sandbox address form; no production legal address was fabricated.
 - A separate conversion defect was repaired before the next Checkout attempt: Checkout success and Customer Portal previously targeted nonexistent `/account/billing`; both now return to the implemented `/account` route, whose client already renders `checkout=success`. The focused billing suite passed 36/36 and the complete local gates remained green.
-- Not yet proven: Stripe Tax sandbox address completion, Customer Portal configuration, a complete authenticated Checkout → signed webhook → entitlement → Portal → cancellation story, real microphone transcription in a deployed browser, and production promotion.
+- The authenticated QA identity opened Stripe's hosted sandbox Customer Portal successfully. The portal rendered the owned email, no payment method, no invoice history, and a working return to `/account`; no billing state was mutated. That proof also exposed a Preview-origin mismatch: the global Preview `NEXT_PUBLIC_APP_URL` pointed at the old main alias, so a narrower branch-scoped override now points `cycle-2-identity-billing-voice` at its stable Vercel alias. A fresh Preview deployment must prove same-origin account continuity.
+- Not yet proven: Stripe Tax sandbox address completion, a complete authenticated Checkout → signed webhook → entitlement → Portal → cancellation story, real microphone transcription in a deployed browser, and production promotion.
 
 ## Acceptance proof
 
