@@ -5,6 +5,8 @@ describe("billing catalog", () => {
   it("keeps core local scoring free while gating paid services", () => {
     expect(hasEntitlement("free", "local_scoring")).toBe(true);
     expect(hasEntitlement("free", "voice_always_on")).toBe(false);
+    expect(hasEntitlement("free", "advanced_checkout")).toBe(false);
+    expect(hasEntitlement("pro", "advanced_checkout")).toBe(true);
     expect(PLAN_CATALOG.free.aiMaxLevel).toBe(8);
     expect(PLAN_CATALOG.pro.aiMaxLevel).toBe(20);
   });

@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@neondatabase/auth/next/server", () => ({ createNeonAuth: vi.fn() }));
+
+import { getCurrentUser } from "./auth";
 import {
   AuthError,
   AuthServiceError,
@@ -140,5 +144,18 @@ describe("durable Dartio identity resolution", () => {
     const store = new MemoryIdentities();
     await resolveVerifiedIdentity(reader(authenticated({ subject: "auth-1", email: "SAME@example.com" })), store);
     await expect(resolveVerifiedIdentity(reader(authenticated({ subject: "auth-2", email: "same@EXAMPLE.com" })), store)).rejects.toBeInstanceOf(IdentityConflictError);
+  });
+});
+
+describe("optional current user resolution", () => {
+  it("returns null for a confirmed signed-out session", async () => {
+    await expect(getCurrentUser(reader({ status: "signed-out" }), new MemoryIdentities())).resolves.toBeNull();
+  });
+
+  it("rethrows an indeterminate auth service failure instead of returning null", async () => {
+    await expect(getCurrentUser(
+      reader({ status: "error", cause: new Error("timeout") }),
+      new MemoryIdentities(),
+    )).rejects.toBeInstanceOf(AuthServiceError);
   });
 });

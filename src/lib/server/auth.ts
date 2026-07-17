@@ -2,6 +2,7 @@ import { createNeonAuth, type NeonAuth } from "@neondatabase/auth/next/server";
 import { createPostgresIdentityStore } from "@/db/identity";
 import { getAuthEnv } from "@/lib/env/server";
 import {
+  AuthError,
   resolveVerifiedIdentity,
   sessionStateFromAuthResult,
   type InternalUser,
@@ -25,6 +26,18 @@ export function getNeonAuth(): NeonAuth {
 
 export async function requireCurrentUser(): Promise<InternalUser> {
   return resolveVerifiedIdentity(neonSessionReader, createPostgresIdentityStore());
+}
+
+export async function getCurrentUser(
+  reader: SessionReader = neonSessionReader,
+  store = createPostgresIdentityStore(),
+): Promise<InternalUser | null> {
+  try {
+    return await resolveVerifiedIdentity(reader, store);
+  } catch (error) {
+    if (error instanceof AuthError) return null;
+    throw error;
+  }
 }
 
 const neonSessionReader: SessionReader = {
