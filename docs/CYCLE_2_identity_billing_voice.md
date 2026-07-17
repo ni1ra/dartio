@@ -45,6 +45,7 @@ Derived from: `PHASE_1_v1_foundation.md`
   - [x] Deploy branch-scoped Preview origin correction as `dpl_8q1KD49P1Se5YxKFrSxrpGFwFAZL` from commit `32fe64f` and pass GitHub verification run `29550338007`.
   - [x] Deploy Preview webhook signing-secret configuration as `dpl_GvToqtNyNJCjzcGrYLDFVfZePqEV` from commit `00a47d3` and pass GitHub verification run `29551221724`.
   - [x] Deploy explicit Stripe cancellation semantics as `dpl_G2u7bDCCuSCJMeaciPTkXjdwj6mG` from commit `10199f1` and pass GitHub verification run `29551797845`.
+  - [x] Deploy professional checkout intelligence as `dpl_AwDwqrqPYR8ufLdJUV5m91dQJLff` from commit `53e6403` and pass GitHub verification run `29553299055`.
 - [x] Reconcile Phase 1 and REPO_CONTROL with exact local, Neon, Stripe, and Vercel receipts and remaining gates.
 
 ## Verified receipts — 2026-07-17
