@@ -25,7 +25,7 @@
 - Stripe webhook endpoint `we_1Tu0YUALEz0P7O2hYBwPCQwF` targets `https://dartioopus46.vercel.app/api/billing/webhook`, uses API version `2026-06-24.dahlia`, is active in sandbox, and listens to 18 subscription events. Customer Portal configuration and a complete subscription lifecycle remain unproven release gates.
 - GitHub release source: commit `80770b47d790411f0c5e72c92f9fd1aee326897a`; CI run `29546595422` passed.
 - Current greenfield production deployment: `dpl_8rpA6xD1iydeTrjCm9JpztK4HFBy` at `https://dartioopus46.vercel.app`.
-- Current Cycle 2 preview deployment: `dpl_33SK5cREqKE35yjBaqnG2ntLk7Pw` at `https://dartio-634qvegtg-niras-projects-868b6f5f.vercel.app`; GitHub verification run `29548727067` passed before the ultrawide follow-up commit.
+- Current Cycle 2 preview deployment: `dpl_CWNL8PeTEGk2W2uVKSsS1EVqgkwZ` at `https://dartio-oe7yracfk-niras-projects-868b6f5f.vercel.app`; commit `58c80dc` passed GitHub verification run `29549237725`.
 - Supabase is explicitly out of scope.
 - Never store secret values in repository files or documentation.
 
@@ -56,6 +56,6 @@
 ## Known release gates
 
 - The regulation dartboard and three-viewport production visual proof passed; future board changes must rerun the same physical T20 and boundary suite.
-- Cycle 2 preview repeated the dartboard gate at exact 1440×1000, 834×1112, and 390×844 viewports: 3/3 independent contexts passed square/in-bounds geometry, 80 beds, 20 labels, zero horizontal overflow, and physical T20 → 60 / 441. Full-page tablet/mobile visual inspection also passed. Ultrawide review found and locally corrected a shell-centering cascade defect outside the board renderer; the follow-up preview still requires deployment verification.
+- Cycle 2 preview repeated the dartboard gate at exact 1440×1000, 834×1112, and 390×844 viewports: 3/3 independent contexts passed square/in-bounds geometry, 80 beds, 20 labels, zero horizontal overflow, and physical T20 → 60 / 441. Full-page tablet/mobile visual inspection also passed. Ultrawide review found and corrected a shell-centering cascade defect outside the board renderer; the corrected preview measured a centered 1472 px stage at `x=544` on a 2560 px viewport, retained a 600×600 board, and passed the full three-width matrix again with zero retries.
 - Figma library implementation is externally blocked by the current one-mode/View-seat limitation.
 - Full Dartio v1 functionality remains open beyond Cycle 1: additional game modes, server-authoritative friend rooms/reconnect, real always-on transcription, persisted match/stat flows, and end-to-end Stripe Checkout/Portal/webhook proof.
