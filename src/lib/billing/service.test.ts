@@ -59,7 +59,7 @@ describe("production billing policy", () => {
     });
     expect(params.subscription_data?.trial_period_days).toBe(14);
     expect(params.subscription_data?.trial_settings).toEqual({ end_behavior: { missing_payment_method: "cancel" } });
-    expect(params.success_url).toBe("https://dartio.app/account/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}");
+    expect(params.success_url).toBe("https://dartio.app/account?checkout=success&session_id={CHECKOUT_SESSION_ID}");
     expect(params.cancel_url).toBe("https://dartio.app/pricing?checkout=cancelled");
   });
 

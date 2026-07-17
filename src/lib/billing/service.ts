@@ -80,7 +80,7 @@ export function checkoutSessionParams(input: { userId: string; customerId: strin
     client_reference_id: input.userId,
     metadata,
     subscription_data: subscriptionData,
-    success_url: `${origin}/account/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+    success_url: `${origin}/account?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/pricing?checkout=cancelled`,
   };
 }
