@@ -10,15 +10,27 @@ Derived from: `PHASE_1_v1_foundation.md`
   - [x] Repair the conversion-blocking `/auth/sign-up` 404 by mounting the shared Neon Auth sign-up view with the same verified `/account` redirect.
 - [x] Persist verified Auth identities into Dartio users/profiles without conflating external subjects with internal UUIDs.
 - [x] Make Pro and Club monthly/annual choices actionable through authenticated Stripe Checkout.
-- [ ] Complete Stripe Customer Portal, webhook endpoint/signing secret, entitlement projection, replay, cancellation, grace, and recovery flows.
-- [ ] Verify a complete Stripe sandbox subscription and portal lifecycle before enabling any live-mode price.
+- [x] Complete Stripe Customer Portal, webhook endpoint/signing secret, entitlement projection, replay, cancellation, grace, and recovery flows.
+- [x] Verify a complete Stripe sandbox subscription and portal lifecycle before enabling any live-mode price.
   - [x] Verify signed-in Pro annual Checkout request construction, durable Stripe customer ownership, exact EUR price selection, 14-day trial policy, promotion codes, billing-address collection, automatic tax, and idempotency metadata in Stripe Workbench.
   - [x] Configure Customer Portal and verify the authenticated sandbox user can open it and return through the implemented `/account` hub.
   - [x] Save and reload a sandbox-only Norwegian head-office address so automatic-tax Checkout can create a session.
-  - [ ] Complete signed webhook → entitlement → Portal → cancellation proof for the successful Pro annual trial.
+  - [x] Complete signed webhook → entitlement → Portal → cancellation proof for the successful Pro annual trial.
 - [x] Implement push-to-talk transcription with structured score/command parsing and visible confirmation/error states.
-- [x] Implement opt-in always-on voice lifecycle with explicit listening, paused, processing, ambiguity, and privacy states.
+- [ ] Implement a true opt-in always-on voice lifecycle with explicit listening, paused, processing, ambiguity, and privacy states.
+  - [x] Implement the current opt-in repeated-clip lifecycle and visible states.
+  - [ ] Add continuous capture, voice/silence segmentation, automatic re-arming, and correction queue without requiring manual resume after every accepted clip.
 - [x] Make voice input feed the same X01 command path as touch/keyboard input.
+- [x] Replace the shallow X01 checkout lookup with a deterministic professional route planner.
+  - [x] Return a legal primary route, unique legal alternatives, finish/bogey/setup state, target leave, and UI-safe explanation codes for 1–3 darts.
+  - [x] Rank routes by explicit player preferences without changing legality, and replan correctly after each recorded dart.
+  - [x] Prove common finishes, awkward finishes, bogeys, setup visits, all out rules, invalid input, route uniqueness, and impossible-route rejection.
+  - [x] Wire alternate-route selection and route explanations into the match companion without changing dartboard geometry.
+- [ ] Repair the integrity gaps in the playable X01 loop before expanding to another mode.
+  - [ ] Make aggregate turn entry rule-safe instead of fabricating rule-significant dart sequences.
+  - [ ] Add complete per-dart entry and correct local-player labels, current leg display, completed-match score, and regulation three-dart averages.
+  - [ ] Define deterministic visit correction and active-match resume contracts shared by manual, voice, and AI input.
+- [ ] Consume paid entitlements fail-closed wherever pricing promises paid value; show honest locked states for benefits that do not yet exist.
 - [x] Run deterministic type, lint, unit, build, and dartboard regression checks.
 - [ ] Run deployed identity, billing, voice, and three-theme browser stories across phone/tablet/desktop.
   - [x] Verify the deployed match and dartboard at 1440×1000, 834×1112, and 390×844: zero horizontal overflow, square/in-bounds SVG, 80 scoring beds, 20 labels, and physical T20 → 60 / 441 at every width.
@@ -53,6 +65,12 @@ Derived from: `PHASE_1_v1_foundation.md`
 - Portal scheduled the sandbox Pro trial to cancel on 31 July 2026. Stripe sent two real `customer.subscription.updated` events to the Preview destination; both returned HTTP 200 in Stripe and Vercel, with zero destination failures. Neon processed both events idempotently into exactly one owned Pro/trialing subscription row.
 - The live event proved Stripe uses `cancel_at=2026-07-31T02:42:12Z` with `cancel_at_period_end=false` for this Portal flow. Dartio now models and persists `cancel_at` separately, grants access until one millisecond before that timestamp, fails closed exactly at it, preserves period-end cancellation semantics, and no longer treats an ordinary renewal boundary as access end. Migration `0005_salty_felicia_hardy.sql` is applied and ledger-reconciled on Preview and Main.
 - Deployment `dpl_G2u7bDCCuSCJMeaciPTkXjdwj6mG` passed the live recovery loop: Portal reactivation emitted a signed update and Neon stored `cancel_at=null`; scheduling cancellation again emitted signed updates and Neon stored `cancel_at=2026-07-31T02:42:12Z`, preserved `cancel_at_period_end=false`, and retained exactly one owned Pro/trialing row. The exact-boundary access behavior is covered by the live Stripe regression fixture in the 136-test suite.
+- The checkout planner now exhaustively generates and validates every 1–3-dart route before deterministic professional ranking; sparse route seeds can only break ties and cannot manufacture a route. The focused matrix passes 52/52 fixtures, the repository passes 175/175 tests, and an independent root sweep passed all 1,620 score/rule/dart-count contexts from 1 through 180 plus 4,050 returned finish plans with legal final beds, exact sums, unique alternatives, and consistent structured/legacy aliases.
+- Checkout setup planning now uses the full remaining visit, distinguishes bogey/setup/scoring states, returns target leaves and explanation codes, supports bounded double/treble/bull preferences, and proves dynamic replanning. Examples include `169 → T20 T20 S9` leaving 40, `350 → T20 T20 T20` leaving 170, and `121 → 61 → 16` route changes as darts are recorded. Personalized expected-value ranking from measured player dispersion remains explicitly out of scope for this slice.
+- Documentation reconciliation commit `6874a5d` passed GitHub CI run `29552011246` and deployed Ready as `dpl_DEgYMgkznwDuZUAEnEW7i5zyohsv` on the stable Cycle 2 Preview alias.
+- The checkout companion now binds to structured planner results and shows the current player/score, semantic ordered route, distinct projected leave/finish, darts in hand, exact engine explanation, selectable notation-named alternatives, and polite live updates. It distinguishes `FINISH AVAILABLE`, `NO FINISH`, tactical `SETUP`, and scoring-only `SCORING PHASE`; the prior inert “Show alternate path” control and false empty setup copy are removed.
+- In-app browser proof covered the real match at 390×844, 834×1112, and 1440×1000 plus black/silver/blood checkout fixtures. The real board remained square at 331.5, 400.3, and 600 px with 80 paths, 20 labels, aligned rings/wires/numbers, and zero horizontal overflow. Mobile alternatives measured 267×44 px; tablet/desktop alternatives measured 38 px high and wrapped without clipping. Black, silver, and blood computed surface/text/selected-state tokens were correct, and the console had zero warnings/errors.
+- The in-app browser did not hydrate client interactions on either `127.0.0.1` or `localhost`, so alternate-button clicks and dynamic physical-dart updates could not be re-proven through that surface. Its full-page mobile capture also omitted an off-axis SVG even while the DOM reported complete geometry; a normal viewport repaint rendered the board correctly. Existing deployed physical T20 proof remains valid because this slice changed no board JSX, geometry, board selector, theme token, or general layout rule.
 - Not yet proven: paid-entitlement consumption in every gated product feature, real microphone transcription in a deployed browser, actual Stripe trial-end cutoff without a test clock, and production promotion.
 
 ## Acceptance proof

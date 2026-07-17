@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Button, CommandDock, IconButton, Modal, Surface, Tabs, TextField } from "navi-ui";
 import { applyDart, BOARD_CLOCKWISE, BOARD_RADII, checkoutAdvice, chooseAiAim, createX01, dart, notation, representativePoint, scoreBoardPoint, seededRandom, throwAiDart, undoLastDart, type Dart, type InRule, type OutRule, type X01State } from "@/domain";
 import { VoiceControl } from "./voice-control";
+import { CheckoutCompanion } from "./checkout-companion";
 
 const SEGMENTS = BOARD_CLOCKWISE;
 const BOARD_CENTER=160,BOARD_RADIUS=136;
@@ -47,7 +48,7 @@ export function X01Match() {
         {darts.map((d,i)=>{const x=BOARD_CENTER+(d.x??0)*BOARD_RADIUS,y=BOARD_CENTER+(d.y??0)*BOARD_RADIUS;return <g key={`${notation(d)}-${i}`} className="throw-mark"><circle cx={x} cy={y} r="7"/><text x={x} y={y+3}>{i+1}</text></g>})}
       </svg><div className="board-caption"><span>Tap the landing point</span><small>or use score entry below</small></div></div></section>
       <aside className="match-side">
-        <Surface className={`checkout-panel ${checkout.checkout?"checkout":checkout.bogey?"bogey":"setup"}`}><header><span>{checkout.checkout?"ON A FINISH":checkout.bogey?"BOGEY NUMBER":"SMART SETUP"}</span><b>{you}</b></header><div className="checkout-route">{(checkout.primary??checkout.setup??[]).map((value,i,route)=><span key={`${notation(value)}-${i}`}><strong>{notation(value)}</strong>{i<route.length-1&&<i>›</i>}</span>)}{checkout.leave!==null&&checkout.leave>0&&<span><strong>LEAVE {checkout.leave}</strong></span>}</div><p>{checkout.checkout?"Professional first-choice route":checkout.bogey?"No finish available — shape the next visit":"Best setup shot for a reliable leave"}</p><button type="button" disabled={!checkout.alternates.length}>Show alternate path</button></Surface>
+        <CheckoutCompanion advice={checkout} playerName={game.currentPlayer===0?"You":game.players[game.currentPlayer]?.name??"Player 2"} interactive={!isAi||game.currentPlayer===0} />
         <Surface className="visit-panel"><Tabs label="Score input method" value={inputMode} onChange={setInputMode} items={[{label:"Board",id:"board",content:null},{label:"Turn score",id:"score",content:null},{label:"Each dart",id:"darts",content:null}]} />
           <div className="current-darts">{[0,1,2].map(i=><div key={i} className={darts[i]?"filled":""}><span>D{i+1}</span><strong>{darts[i]?notation(darts[i]!):"—"}</strong><small>{darts[i]?.score??"Waiting"}</small></div>)}</div>
           {inputMode==="score"&&<form className="score-form" onSubmit={e=>{e.preventDefault();submitTurn(Number(scoreInput));}}><TextField label="Turn score" inputMode="numeric" value={scoreInput} onChange={e=>setScoreInput(e.target.value)} placeholder="0–180"/><Button type="submit">Record visit</Button></form>}

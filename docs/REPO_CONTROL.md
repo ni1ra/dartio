@@ -31,7 +31,7 @@
 - Deployment `dpl_G2u7bDCCuSCJMeaciPTkXjdwj6mG` proved explicit cancellation recovery and reprojection: reactivation cleared `cancel_at`; rescheduling stored `cancel_at=2026-07-31T02:42:12Z` while keeping `cancel_at_period_end=false`, status `trialing`, plan `pro`, and one subscription row.
 - GitHub release source: commit `80770b47d790411f0c5e72c92f9fd1aee326897a`; CI run `29546595422` passed.
 - Current greenfield production deployment: `dpl_8rpA6xD1iydeTrjCm9JpztK4HFBy` at `https://dartioopus46.vercel.app`.
-- Current Cycle 2 preview deployment: `dpl_G2u7bDCCuSCJMeaciPTkXjdwj6mG` at `https://dartio-bol6ehqi1-niras-projects-868b6f5f.vercel.app`; commit `10199f1` passed GitHub verification run `29551797845`. Prior Ready deployment `dpl_GvToqtNyNJCjzcGrYLDFVfZePqEV` is the rollback target.
+- Current Cycle 2 preview deployment: `dpl_DEgYMgkznwDuZUAEnEW7i5zyohsv` at `https://dartio-1ad24wkiv-niras-projects-868b6f5f.vercel.app`; documentation reconciliation commit `6874a5d` passed GitHub verification run `29552011246`. Prior code-bearing deployment `dpl_G2u7bDCCuSCJMeaciPTkXjdwj6mG` is the rollback target.
 - Preview has a branch-scoped `NEXT_PUBLIC_APP_URL` override for `cycle-2-identity-billing-voice`, targeting its stable Vercel alias. The global Preview and Production values were not changed.
 - Supabase is explicitly out of scope.
 - Never store secret values in repository files or documentation.

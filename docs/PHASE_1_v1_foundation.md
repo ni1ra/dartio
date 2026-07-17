@@ -24,14 +24,16 @@ Build and release a fresh Dartio `v1.0.0` using Navi UI `v1.0.0`, Neon PostgreSQ
   - [ ] Implement local friend play and server-authoritative online room foundations with reconnect.
   - [ ] Implement accessible keyboard/touch alternatives and correction flows.
 - [ ] Voice scoring
-  - [x] Implement push-to-talk and opt-in always-on session modes.
+  - [ ] Implement push-to-talk and a true opt-in always-on session mode.
+    - [x] Implement push-to-talk plus explicit listening, processing, confirmation, ambiguity, privacy, and failure states.
+    - [ ] Replace the current manually resumed 4.5-second clip cycle with continuous opt-in capture, silence segmentation, automatic re-arming, and queued correction.
   - [x] Use OpenAI transcription with structured command parsing through the current shared game-command path.
   - [x] Implement confirmation, ambiguity, correction, privacy, and failure states.
   - [ ] Extend and prove the shared voice-command path across every remaining game mode.
 - [ ] Checkout intelligence
-  - [ ] Implement dynamic professional routes, alternate paths, setup shots, bogey detection, and dart-count context.
-  - [ ] Support player preferences and explain route changes after each dart.
-  - [ ] Verify known checkout fixtures and invalid-route rejection.
+  - [x] Implement dynamic professional routes, alternate paths, setup shots, bogey detection, and dart-count context.
+  - [x] Support player preferences and explain route changes after each dart.
+  - [x] Verify known checkout fixtures and invalid-route rejection.
 - [ ] Product, navigation, and responsive UI
   - [ ] Build the dynamic landing page, game lobby, setup, match, friends, practice, stats, billing, and account paths.
   - [x] Use Navi UI as the only component/theme system.
