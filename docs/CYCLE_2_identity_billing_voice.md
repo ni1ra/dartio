@@ -16,7 +16,11 @@ Derived from: `PHASE_1_v1_foundation.md`
 - [x] Make voice input feed the same X01 command path as touch/keyboard input.
 - [x] Run deterministic type, lint, unit, build, and dartboard regression checks.
 - [ ] Run deployed identity, billing, voice, and three-theme browser stories across phone/tablet/desktop.
+  - [x] Verify the deployed match and dartboard at 1440×1000, 834×1112, and 390×844: zero horizontal overflow, square/in-bounds SVG, 80 scoring beds, 20 labels, and physical T20 → 60 / 441 at every width.
+  - [x] Inspect full-page tablet/mobile match layouts and correct the ultrawide shell cascade so the 92 rem stage centers above 1472 px without changing board geometry.
+  - [ ] Complete the remaining three-theme, identity, and real-microphone deployed stories.
 - [ ] Deploy through preview, verify identity/billing/voice stories, then promote and rerun production proof.
+  - [x] Deploy Cycle 2 preview `dpl_33SK5cREqKE35yjBaqnG2ntLk7Pw` and pass GitHub verification run `29548727067` before the ultrawide follow-up.
 - [x] Reconcile Phase 1 and REPO_CONTROL with exact local, Neon, Stripe, and Vercel receipts and remaining gates.
 
 ## Verified receipts — 2026-07-17
@@ -25,7 +29,8 @@ Derived from: `PHASE_1_v1_foundation.md`
 - Identity and billing migrations `0003` and `0004` were applied transactionally to Neon Preview (`br-fragrant-art-af79dyw5`) and Main (`br-sweet-wildflower-afy2ygj6`). Both branches now contain five Drizzle journal rows and the nullable webhook/subscription lifecycle timestamps required by the idempotent projection.
 - Stripe sandbox account `acct_1TtxM1ALEz0P7O2h` contains active Pro and Club monthly/annual EUR prices and webhook endpoint `we_1Tu0YUALEz0P7O2hYBwPCQwF`, listening to 18 subscription lifecycle events at the stable production alias.
 - Vercel server-side environment listing confirms `STRIPE_CLUB_MONTHLY_PRICE_ID`, `STRIPE_CLUB_ANNUAL_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`, and `OPENAI_API_KEY` are encrypted and scoped to Preview and Production.
-- The regulation dartboard renderer and scoring geometry were not changed in this cycle. Its prior desktop/tablet/mobile physical-T20 proof remains under `docs/artifacts/`; deployed regression proof is still required for the new preview.
+- The regulation dartboard renderer and scoring geometry were not changed in this cycle. The Cycle 2 preview passed a fresh exact-width browser matrix at 1440×1000, 834×1112, and 390×844: one square/in-bounds SVG, 80 beds, 20 labels, no horizontal overflow, and a physical click on the T20 path producing T20 / 60 / 441 in all three independent browser contexts. Full-page tablet/mobile visual inspection found no warped rings, drifting wires, clipped numbers, overlapping score controls, or command-dock/navigation collision.
+- Harsh ultrawide inspection found the 92 rem Navi shell left-anchored because an unlayered consumer reset overrode Navi UI's layered auto margins. A Dartio integration rule now recenters the main shell only above 1472 px and preserves the full-width navigation calculation; it does not touch dartboard selectors, renderer code, or the three primary breakpoints.
 - Not yet proven: Stripe Customer Portal configuration, a complete authenticated Checkout → signed webhook → entitlement → Portal → cancellation story, real microphone transcription in a deployed browser, and production promotion.
 
 ## Acceptance proof
