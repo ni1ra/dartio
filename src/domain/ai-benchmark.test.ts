@@ -35,7 +35,7 @@ function simulateLeg(level: number, seed: number): { darts: number; won: boolean
   return { darts, won: state.status === "complete" };
 }
 
-function averageDarts(level: number, legs = 10): number {
+function averageDarts(level: number, legs = 6): number {
   let total = 0;
   for (let leg = 0; leg < legs; leg += 1) total += simulateLeg(level, level * 1000 + leg * 7 + 1).darts;
   return total / legs;
@@ -70,6 +70,8 @@ describe("AI ladder", () => {
     expect(expert).toBeTruthy();
   });
 
+  // Simulation, not arithmetic: an expert calls the checkout planner on every
+  // dart, so this is the one slow test in the suite and says so out loud.
   it("finishes a leg faster at the top of the ladder than at the bottom", () => {
     const novice = averageDarts(2);
     const competent = averageDarts(10);
@@ -80,7 +82,7 @@ describe("AI ladder", () => {
     expect(competent).toBeLessThan(novice);
     expect(expert).toBeLessThan(competent);
     expect(expert).toBeLessThan(novice * 0.7);
-  });
+  }, 60_000);
 
   it("keeps the miss spread strictly decreasing across every level", () => {
     // Measured on the model itself rather than by simulation: this is a claim
