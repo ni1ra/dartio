@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HeroBoard } from "@/components/hero-board";
 import { Surface } from "navi-ui";
 
 const modes = ["X01", "Cricket", "Around the clock", "Shanghai", "Count-up", "Bob’s 27"];
@@ -15,7 +16,7 @@ export default function HomePage() {
       </div>
       <div className="hero-orbit" aria-label="Live match preview">
         <div className="orbit-ring orbit-ring-one" /><div className="orbit-ring orbit-ring-two" />
-        <div className="hero-board" aria-hidden="true"><div className="board-bull" /><span className="dart dart-one">◆</span><span className="dart dart-two">◆</span><span className="dart dart-three">◆</span></div>
+        <HeroBoard />
         <Surface className="floating-score"><span>You</span><strong>121</strong><small>T20 · T11 · D14</small></Surface>
         <Surface className="floating-ai"><span>AI / level 12</span><strong>74.2</strong><small>3-dart average</small></Surface>
       </div>
