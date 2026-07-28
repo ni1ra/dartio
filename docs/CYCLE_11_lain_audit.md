@@ -88,6 +88,36 @@ browser run and the failed browser *install* returned 0 that way, and the
 truncation cut the error off the top of the output. Gate commands are run
 unpiped, with the exit code read, or they are not gates.
 
+## Reopened — the nav sign-in fix never reached a phone
+
+Verifying the closed rows against production found that **"No login or signup
+anywhere in the top nav" was only fixed on desktop.** Below 1100px the sign-in
+link was in the DOM at every width, correctly href'd, and painted at none of
+them.
+
+`globals.css` hides every direct `<a>` child of `.nav-actions` at both
+breakpoints under 1100px. That rule predates `AccountNav` and was written for
+the "Start a match" button; `AccountNav` renders its links as direct children of
+the same container and inherited it. `match-layout.css` already had a block
+whose comment claimed to "keep the signed-out prompt", and it was not doing so.
+
+This is the same shape as the Pricing defect Lain found — a surface carried only
+by a desktop-scoped rule — and it survived the fix for the note it belongs to.
+
+Two things made it invisible:
+
+- Grepping the deployed HTML cannot see it. The link is present in the markup;
+  the defect is that it is not painted. `AccountNav` is also a client component,
+  so the server response contains neither state.
+- The browser suite asserted that `/auth/sign-in` **loads as a route**, which was
+  always true. Nothing asserted a visitor could **reach** it. A route that
+  answers 200 and a route someone can find are different claims, and only the
+  first was tested.
+
+`tests/browser/layout.spec.ts` now asserts a visible sign-in entry point at all
+three viewports, and asserts sign-up only above 1100px, where it is a deliberate
+choice rather than an accident.
+
 ## The gap that let production auth ship dead
 
 The browser suite passed 102/102 against production while nobody could sign in.
