@@ -805,3 +805,15 @@ html[data-lp-motion] [data-reveal][data-inview] {
     font-size: 9px;
   }
 }
+
+/* ── Icon family (src/components/icons.tsx) ────────────────────────────────
+ * The icons size themselves at 1em, but an inline <svg> sits on the text
+ * baseline and opens a descender-height gap under it. Nudging it down a
+ * shade optically centres the icon against adjacent text, and inline-block
+ * keeps it from collapsing inside flex/grid glyph containers.
+ */
+.icon {
+  display: inline-block;
+  vertical-align: -0.125em;
+  flex-shrink: 0;
+}

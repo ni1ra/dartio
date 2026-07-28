@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button, Surface } from "navi-ui";
 import type { VoiceCommand } from "@/lib/voice/commands";
 import { hasAccessEntitlement, isProductAvailable } from "@/lib/product/access-contract";
+import { RecordDotIcon } from "./icons";
 import { useAccess } from "./access-provider";
 
 type VoicePhase =
@@ -358,7 +359,7 @@ export function VoiceControl({
               }
             }}
           >
-            <span className="mic">●</span>
+            <span className="mic"><RecordDotIcon /></span>
             <b>
               {phase === "recording" ? "Release to process" : "Hold to speak"}
             </b>

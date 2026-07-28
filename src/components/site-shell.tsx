@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { AppShell, NaviProvider, TopNav } from "navi-ui";
 import { AccessProvider } from "./access-provider";
 import { AccountNav } from "./account-nav";
+import { TargetIcon } from "./icons";
 import { ThemeMenu } from "./theme-menu";
 
 const routes = [
@@ -27,7 +28,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     <NaviProvider theme={theme} onThemeChange={setTheme}>
       <AccessProvider>
       <AppShell nav={<TopNav className="site-nav" brand={<Link className="brand" href="/" aria-label="Dartio home">
-            <span className="brand-mark" aria-hidden="true">↗</span>
+            <span className="brand-mark" aria-hidden="true"><TargetIcon /></span>
             <span>Dartio</span>
           </Link>} actions={<div className="nav-actions"><ThemeMenu /><AccountNav /><Link className="button-link" href="/play">Start a match</Link></div>}>
           <div className="desktop-links" aria-label="Primary navigation">
