@@ -49,3 +49,34 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Install browser
+        run: pnpm test:browser:install
+
+      # Placeholders only. Nothing here reaches a real service: they exist so the
+      # server boots and answers as an anonymous Free visitor, which is exactly
+      # the state the browser suite asserts. Real secrets live in Vercel.
+      - name: Browser proof
+        run: pnpm test:browser
+        env:
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci?sslmode=disable
+          NEON_AUTH_BASE_URL: http://127.0.0.1:9/neondb/auth
+          NEON_AUTH_COOKIE_SECRET: ci-placeholder-secret-at-least-32-chars
+          NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100
+          STRIPE_SECRET_KEY: sk_test_placeholder
+          STRIPE_WEBHOOK_SECRET: whsec_placeholder
+          STRIPE_PRO_MONTHLY_PRICE_ID: price_placeholder
+          STRIPE_PRO_ANNUAL_PRICE_ID: price_placeholder
+          STRIPE_CLUB_MONTHLY_PRICE_ID: price_placeholder
+          STRIPE_CLUB_ANNUAL_PRICE_ID: price_placeholder
+          OPENAI_API_KEY: sk-placeholder
+
+      - name: Keep the browser evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

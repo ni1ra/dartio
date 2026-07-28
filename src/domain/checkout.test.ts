@@ -229,7 +229,7 @@ describe("free-tier basic checkout advice", () => {
     expect(paid.setupPlan).not.toBeNull();
     expect(free.setupPlan).toBeNull();
     expect(free.primary).toBeNull();
-    expect(free.reasonCodes).toEqual(["no-route"]);
+    expect(free.reasonCodes).toEqual(["scoring-setup"]);
   });
 
   it("still names a bogey number so the player is not misled", () => {
@@ -237,6 +237,18 @@ describe("free-tier basic checkout advice", () => {
     expect(free.bogey).toBe(true);
     expect(free.reasonCodes).toEqual(["bogey-number"]);
     expect(free.explanation).toContain("No three-dart double-out exists from 169");
+  });
+
+  it("calls the top of a leg a scoring phase, not a missing route", () => {
+    const free = basicCheckoutAdvice(501, 3, "double");
+    expect(free.reasonCodes).toEqual(["scoring-setup"]);
+    expect(free.explanation).toContain("Scoring phase");
+    expect(free.explanation).not.toContain("No valid");
+    // Inside the finishing range with genuinely no route, it still says so:
+    // 3 is reachable in one dart but no double equals it.
+    expect(basicCheckoutAdvice(3, 1, "double").reasonCodes).toEqual(["no-route"]);
+    // And a bogey stays a bogey rather than being softened into scoring copy.
+    expect(basicCheckoutAdvice(159, 3, "double").reasonCodes).toEqual(["bogey-number"]);
   });
 
   it("ignores preferences because it accepts none", () => {

@@ -95,11 +95,7 @@ export function CheckoutCompanion({
             <strong>{selectedPlan.leave === 0 ? "Finish" : selectedPlan.leave}</strong>
           </div>
         </div>
-      ) : (
-        <p className="checkout-empty">
-          Keep building the score. A ranked route will appear as soon as one is available.
-        </p>
-      )}
+      ) : null}
 
       <div className="checkout-meta">
         <span>
