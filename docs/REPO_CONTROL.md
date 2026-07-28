@@ -2,7 +2,8 @@
 
 ## Canonical identity
 
-- Local path: `C:\Users\nira\Documents\Codex\2026-07-17\rec\dartio`
+- Local path: `\\wsl.localhost\Ubuntu-24.04\home\nira\dev\dartio` (WSL: `/home/nira/dev/dartio`)
+- Prior local path: `C:\Users\nira\Documents\Codex\2026-07-17\rec\dartio`, retained read-only. Work moved to the WSL-native filesystem on 2026-07-28 because pnpm on `/mnt/c` aborts its modules-directory check without a TTY and pays the DrvFs IO penalty on every install and build; the same install takes 13 s in WSL.
 - GitHub target: `https://github.com/ni1ra/dartio`
 - Vercel project: `dartio` (`prj_tYySUSn7wfIjqFQA1KZsVJtDbLIM`)
 - Product version: `1.0.0`
@@ -33,6 +34,8 @@
 - Current greenfield production deployment: `dpl_8rpA6xD1iydeTrjCm9JpztK4HFBy` at `https://dartioopus46.vercel.app`.
 - Current Cycle 2 preview deployment: `dpl_71X1Gfea1BsPLSm6rAPir8AonjUK` at `https://dartio-lf4clhysm-niras-projects-868b6f5f.vercel.app`; entitled X01 continuity/access-authority head `e3a80a4` passed GitHub verification run `29554449332`. The stable branch alias points to this Ready deployment. Prior code Preview `dpl_AwDwqrqPYR8ufLdJUV5m91dQJLff` is the rollback target.
 - Preview has a branch-scoped `NEXT_PUBLIC_APP_URL` override for `cycle-2-identity-billing-voice`, targeting its stable Vercel alias. The global Preview and Production values were not changed.
+- Paid features are authorized server-side only. `voice_always_on` gates `POST /api/voice/transcribe` before body parsing; `advanced_ai` gates `POST /api/ai/turn` for levels 9–20 while 1–8 stay local; `advanced_checkout` gates `POST /api/checkout/advice` for alternates, setup plans, and preference ranking while Free computes one route locally. All three read the server's own access snapshot and accept no client plan, access, or seed claim.
+- Club Checkout is closed: `PLAN_CATALOG.club.checkout` is `unavailable`, `POST /api/billing/checkout` returns 409 for any non-`self_serve` plan before Stripe is called, and the pricing surface disables the action. Existing Club subscribers keep their projected entitlements.
 - Supabase is explicitly out of scope.
 - Never store secret values in repository files or documentation.
 

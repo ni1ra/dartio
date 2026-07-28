@@ -4,6 +4,7 @@ import Stripe from "stripe";
 import { z } from "zod";
 import { createDatabase } from "@/db/client";
 import { subscriptions, users } from "@/db/schema";
+import { PLAN_CATALOG } from "@/lib/billing/catalog";
 import { BillingPublicError, safeBillingError } from "@/lib/billing/errors";
 import { checkoutSessionParams, ensureStripeCustomer, hasRecoverableStripeSubscription, mustRecoverExistingSubscription, resolveCheckoutPriceId, stripeCustomerBelongsToUser } from "@/lib/billing/service";
 import { getBillingCheckoutEnv } from "@/lib/env/server";
@@ -16,6 +17,7 @@ export async function POST(request: Request) {
   try {
     const user = await requireCurrentUser();
     const { plan, interval } = bodySchema.parse(await request.json());
+    if (PLAN_CATALOG[plan].checkout !== "self_serve") return NextResponse.json({ error: "plan_unavailable" }, { status: 409 });
     const requestKey = idempotencySchema.parse(request.headers.get("idempotency-key"));
     const env = getBillingCheckoutEnv();
     const db = createDatabase();

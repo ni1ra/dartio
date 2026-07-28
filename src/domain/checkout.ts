@@ -164,6 +164,69 @@ export function checkoutAdvice(
   };
 }
 
+/**
+ * Free-plan checkout advice: the single highest-ranked route to a finish.
+ *
+ * The paid `advanced_checkout` entitlement covers alternate routes, setup-visit
+ * planning, and preference-driven ranking. Those are produced only by the
+ * server route that verifies the entitlement, so this function must never
+ * compute them — a client that can render them is a client that was granted
+ * them without authorization. Skipping `findSetupPlan` also keeps the free path
+ * off the exhaustive three-dart setup walk, which is the expensive half.
+ */
+export function basicCheckoutAdvice(
+  score: number,
+  dartsAvailable: 1 | 2 | 3 = 3,
+  outRule: OutRule = "double",
+): CheckoutAdvice {
+  validateDartsAvailable(dartsAvailable);
+  validateOutRule(outRule);
+  if (!Number.isInteger(score) || score < minimumScore(outRule)) {
+    return emptyAdvice(score, dartsAvailable, "invalid-score", "The remaining score cannot be finished under this out rule.");
+  }
+
+  const [route] = findFinishRoutes(score, dartsAvailable, outRule, {});
+  if (route) {
+    const primaryPlan = finishPlan(route, score, dartsAvailable, outRule, {});
+    return {
+      score,
+      dartsAvailable,
+      checkout: true,
+      bogey: false,
+      primary: primaryPlan.darts,
+      alternates: [],
+      setup: null,
+      leave: 0,
+      targetLeave: 0,
+      reasonCodes: primaryPlan.reasonCodes,
+      explanation: primaryPlan.explanation,
+      primaryPlan,
+      alternatePlans: [],
+      setupPlan: null,
+    };
+  }
+
+  const bogey = outRule === "double" && dartsAvailable === 3 && BOGEY_NUMBERS.has(score);
+  return {
+    score,
+    dartsAvailable,
+    checkout: false,
+    bogey,
+    primary: null,
+    alternates: [],
+    setup: null,
+    leave: null,
+    targetLeave: null,
+    reasonCodes: bogey ? ["bogey-number"] : ["no-route"],
+    explanation: bogey
+      ? `No three-dart double-out exists from ${score}. Score down to a finishable leave.`
+      : `No valid ${dartsAvailable}-dart route is available from ${score}.`,
+    primaryPlan: null,
+    alternatePlans: [],
+    setupPlan: null,
+  };
+}
+
 function findFinishRoutes(score: number, dartsAvailable: number, outRule: OutRule, preferences: CheckoutPreferences): Dart[][] {
   if (score > maximumFinish(dartsAvailable, outRule)) return [];
   const routes: Dart[][] = [];

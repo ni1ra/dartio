@@ -11,10 +11,21 @@ import {
 
 type CheckoutPlan = CheckoutRoutePlan | CheckoutSetupPlan;
 
+/**
+ * `basic` is the Free plan: one ranked route, no alternates, no setup planning.
+ * `advanced` is rendered only from a server-authorized response, so the tier is
+ * passed in rather than derived here — a component must not decide its own
+ * entitlement.
+ */
+export type CheckoutTier = "basic" | "advanced";
+
 type CheckoutCompanionProps = {
   advice: CheckoutAdvice;
   playerName: string;
   interactive?: boolean;
+  tier?: CheckoutTier;
+  /** True while the advanced route request for this position is still in flight. */
+  upgrading?: boolean;
 };
 
 function planKey(plan: CheckoutPlan) {
@@ -25,6 +36,8 @@ export function CheckoutCompanion({
   advice,
   playerName,
   interactive = true,
+  tier = "advanced",
+  upgrading = false,
 }: CheckoutCompanionProps) {
   const [selection, setSelection] = useState({ adviceKey: "", planKey: "" });
   const plans: readonly CheckoutPlan[] = advice.primaryPlan
@@ -98,7 +111,15 @@ export function CheckoutCompanion({
         {selectedPlan?.explanation ?? advice.explanation}
       </p>
 
-      {interactive && advice.alternatePlans.length > 0 && (
+      {tier === "basic" && (
+        <p className="checkout-tier-note">
+          {upgrading
+            ? "Loading your alternate routes and setup plans…"
+            : "Alternate routes, setup-visit plans, and preferred doubles come with Pro."}
+        </p>
+      )}
+
+      {interactive && tier === "advanced" && advice.alternatePlans.length > 0 && (
         <div className="checkout-alternates" role="group" aria-label="Checkout routes">
           <span>ROUTE OPTIONS</span>
           <div>

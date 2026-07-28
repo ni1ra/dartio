@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkoutAdvice, notation, type Dart, type OutRule } from "@/domain";
+import { basicCheckoutAdvice, checkoutAdvice, notation, type Dart, type OutRule } from "@/domain";
 
 function routeText(route: readonly Dart[] | null | undefined): string | null { return route ? route.map(notation).join(" ") : null; }
 function routeScore(route: readonly Dart[]): number { return route.reduce((sum, target) => sum + target.score, 0); }
@@ -200,5 +200,53 @@ describe("invalid and impossible input", () => {
     expect(advice.primary).toBeNull();
     expect(advice.bogey).toBe(false);
     expect(routeScore(advice.setup!) + advice.leave!).toBe(171);
+  });
+});
+
+describe("free-tier basic checkout advice", () => {
+  it("matches the paid primary route on every double-out finish", () => {
+    for (let score = 2; score <= 170; score += 1) {
+      const paid = checkoutAdvice(score, 3, "double");
+      const free = basicCheckoutAdvice(score, 3, "double");
+      expect(routeText(free.primary)).toBe(routeText(paid.primary));
+      expect(free.checkout).toBe(paid.checkout);
+      expect(free.bogey).toBe(paid.bogey);
+    }
+  });
+
+  it("withholds the paid planning surfaces entirely", () => {
+    const free = basicCheckoutAdvice(141, 3, "double");
+    expect(free.checkout).toBe(true);
+    expect(free.alternates).toEqual([]);
+    expect(free.alternatePlans).toEqual([]);
+    expect(free.setup).toBeNull();
+    expect(free.setupPlan).toBeNull();
+  });
+
+  it("withholds the setup plan on a non-finishable score", () => {
+    const paid = checkoutAdvice(200, 3, "double");
+    const free = basicCheckoutAdvice(200, 3, "double");
+    expect(paid.setupPlan).not.toBeNull();
+    expect(free.setupPlan).toBeNull();
+    expect(free.primary).toBeNull();
+    expect(free.reasonCodes).toEqual(["no-route"]);
+  });
+
+  it("still names a bogey number so the player is not misled", () => {
+    const free = basicCheckoutAdvice(169, 3, "double");
+    expect(free.bogey).toBe(true);
+    expect(free.reasonCodes).toEqual(["bogey-number"]);
+    expect(free.explanation).toContain("No three-dart double-out exists from 169");
+  });
+
+  it("ignores preferences because it accepts none", () => {
+    expect(routeText(basicCheckoutAdvice(40, 3, "double").primary)).toBe("D20");
+    expect(routeText(checkoutAdvice(40, 3, "double", { preferredDoubles: [10] }).primary)).toBe("S20 D10");
+  });
+
+  it("applies the same validation as the paid planner", () => {
+    expect(() => basicCheckoutAdvice(40, 4 as 3)).toThrow("Darts available must be 1, 2, or 3");
+    expect(() => basicCheckoutAdvice(40, 1, "triple" as OutRule)).toThrow("Out rule must be straight, double, or master");
+    expect(basicCheckoutAdvice(1, 3, "double").reasonCodes).toEqual(["invalid-score"]);
   });
 });

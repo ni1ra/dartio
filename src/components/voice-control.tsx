@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Button, Surface } from "navi-ui";
 import type { VoiceCommand } from "@/lib/voice/commands";
+import { hasAccessEntitlement, isProductAvailable } from "@/lib/product/access-contract";
+import { useAccess } from "./access-provider";
 
 type VoicePhase =
   | "idle"
@@ -31,6 +34,7 @@ export function VoiceControl({
   onUndo,
   onNextPlayer,
 }: VoiceControlProps) {
+  const access = useAccess();
   const [phase, setPhase] = useState<VoicePhase>("idle"),
     [alwaysOn, setAlwaysOn] = useState(false),
     [result, setResult] = useState<VoiceResult | null>(null),
@@ -59,6 +63,14 @@ export function VoiceControl({
     },
     [],
   );
+
+  const voiceEnabled = access.status === "ready" && isProductAvailable(access.snapshot, "voiceInput") && hasAccessEntitlement(access.snapshot, "voice_always_on");
+  if (!voiceEnabled) {
+    const loading = access.status === "loading";
+    const unavailable = access.status === "unavailable";
+    const anonymous = access.status === "ready" && access.snapshot.auth === "anonymous";
+    return <Surface className={`voice-console voice-access ${unavailable?"unavailable":"locked"}`} aria-busy={loading||undefined} aria-label="Voice score input access"><header><div><span className="voice-kicker">VOICE INPUT</span><h3>{loading?"Checking voice access":unavailable?"Voice access unavailable":"Voice scoring is a Pro feature"}</h3></div><span className="voice-state"><i />{loading?"CHECKING":unavailable?"UNAVAILABLE":"LOCKED"}</span></header><p className="voice-guidance">{loading?"Local scoring stays ready while Dartio checks this feature.":unavailable?"Dartio could not verify paid access. Your match and manual scoring are unaffected.":"Pro includes push-to-talk voice scoring."}</p><div className="voice-access-actions">{unavailable?<Button variant="secondary" onClick={()=>void access.retry()}>Retry access</Button>:anonymous?<><Link className="button-link" href="/auth/sign-in">Sign in</Link><Link className="button-link button-link-secondary" href="/pricing">View Pro</Link></>:!loading?<Link className="button-link" href="/pricing">Upgrade to Pro</Link>:null}</div></Surface>;
+  }
 
   function clearCycle() {
     if (cycleTimer.current !== null) {
@@ -202,12 +214,10 @@ export function VoiceControl({
         command?: VoiceCommand | null;
         error?: string;
       };
-      if (!response.ok)
-        throw new Error(
-          response.status === 401
-            ? "Sign in to use cloud voice scoring."
-            : payload.error || "Transcription failed",
-        );
+      if (!response.ok) {
+        if ([401, 402, 403, 503].includes(response.status)) void access.refresh();
+        throw new Error(response.status === 401?"Sign in to use cloud voice scoring.":response.status===402||response.status===403?"Voice scoring requires active Pro access.":response.status===503?"Voice access could not be verified. Try again shortly.":payload.error||"Transcription failed");
+      }
       const next = {
         transcript: payload.transcript?.trim() || "",
         command: payload.command ?? null,
@@ -296,7 +306,7 @@ export function VoiceControl({
       <div className="voice-controls">
         {phase === "paused" && alwaysOn ? (
           <Button onClick={resume} disabled={disabled}>
-            Resume listening
+            Listen again
           </Button>
         ) : (
           <button
@@ -357,12 +367,12 @@ export function VoiceControl({
         <button
           type="button"
           className={`always-toggle ${alwaysOn ? "active" : ""}`}
-          aria-pressed={alwaysOn}
+          aria-label={alwaysOn ? "End hands-free clip mode" : "Listen for one voice clip"}
           onClick={toggleAlways}
           disabled={disabled || phase === "processing"}
         >
-          <span>{phase === "requesting" ? "Cancel mic" : "Always-on"}</span>
-          <i>{phase === "requesting" ? "CANCEL" : alwaysOn ? "ON" : "OFF"}</i>
+          <span>{phase === "requesting" ? "Cancel mic" : alwaysOn ? "End clip mode" : "Listen once"}</span>
+          <i>{phase === "requesting" ? "CANCEL" : alwaysOn ? "ACTIVE" : "4.5 SEC"}</i>
         </button>
       </div>
       {result && (
@@ -411,9 +421,9 @@ export function VoiceControl({
       )}
       <p className="voice-privacy">
         <span>PRIVATE BY DEFAULT</span> Audio is recorded only after you hold
-        the control or explicitly enable always-on. Clips are sent to Dartio for
-        transcription, are limited to 10 MB, and are never applied to the match
-        without confirmation.
+        the control or choose Listen once. A hands-free clip stops after 4.5
+        seconds. Clips are sent to Dartio for transcription, are limited to 10
+        MB, and are never applied to the match without confirmation.
       </p>
       <div className="voice-live" role="status" aria-live="polite">
         {label.announcement}
@@ -447,19 +457,19 @@ function phaseLabel(phase: VoicePhase) {
       };
     case "listening":
       return {
-        title: "Always-on is listening",
+        title: "Listening for one command",
         state: "LISTENING",
         guidance:
-          "Speak one command. Dartio pauses after each clip for confirmation.",
-        announcement: "Always-on microphone is listening.",
+          "Speak one command. This clip stops after 4.5 seconds, then waits for confirmation.",
+        announcement: "One voice clip is recording.",
       };
     case "paused":
       return {
         title: "Listening is paused",
         state: "PAUSED",
         guidance:
-          "Review complete. Resume when you are ready for another command.",
-        announcement: "Always-on microphone is paused.",
+          "The last clip has stopped. Choose Listen again when you are ready for another command.",
+        announcement: "Voice clip has stopped.",
       };
     case "processing":
       return {
@@ -503,7 +513,7 @@ function phaseLabel(phase: VoicePhase) {
         title: "Score without breaking stance",
         state: "READY",
         guidance:
-          "Hold to speak, or opt into a short always-on listening cycle.",
+          "Hold to speak, or choose Listen once for a 4.5-second hands-free clip. Every result waits for confirmation.",
         announcement: "Voice input is ready.",
       };
   }

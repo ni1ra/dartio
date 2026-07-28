@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { AppShell, NaviProvider, ThemeSwitcher, TopNav } from "navi-ui";
+import { AccessProvider } from "./access-provider";
 
 const routes = [
   ["/play", "Play"], ["/practice", "Practice"], ["/friends", "Friends"], ["/pricing", "Pricing"],
@@ -22,6 +23,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
 
   return (
     <NaviProvider theme={theme} onThemeChange={setTheme}>
+      <AccessProvider>
       <AppShell nav={<TopNav className="site-nav" brand={<Link className="brand" href="/" aria-label="Dartio home">
             <span className="brand-mark" aria-hidden="true">↗</span>
             <span>Dartio</span>
@@ -37,6 +39,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
       </AppShell>
+      </AccessProvider>
     </NaviProvider>
   );
 }

@@ -42,15 +42,15 @@ Build and release a fresh Dartio `v1.0.0` using Navi UI `v1.0.0`, Neon PostgreSQ
   - [ ] Build the dynamic landing page, game lobby, setup, match, friends, practice, stats, billing, and account paths.
   - [x] Use Navi UI as the only component/theme system.
   - [x] Verify deep black, bright silver, and blood red themes across mobile, tablet, and desktop for the Cycle 1 paths.
-- [ ] Membership and Stripe
+- [x] Membership and Stripe
   - [x] Define free and paid plans, entitlements, trials/discount policy, annual/monthly pricing, cancellation, and grace behavior.
   - [x] Implement Stripe Checkout, Customer Portal, idempotent webhooks, entitlement projection, and recovery states.
     - [x] Implement authenticated Pro/Club monthly/annual Checkout, Portal session endpoint, idempotent webhook projection, and recovery UI.
     - [x] Configure and prove Customer Portal plus Checkout, signed projection, scheduled cancellation, and reactivation in sandbox.
   - [x] Verify a sandbox Pro annual transaction and real signed webhook updates before any live activation.
-  - [ ] Connect projected entitlements to every paid product feature and verify fail-closed consumption.
+  - [x] Connect projected entitlements to every paid product feature and verify fail-closed consumption.
     - [x] Establish the canonical server-owned access snapshot and exact subscription boundary behavior.
-    - [ ] Enforce voice, AI 9–20, and advanced checkout at their server consumers and wire honest frontend locked states.
+    - [x] Enforce voice, AI 9–20, and advanced checkout at their server consumers and wire honest frontend locked states.
 - [ ] Neon and operations
   - [x] Implement and deploy the initial migrations, constraints, indexes, and ownership model.
   - [x] Deploy identity and billing lifecycle migrations `0003` through `0005` to Preview and Main.

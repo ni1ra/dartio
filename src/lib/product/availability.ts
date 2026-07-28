@@ -12,4 +12,12 @@ export const PRODUCT_AVAILABILITY = {
   clubManagement: "coming_soon",
 } as const;
 
-export type ProductAvailability = typeof PRODUCT_AVAILABILITY;
+export type AvailabilityState = "implemented" | "coming_soon";
+
+/**
+ * Deliberately wider than `typeof PRODUCT_AVAILABILITY`. Snapshots carry
+ * availability as data that changes when a feature ships, so consumers must be
+ * able to branch on either state — narrowing to today's literals would make an
+ * unshipped-feature check look like dead code and invite its removal.
+ */
+export type ProductAvailability = Record<keyof typeof PRODUCT_AVAILABILITY, AvailabilityState>;
