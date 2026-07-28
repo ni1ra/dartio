@@ -51,6 +51,6 @@ export default function HomePage() {
       </div>
     </section>
     <section className="page-frame mode-ribbon"><div className="mode-intro" data-reveal><p className="eyebrow">More than X01</p><h2>A mode for every kind of session.</h2><Link className="button-link button-link-secondary" href="/practice">See all modes</Link></div><div className="mode-list">{modes.map((mode, i) => <Link href={i === 0 ? "/play" : "/practice"} key={mode} data-reveal="left" style={{ "--lp-i": i } as React.CSSProperties}><span>0{i + 1}</span>{mode}<b>→</b></Link>)}</div></section>
-    <section className="page-frame closing-cta" data-reveal><p>Meet your next favourite opponent.</p><h2>They never cancel.<br />They do get better.</h2><div><Link className="button-link button-link-lg inverted" href="/play">Challenge the AI</Link><span>20 levels · no waiting room</span></div></section>
+    <section className="page-frame closing-cta" data-reveal><p>Meet your next favourite opponent.</p><h2>They never cancel.<br />They do get better.</h2><div><Link className="button-link button-link-lg inverted" href="/play">Challenge the AI</Link><Link className="text-link" href="/pricing">See Free and Pro →</Link><span>20 levels · no waiting room</span></div></section>
   </>;
 }

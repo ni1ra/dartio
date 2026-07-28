@@ -36,7 +36,13 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         </TopNav>}>
         <div id="main-content">{children}</div>
         <nav className="mobile-nav" aria-label="Mobile navigation">
-          {[['/', 'Home'], ...routes.slice(0, 3), ['/account', 'You']].map(([href, label]) => (
+          {/*
+            * Every route the desktop bar carries, plus the account. Pricing used
+            * to be dropped here and hidden by .desktop-links below 1100px, so
+            * the page the product converts on was unreachable on a phone — the
+            * device the whole design centre is built around.
+            */}
+          {[['/', 'Home'], ...routes, ['/account', 'You']].map(([href, label]) => (
             <Link key={href} href={href} aria-current={pathname === href || (href !== '/' && pathname.startsWith(href)) ? "page" : undefined}>{label}</Link>
           ))}
         </nav>

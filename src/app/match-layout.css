@@ -782,3 +782,14 @@ html[data-lp-motion] [data-reveal][data-inview] {
     display: none;
   }
 }
+
+/* Six destinations now that Pricing is carried on the phone too. */
+.mobile-nav {
+  grid-template-columns: repeat(6, 1fr);
+}
+
+@media (max-width: 390px) {
+  .mobile-nav a {
+    font-size: 9px;
+  }
+}
