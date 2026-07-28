@@ -1,6 +1,6 @@
 # Cycle 2 — Identity, Billing, and Voice Activation
 
-Status: active
+Status: closed 2026-07-28 — see the carry-forward list below
 
 Derived from: `PHASE_1_v1_foundation.md`
 
@@ -96,6 +96,28 @@ Derived from: `PHASE_1_v1_foundation.md`
 - Access authority failures degrade instead of locking the player out. `AccessProvider` exposes explicit loading/ready/unavailable states; the match keeps local Free scoring and local level-8 AI running through an outage, and the checkout companion keeps its locally computed route on screen when the advanced request is denied, slow, or aborted. `ProductAvailability` was widened from today's literal values so an entitled-but-unshipped feature is a state the type system admits rather than dead code.
 - Local gates on the completed slice: TypeScript clean, ESLint clean at `--max-warnings=0`, 314 tests across 25 files, and the Next.js 16.2.10 production build with 19 routes including the new `/api/checkout/advice`. The new coverage proves anonymous 401, authenticated-Free 403, entitled-but-unshipped 403, indeterminate-authority 503, sanitized 500, strict rejection of unknown request keys such as a client-supplied `entitlements` array, a tampered route being refused rather than rendered, and free/paid primary-route parity across every double-out score from 2 to 170.
 - The regulation dartboard renderer, SVG geometry, board selectors, and coordinate contract were not touched in this slice.
+
+## Carry-forward — closed 2026-07-28
+
+This cycle shipped identity, billing, voice, the professional checkout planner,
+and server-side authorization of every paid promise. Four items did not land and
+were not silently dropped; each is bigger than a cycle tail and now owns a cycle
+of its own in Phase 2:
+
+- Continuous opt-in voice capture with silence segmentation, automatic
+  re-arming, and a correction queue (slice line 22) moved to Phase 2 Cycle 9.
+- Deterministic completed-visit rewind/replay and a versioned active-match
+  serializer/rehydrator (slice line 34) moved to Phase 2 Cycle 5, where it
+  becomes the canonical event log that also unblocks history and statistics.
+- The remaining three-theme, identity, and real-microphone deployed stories
+  (slice line 50) moved to Phase 2 Cycle 4, which introduces the repeatable
+  browser harness those stories need in order to be re-runnable rather than
+  ad hoc.
+- Production promotion of this branch (slice line 51) moved to Phase 2 Cycle 10
+  release closure.
+
+The full evidence-backed gap list this closure was measured against is
+`docs/artifacts/GAP_AUDIT_2026-07-28.md`.
 
 ## Acceptance proof
 
