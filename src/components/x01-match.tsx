@@ -46,6 +46,19 @@ export function X01Match() {
   const replayed=useMemo(()=>replay(log),[log]);
   const game=replayed.state;
   const aiTimer=useRef<number|null>(null),aiController=useRef<AbortController|null>(null),aiGeneration=useRef(0);
+  /**
+   * The authoritative log, readable synchronously.
+   *
+   * `commitEvents` used to fold over the `log` captured in its closure. That is
+   * correct for a click, which is handled with a fresh render's closure, but the
+   * AI commits from inside a `setTimeout` whose closure was created a visit
+   * earlier. It therefore appended to a stale log and — worse — decided from the
+   * stale result whose turn it now was, so it re-queued itself forever, scored
+   * against whichever player the stale turn order named, and made scores jump
+   * back up as busts replayed. A ref is updated in the same tick as the append,
+   * so the next commit always folds over what actually happened.
+   */
+  const logRef=useRef<X01Log>(freshLog);
   const [inputMode,setInputMode]=useState<"board"|"score"|"darts">("board"), [correction,setCorrection]=useState(false), [message,setMessage]=useState("Your throw · 3 darts");
   const [continueAtEight,setContinueAtEight]=useState(false),[aiRecovery,setAiRecovery]=useState<AiRecovery|null>(null);
   const premiumRequested=isAi&&requestedAiLevel>8;
@@ -72,7 +85,7 @@ export function X01Match() {
   // computation keeps the server and first client render identical.
   // Deferred a frame so the first client render matches the server's, and so
   // the read never counts as a synchronous setState inside an effect.
-  useEffect(()=>{const frame=window.requestAnimationFrame(()=>{const stored=loadActiveMatch();if(!stored||stored.events.length===0||!matchesSetup(stored,freshLog))return;setLog(stored);setResumed(true);setMessage("Match resumed where you left off")});return()=>window.cancelAnimationFrame(frame)},[freshLog]);
+  useEffect(()=>{const frame=window.requestAnimationFrame(()=>{const stored=loadActiveMatch();if(!stored||stored.events.length===0||!matchesSetup(stored,freshLog))return;logRef.current=stored;setLog(stored);setResumed(true);setMessage("Match resumed where you left off")});return()=>window.cancelAnimationFrame(frame)},[freshLog]);
   useEffect(()=>{if(log.events.length===0)return;saveActiveMatch(log)},[log]);
   useEffect(()=>{if(game.status==="complete")clearActiveMatch()},[game.status]);
 
@@ -87,20 +100,20 @@ export function X01Match() {
    * board, keypad, voice, AI — goes through here, so correction and resume
    * behave identically no matter how the dart was recorded.
    */
-  function commitEvents(events:readonly X01Event[],announce?:string){if(events.length===0)return;const next=replay({...log,events:[...log.events,...events]});if(next.rejected.length>0){setRejectedNotice("That input does not fit the rules from here.");return}setRejectedNotice(null);setLog(current=>({...current,events:[...current.events,...events]}));const result=next.state;if(announce)setMessage(announce);if(result.status==="complete"){cancelAi();setMessage(settledMessage(result));return}if(result.currentPlayer===1&&isAi){queueAiTurn(result);return}if(!announce)setMessage(`${result.players[result.currentPlayer]?.name} · ${3-result.currentDarts.length} darts`)}
+  function commitEvents(events:readonly X01Event[],announce?:string){if(events.length===0)return;const base=logRef.current;const appended={...base,events:[...base.events,...events]};const next=replay(appended);if(next.rejected.length>0){setRejectedNotice("That input does not fit the rules from here.");return}setRejectedNotice(null);logRef.current=appended;setLog(appended);const result=next.state;if(announce)setMessage(announce);if(result.status==="complete"){cancelAi();setMessage(settledMessage(result));return}if(result.currentPlayer===1&&isAi){queueAiTurn(result);return}if(!announce)setMessage(`${result.players[result.currentPlayer]?.name} · ${3-result.currentDarts.length} darts`)}
   function commitDarts(values:readonly Dart[]){commitEvents(values.map(dartEvent))}
   function addDart(value:Dart){if(manualInputDisabled)return;const placed=positioned(value);commitEvents([dartEvent(placed)],`${notation(placed)} registered`)}
   function submitAggregate(score:number,dartsThrown:1|2|3){if(manualInputDisabled)return;commitEvents([visitEvent(score,dartsThrown)],`Visit total ${score} registered`)}
   function submitVoiceAggregate(score:number){try{submitAggregate(score,3);}catch(problem){if(problem instanceof AggregateVisitRequiresDartsError){setInputMode("darts");setMessage(problem.reason==="in-rule"?"Enter each dart until you are in":problem.reason==="out-rule"?"Enter each dart to verify the finish":"Finish this visit one dart at a time");}else setMessage(problem instanceof Error?problem.message:"That visit cannot be recorded");}}
   function refuseSyntheticEnd(){setInputMode("darts");setMessage("Record every dart, including misses, before ending the visit");}
-  function undo(){cancelAi();setAiRecovery(null);setRejectedNotice(null);if(log.events.length===0)return;setLog(undoLastEvent(log));setMessage("Latest entry removed")}
+  function undo(){cancelAi();setAiRecovery(null);setRejectedNotice(null);if(logRef.current.events.length===0)return;const undone=undoLastEvent(logRef.current);logRef.current=undone;setLog(undone);setMessage("Latest entry removed")}
   /**
    * Rewinds to just before a completed visit so it can be thrown again. Cutting
    * a visit out of the middle instead would hand every later visit to the wrong
    * player, because the log records what was thrown and turn order decides who
    * threw it.
    */
-  function correctVisit(visitIndex:number){cancelAi();setAiRecovery(null);const rewound=rewindToVisit(log,visitIndex);const dropped=log.events.length-rewound.events.length;setLog(rewound);setCorrection(false);setRejectedNotice(null);setMessage(`Rewound ${dropped} ${dropped===1?"entry":"entries"} · throw the visit again`)}
+  function correctVisit(visitIndex:number){cancelAi();setAiRecovery(null);const rewound=rewindToVisit(logRef.current,visitIndex);const dropped=logRef.current.events.length-rewound.events.length;logRef.current=rewound;setLog(rewound);setCorrection(false);setRejectedNotice(null);setMessage(`Rewound ${dropped} ${dropped===1?"entry":"entries"} · throw the visit again`)}
   function openCorrection(){cancelAi();setAiRecovery(null);setCorrection(true);setMessage("AI paused while you review the latest dart")}
   function closeCorrection(){setCorrection(false);if(game.status==="playing"&&game.currentPlayer===1&&isAi)queueAiTurn(game)}
   function retryPremiumAi(){if(game.status!=="playing"||game.currentPlayer!==1||!isAi)return;queuePremiumAiTurn(game)}
