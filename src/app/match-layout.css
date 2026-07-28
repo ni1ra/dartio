@@ -321,3 +321,71 @@
     grid-template-columns: minmax(340px, 1fr) minmax(360px, 0.7fr);
   }
 }
+
+/* ── Round-based modes ─────────────────────────────────────────────────────
+ * Around the Clock, Shanghai, Count-Up, and Bob's 27 share one surface: the
+ * target for this visit, then a total per player. The modes differ in how a
+ * visit scores, not in how it is played.
+ */
+.round-scoreboard {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  text-align: center;
+}
+
+.round-target {
+  margin: 0 0 10px;
+  font: 500 10px var(--font-mono);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.round-target strong {
+  font: 800 20px var(--font-display);
+  color: var(--accent);
+  letter-spacing: 0;
+}
+
+.round-totals {
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.round-totals li {
+  min-width: 96px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--navi-radius-sm, 6px);
+}
+
+.round-totals li.active {
+  border-color: var(--accent);
+}
+
+.round-totals span,
+.round-totals strong,
+.round-totals small {
+  display: block;
+}
+
+.round-totals span {
+  font: 500 9px var(--font-mono);
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.round-totals strong {
+  font: 800 32px var(--font-display);
+  line-height: 1.05;
+}
+
+.round-totals small {
+  font-size: 9px;
+  color: var(--muted);
+}

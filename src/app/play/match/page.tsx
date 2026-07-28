@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { CricketMatch } from "@/components/cricket-match";
+import { RoundMatch } from "@/components/round-match";
+import { ROUND_MODES, type RoundModeId } from "@/domain";
 import { X01Match } from "@/components/x01-match";
 
 export const metadata: Metadata = { title: "Live match" };
@@ -11,5 +13,7 @@ export const metadata: Metadata = { title: "Live match" };
  */
 export default async function MatchPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const mode = (await searchParams).mode;
-  return mode === "cricket" ? <CricketMatch /> : <X01Match />;
+  if (mode === "cricket") return <CricketMatch />;
+  if (typeof mode === "string" && mode in ROUND_MODES) return <RoundMatch mode={mode as RoundModeId} />;
+  return <X01Match />;
 }
