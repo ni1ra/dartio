@@ -46,6 +46,8 @@
 - `pnpm lint`
 - `pnpm test`
 - `pnpm build`
+- `pnpm test:browser:install` (once per machine)
+- `pnpm test:browser` — 54 checks across 390×844, 834×1112, and 1440×1000; set `DARTIO_BASE_URL` to run them against a preview or production deployment instead of a local build
 - `pnpm db:generate`
 
 ## Release ladder
@@ -65,6 +67,8 @@
 
 ## Known release gates
 
+- The regulation dartboard gate is executable as of 2026-07-28: `tests/browser/dartboard.spec.ts` asserts one square in-bounds SVG, 80 scoring beds, 20 numerals, and a physical treble-twenty click scoring 60 / leaving 441, at all three viewports. Board changes rerun it through `pnpm test:browser`.
+- Navi UI is the component system, and third-party stylesheets that ship an unlayered reset must be scoped to their own route segment. `@neondatabase/auth/ui/css` loads from `src/app/auth/layout.tsx` for this reason; loading it globally strips border, background, and radius off every Navi component, because unlayered CSS outranks Navi's `@layer navi.*` at any specificity.
 - The regulation dartboard and three-viewport production visual proof passed; future board changes must rerun the same physical T20 and boundary suite.
 - Cycle 2 preview repeated the dartboard gate at exact 1440×1000, 834×1112, and 390×844 viewports: 3/3 independent contexts passed square/in-bounds geometry, 80 beds, 20 labels, zero horizontal overflow, and physical T20 → 60 / 441. Full-page tablet/mobile visual inspection also passed. Ultrawide review found and corrected a shell-centering cascade defect outside the board renderer; the corrected preview measured a centered 1472 px stage at `x=544` on a 2560 px viewport, retained a 600×600 board, and passed the full three-width matrix again with zero retries.
 - Figma library implementation is externally blocked by the current one-mode/View-seat limitation.

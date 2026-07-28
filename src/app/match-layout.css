@@ -1,0 +1,114 @@
+/*
+ * Match surface layout corrections.
+ *
+ * Loaded after globals.css so these rules win on order rather than on an arms
+ * race of `!important`. Everything here addresses a measured defect from
+ * docs/artifacts/GAP_AUDIT_2026-07-28.md — gap 1 (the match does not fit a
+ * phone) and gap 11 (the board column crowds out the controls).
+ */
+
+/* ── Desktop: give the controls their width back ───────────────────────────
+ * The board column was minmax(380px, 1.3fr) against a 0.7fr control column and
+ * a fixed 310 px history rail, so a 600 px board sat beside a cramped input
+ * stack. The board is still the largest element — it is the thing being tapped
+ * — but the ratio no longer starves the panel a player reads every visit.
+ */
+@media (min-width: 1101px) {
+  .match-grid {
+    grid-template-columns: minmax(340px, 1fr) minmax(390px, 0.82fr) minmax(240px, 0.46fr);
+  }
+}
+
+/* ── Phone: the leg belongs on one screen ──────────────────────────────────
+ * The design centre is a phone on a stool being passed around. Before this the
+ * match was 1882 px tall at 390×844 and the scoring pad began at y=969 — below
+ * the fold — so a player scrolled down to score and back up to read the score,
+ * every visit.
+ *
+ * Three changes carry the weight: the scoreboard sticks so the number is never
+ * scrolled away, the board yields its space when it is not the active input,
+ * and the checkout companion collapses to the two lines that matter mid-throw.
+ */
+@media (max-width: 760px) {
+  .score-race {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: var(--surface);
+    box-shadow: 0 8px 20px color-mix(in srgb, var(--canvas) 60%, transparent);
+  }
+
+  .board-zone {
+    padding: 12px 12px 8px;
+  }
+
+  .board-wrap {
+    width: min(72vw, 320px);
+    transition: width var(--navi-motion-standard, 0.24s) var(--navi-motion-ease, ease);
+  }
+
+  /*
+   * Keypad and visit-total modes make the board a picture of the visit rather
+   * than the input, so it shrinks and the controls the player is actually using
+   * rise into the first screen. It is never hidden: where the darts landed is
+   * still the thing being corrected.
+   */
+  .match-page[data-input-mode="score"] .board-wrap,
+  .match-page[data-input-mode="darts"] .board-wrap {
+    width: min(40vw, 168px);
+  }
+
+  .match-page[data-input-mode="score"] .board-caption,
+  .match-page[data-input-mode="darts"] .board-caption {
+    display: none;
+  }
+
+  .match-side {
+    padding: 0 12px;
+    gap: 10px;
+  }
+
+  .checkout-panel,
+  .visit-panel,
+  .voice-panel {
+    padding: 13px !important;
+  }
+
+  /*
+   * Mid-visit a player needs the state, the number, and the route. The prose
+   * explanation, the darts-in-hand restatement, and the upgrade note are all
+   * readable on the panel at rest — they are not worth 200 px of scroll between
+   * the board and the keypad.
+   */
+  .checkout-explanation,
+  .checkout-meta,
+  .checkout-tier-note {
+    display: none;
+  }
+
+  .checkout-heading h2 {
+    font-size: 12px;
+  }
+
+  .checkout-owner strong {
+    font-size: 24px;
+  }
+
+  .checkout-plan {
+    margin: 10px 0 0;
+  }
+
+  .voice-panel > p {
+    display: none;
+  }
+
+  .history-strip {
+    padding-top: 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-wrap {
+    transition: none;
+  }
+}

@@ -7,3 +7,6 @@ coverage/
 .vercel/
 
 .vercel
+test-results/
+playwright-report/
+.playwright/

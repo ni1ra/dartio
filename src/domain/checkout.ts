@@ -207,6 +207,10 @@ export function basicCheckoutAdvice(
   }
 
   const bogey = outRule === "double" && dartsAvailable === 3 && BOGEY_NUMBERS.has(score);
+  // Being above the finishing range is the ordinary scoring phase, not a
+  // failure to find a route. Reporting "no valid route from 501" at the top of
+  // a leg is technically true and reads as an error.
+  const scoring = score > maximumFinish(dartsAvailable, outRule);
   return {
     score,
     dartsAvailable,
@@ -217,10 +221,12 @@ export function basicCheckoutAdvice(
     setup: null,
     leave: null,
     targetLeave: null,
-    reasonCodes: bogey ? ["bogey-number"] : ["no-route"],
+    reasonCodes: bogey ? ["bogey-number"] : scoring ? ["scoring-setup"] : ["no-route"],
     explanation: bogey
       ? `No three-dart double-out exists from ${score}. Score down to a finishable leave.`
-      : `No valid ${dartsAvailable}-dart route is available from ${score}.`,
+      : scoring
+        ? `Scoring phase. ${score} is above the ${dartsAvailable}-dart finishing range — build the score down.`
+        : `No valid ${dartsAvailable}-dart route is available from ${score}.`,
     primaryPlan: null,
     alternatePlans: [],
     setupPlan: null,
