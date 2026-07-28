@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button, CommandDock, IconButton, Modal } from "navi-ui";
-import { AggregateVisitRequiresDartsError, applyDart, basicCheckoutAdvice, BOARD_CLOCKWISE, BOARD_RADII, chooseAiAim, createLog, dart, dartEvent, notation, replay, rewindToVisit, representativePoint, scoreBoardPoint, seededRandom, throwAiDart, undoLastEvent, visitEvent, x01PlayerStats, type Dart, type InRule, type OutRule, type X01Event, type X01Log, type X01State } from "@/domain";
+import { AggregateVisitRequiresDartsError, applyDart, basicCheckoutAdvice, chooseAiAim, createLog, dart, dartEvent, notation, replay, rewindToVisit, seededRandom, throwAiDart, undoLastEvent, visitEvent, x01PlayerStats, type Dart, type InRule, type OutRule, type X01Event, type X01Log, type X01State } from "@/domain";
 import { clearActiveMatch, loadActiveMatch, matchesSetup, saveActiveMatch } from "@/lib/product/match-store";
-import { AiTurnClientError, projectDartMarker, requestPremiumAiTurn } from "@/lib/product/ai-turn-client";
+import { AiTurnClientError, requestPremiumAiTurn } from "@/lib/product/ai-turn-client";
+import { Dartboard, positioned } from "./dartboard";
 import { hasAccessEntitlement, isProductAvailable } from "@/lib/product/access-contract";
 import { useAccess } from "./access-provider";
 import { useAdvancedCheckout } from "./use-advanced-checkout";
@@ -15,12 +16,6 @@ import { CheckoutCompanion } from "./checkout-companion";
 import { MatchResult } from "./match-result";
 import { VisitEntry } from "./visit-entry";
 
-const SEGMENTS = BOARD_CLOCKWISE;
-const BOARD_CENTER=160,BOARD_RADIUS=136;
-const R={innerBull:BOARD_RADII.innerBull*BOARD_RADIUS,outerBull:BOARD_RADII.outerBull*BOARD_RADIUS,trebleInner:BOARD_RADII.trebleInner*BOARD_RADIUS,trebleOuter:BOARD_RADII.trebleOuter*BOARD_RADIUS,doubleInner:BOARD_RADII.doubleInner*BOARD_RADIUS,outer:BOARD_RADII.outer*BOARD_RADIUS};
-function polar(radius:number,degrees:number){const angle=degrees*Math.PI/180,round=(value:number)=>Math.round(value*10_000)/10_000;return{x:round(BOARD_CENTER+radius*Math.cos(angle)),y:round(BOARD_CENTER+radius*Math.sin(angle))}}
-function ringPath(inner:number,outer:number,start:number,end:number){const a=polar(outer,start),b=polar(outer,end),c=polar(inner,end),d=polar(inner,start);return `M${a.x} ${a.y} A${outer} ${outer} 0 0 1 ${b.x} ${b.y} L${c.x} ${c.y} A${inner} ${inner} 0 0 0 ${d.x} ${d.y} Z`;}
-function positioned(value:Dart):Dart{return value.x!==undefined&&value.y!==undefined?value:dart(value.segment,value.multiplier,representativePoint(value))}
 /**
  * Plays out a local AI visit and returns the darts, not the resulting state.
  *
@@ -110,7 +105,6 @@ export function X01Match() {
   function retryPremiumAi(){if(game.status!=="playing"||game.currentPlayer!==1||!isAi)return;queuePremiumAiTurn(game)}
   function continueWithLevelEight(){cancelAi();setContinueAtEight(true);setAiRecovery(null);setMessage("Continuing this match with AI level 8");if(game.status==="playing"&&game.currentPlayer===1&&isAi)queueLocalAiTurn(game,8)}
   const keyboard=useMatchKeyboard({onDart:addDart,onUndo:undo,disabled:manualInputDisabled});
-  function boardClick(e:React.MouseEvent<SVGSVGElement>){const rect=e.currentTarget.getBoundingClientRect();const x=(e.clientX-rect.left)*320/rect.width,y=(e.clientY-rect.top)*320/rect.height;addDart(scoreBoardPoint({x:(x-BOARD_CENTER)/BOARD_RADIUS,y:(y-BOARD_CENTER)/BOARD_RADIUS}));}
   // The active input mode drives the phone layout: the board only claims the
   // screen while it is the thing being tapped. See src/app/match-layout.css.
   return <div className="match-page" data-input-mode={inputMode}>
@@ -120,13 +114,7 @@ export function X01Match() {
     <section className="score-race" aria-label="Scoreboard"><div className={`score-player ${game.currentPlayer===0&&game.status==="playing"?"active":""}`}><span>{game.players[0]?.name??"Player 1"} <i>{game.status==="complete"?"finished":game.currentPlayer===0?"at the oche":"waiting"}</i></span><strong>{you}</strong><small>{stats[0]?.dartsThrown?`${stats[0].threeDartAverage.toFixed(2)} 3DA`:"No darts yet"}</small></div><div className="leg-score"><span>{game.options.setsToWin>1?"SETS · LEGS":"LEGS"}</span><b>{game.options.setsToWin>1?`${game.sets[0]}–${game.sets[1]} · `:""}{game.legs[0]} — {game.legs[1]}</b></div><div className={`score-player opponent ${game.currentPlayer===1&&game.status==="playing"?"active":""}`}><span>{game.players[1]?.name??"Player 2"} <i>{game.status==="complete"?"finished":isAi?`LV ${level}`:game.currentPlayer===1?"at the oche":"waiting"}</i></span><strong>{ai}</strong><small>{stats[1]?.dartsThrown?`${stats[1].threeDartAverage.toFixed(2)} 3DA`:"No darts yet"}</small></div></section>
     {game.status==="complete"&&<MatchResult players={game.players} winnerId={game.winnerId} legs={game.legs} averages={stats.map(value=>value.threeDartAverage)} />}
     <div className="match-grid">
-      <section className="board-zone"><div className="board-wrap"><svg className="dartboard" viewBox="0 0 320 320" preserveAspectRatio="xMidYMid meet" role="button" tabIndex={manualInputDisabled?-1:0} aria-disabled={manualInputDisabled} aria-label="Dartboard. Click a landing point to record a dart. Press Enter to record treble twenty." onClick={boardClick} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();addDart(dart(20,3));}}}>
-        <circle cx={BOARD_CENTER} cy={BOARD_CENTER} r="151" className="board-shadow"/>
-        {SEGMENTS.map((number,index)=>{const center=index*18-90,start=center-9,end=center+9;const label=polar(145,center);const bed=index%2===0?"bed-dark":"bed-light";const color=index%2===0?"ring-red":"ring-green";return <g key={number} data-segment={number}><path d={ringPath(R.outerBull,R.trebleInner,start,end)} className={`board-bed ${bed}`}/><path d={ringPath(R.trebleInner,R.trebleOuter,start,end)} className={`board-bed ${color}`}/><path d={ringPath(R.trebleOuter,R.doubleInner,start,end)} className={`board-bed ${bed}`}/><path d={ringPath(R.doubleInner,R.outer,start,end)} className={`board-bed ${color}`}/><text x={label.x} y={label.y} className="board-number">{number}</text></g>})}
-        <circle cx={BOARD_CENTER} cy={BOARD_CENTER} r={R.outerBull} className="outer-bull"/><circle cx={BOARD_CENTER} cy={BOARD_CENTER} r={R.innerBull} className="inner-bull"/>
-        <g className="board-wires" aria-hidden="true">{[R.innerBull,R.outerBull,R.trebleInner,R.trebleOuter,R.doubleInner,R.outer].map(radius=><circle key={radius} cx={BOARD_CENTER} cy={BOARD_CENTER} r={radius}/>)}{SEGMENTS.map((number,index)=>{const point=polar(R.outer,index*18-99),inner=polar(R.outerBull,index*18-99);return <line key={number} x1={inner.x} y1={inner.y} x2={point.x} y2={point.y}/>})}</g>
-        {darts.map((d,i)=>{const marker=projectDartMarker(d),x=BOARD_CENTER+marker.x*BOARD_RADIUS,y=BOARD_CENTER+marker.y*BOARD_RADIUS;return <g key={`${notation(d)}-${i}`} className={`throw-mark${marker.offBoard?" off-board":""}`} data-off-board={marker.offBoard||undefined}><title>{marker.offBoard?`Dart ${i+1}: off-board miss`:`Dart ${i+1}: ${notation(d)}`}</title><circle cx={x} cy={y} r="7"/><text x={x} y={y+3}>{marker.offBoard?"×":i+1}</text></g>})}
-      </svg><div className="board-caption"><span>Tap the landing point</span><small>or use score entry below</small></div></div></section>
+      <section className="board-zone"><Dartboard darts={darts} disabled={manualInputDisabled} onDart={addDart} /></section>
       <aside className="match-side">
         <CheckoutCompanion advice={checkout} playerName={game.players[game.currentPlayer]?.name??`Player ${game.currentPlayer+1}`} interactive={!isAi||game.currentPlayer===0} tier={checkoutTier} upgrading={advancedCheckout.pending} />
         <VisitEntry darts={darts} disabled={manualInputDisabled} mode={inputMode} onModeChange={setInputMode} onDart={addDart} onAggregate={submitAggregate} />

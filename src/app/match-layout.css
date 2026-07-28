@@ -237,3 +237,87 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ── Cricket scoreboard ────────────────────────────────────────────────────
+ * A real Cricket board is a three-column table: marks, number, marks. Keeping
+ * it as a table rather than a grid of divs means a screen reader announces the
+ * number a mark belongs to without any extra scaffolding.
+ */
+.cricket-board {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.cricket-board table {
+  width: 100%;
+  max-width: 460px;
+  margin: 0 auto;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.cricket-board th,
+.cricket-board td {
+  padding: 6px 4px;
+  text-align: center;
+  border-bottom: 1px solid var(--line);
+}
+
+.cricket-board thead th {
+  font: 500 9px var(--font-mono);
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.cricket-board tbody th {
+  font: 700 15px var(--font-display);
+  color: var(--muted);
+}
+
+.cricket-board tbody td {
+  font-size: 22px;
+  line-height: 1;
+  color: var(--accent);
+}
+
+/* Both players closed it: the number is dead and cannot score again. */
+.cricket-board tr.dead th,
+.cricket-board tr.dead td {
+  color: var(--muted);
+  opacity: 0.5;
+}
+
+.cricket-board tfoot th {
+  font: 500 9px var(--font-mono);
+  color: var(--muted);
+}
+
+.cricket-board tfoot strong {
+  font: 800 22px var(--font-display);
+}
+
+.cricket-turn,
+.cricket-rates {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 10px 0 0;
+  font: 500 10px var(--font-mono);
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.cricket-turn .active {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* Cricket has no checkout companion or history rail, so the board and the pad
+ * take the width between them. */
+@media (min-width: 1101px) {
+  .cricket-grid {
+    grid-template-columns: minmax(340px, 1fr) minmax(360px, 0.7fr);
+  }
+}
