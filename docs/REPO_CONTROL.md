@@ -40,7 +40,7 @@
 - Active matches resume from local storage with no account, because free play requires no account. Completed-match history in Neon is still unwritten; `matches`, `players`, `turns`, and `darts` have no writer as of 2026-07-28.
 - Playable modes as of 2026-07-28: X01, Cricket (standard / cut-throat / tactics), Around the Clock, Shanghai, Count-Up, and Bob's 27. Checkout Lab, Doubles Matrix, and Scoring Sprint are catalogue rows only and are labelled as such.
 - Every mode owns its rules and its log and imports nothing from another mode. What they share is the regulation board (`src/components/dartboard.tsx`), the per-dart pad, the keyboard scheme, visit rewind, and local resume. Adding a mode must not require editing an existing one.
-- `pnpm test:browser` runs against production by setting `DARTIO_BASE_URL`. On 2026-07-28 it passed 102/102 against `https://dartioopus46.vercel.app`.
+- `pnpm test:browser` runs against production by setting `DARTIO_BASE_URL`. On 2026-07-28 it passed 115 with 2 skipped against `https://dartioopus46.vercel.app`. The suite grew from 102 in the same session: a green 102/102 had been reported against a deployment whose top bar offered a phone no way to sign in, because the suite asserted that `/auth/sign-in` answers 200 and never that a visitor could reach it. Nav reachability and accent-foreground contrast are now asserted rather than assumed.
 - Known unfixed defect: `/api/auth/get-session` answers 500 when Neon Auth's upstream is unreachable, where Dartio's own routes answer a deliberate 503. A real Neon outage would report a server fault instead of degrading to local free play.
 - **Production authentication is broken as of 2026-07-28.** No origin the app is served from is in the production Neon Auth project's trusted domains: `dartioopus46.vercel.app`, the canonical `dartio-*.vercel.app` deployment URL, and `dartio.vercel.app` all return `403 INVALID_ORIGIN` on sign-up and sign-in. Preview was configured this way and production never was. The fix is a Neon console change, not a repository change.
 - There is no admin or superadmin role. `users` carries no role column and no admin surface exists.
@@ -55,7 +55,7 @@
 - `pnpm test`
 - `pnpm build`
 - `pnpm test:browser:install` (once per machine)
-- `pnpm test:browser` — 54 checks across 390×844, 834×1112, and 1440×1000; set `DARTIO_BASE_URL` to run them against a preview or production deployment instead of a local build
+- `pnpm test:browser` — 117 checks across 390×844, 834×1112, and 1440×1000; 115 run and 2 skip by design, those being the sign-up assertion at the two widths where sign-up is deliberately absent. Set `DARTIO_BASE_URL` to run them against a preview or production deployment instead of a local build
 - `pnpm db:generate`
 
 ## Release ladder

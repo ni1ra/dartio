@@ -96,6 +96,56 @@ for (const theme of THEMES) {
   });
 }
 
+/*
+ * Lain's standing rule: never black or dark text on an orange/accent background,
+ * always white, via --on-accent.
+ *
+ * The rule was closed in Cycle 11 on the receipt that the token exists. A token
+ * existing is not proof that every accent surface uses it — the same shape of gap
+ * that let "/auth/sign-in loads" stand in for "a visitor can reach it". This
+ * measures what is actually painted, so a future rule that sets an accent
+ * background without setting the foreground fails here rather than in his hands.
+ */
+const ACCENT_SURFACES = [
+  ["landing call to action", "/", ".closing-cta"],
+  ["start-a-match button", "/", "a.button-link"],
+  ["brand mark", "/", ".brand-mark"],
+] as const;
+
+for (const [name, path, selector] of ACCENT_SURFACES) {
+  test(`${name} keeps light text on the accent`, async ({ page }) => {
+    await page.goto(path, { waitUntil: "networkidle" });
+    const element = page.locator(selector).first();
+    await expect(element, `${name} not found at ${path}`).toBeAttached();
+
+    const measured = await element.evaluate((node) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 1;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+      const toRgba = (value: string): number[] => {
+        ctx.clearRect(0, 0, 1, 1);
+        ctx.fillStyle = value;
+        ctx.fillRect(0, 0, 1, 1);
+        return [...ctx.getImageData(0, 0, 1, 1).data];
+      };
+      const style = getComputedStyle(node);
+      return { text: toRgba(style.color), background: toRgba(style.backgroundColor) };
+    });
+
+    // Only meaningful where the element genuinely paints the accent; a themed
+    // variant that drops the accent background is not what this guards.
+    const backgroundLuminance = luminance(measured.background);
+    if (measured.background[3] === 0) return;
+
+    // The rule is directional, not merely contrasty: dark-on-accent is the
+    // failure, and black text on orange can still clear a naive contrast floor.
+    expect(
+      luminance(measured.text),
+      `${name}: text rgb(${measured.text}) on rgb(${measured.background}) is darker than its accent background`,
+    ).toBeGreaterThan(backgroundLuminance);
+  });
+}
+
 test("Navi controls keep a visible selected state", async ({ page }) => {
   // Neon Auth's unlayered Tailwind preflight once stripped border, background,
   // and radius off every Navi component, leaving the setup control looking like
