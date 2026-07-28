@@ -723,3 +723,62 @@ html[data-lp-motion] [data-reveal][data-inview] {
     animation: none;
   }
 }
+
+/* ── Account entry point ───────────────────────────────────────────────────
+ * The site had no link to sign in above 760px. Both /auth/sign-in and /account
+ * worked; nothing pointed at them, so the only way in was typing the URL — and
+ * everything the product charges for is behind that door.
+ */
+.account-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.account-nav:hover {
+  color: var(--ink);
+}
+
+/* Reserves the label's space while the session resolves, so the bar does not
+ * reflow when it lands. */
+.account-nav--pending {
+  color: transparent;
+  pointer-events: none;
+}
+
+.account-nav__signup {
+  min-height: 38px;
+}
+
+.account-nav__avatar {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.account-nav__label {
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Below the desktop breakpoint the bar has room for one action, and the bottom
+ * navigation already carries "You". Keep the signed-out prompt, drop the rest. */
+@media (max-width: 1100px) {
+  .account-nav__label,
+  .account-nav__signup {
+    display: none;
+  }
+}

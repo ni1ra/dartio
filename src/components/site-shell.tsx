@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { AppShell, NaviProvider, TopNav } from "navi-ui";
 import { AccessProvider } from "./access-provider";
+import { AccountNav } from "./account-nav";
 import { ThemeMenu } from "./theme-menu";
 
 const routes = [
@@ -28,7 +29,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       <AppShell nav={<TopNav className="site-nav" brand={<Link className="brand" href="/" aria-label="Dartio home">
             <span className="brand-mark" aria-hidden="true">↗</span>
             <span>Dartio</span>
-          </Link>} actions={<div className="nav-actions"><ThemeMenu /><Link className="button-link" href="/play">Start a match</Link></div>}>
+          </Link>} actions={<div className="nav-actions"><ThemeMenu /><AccountNav /><Link className="button-link" href="/play">Start a match</Link></div>}>
           <div className="desktop-links" aria-label="Primary navigation">
             {routes.map(([href, label]) => <Link key={href} href={href} aria-current={pathname.startsWith(href) ? "page" : undefined}>{label}</Link>)}
           </div>
