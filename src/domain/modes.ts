@@ -1,6 +1,6 @@
 export const GAME_MODES = {
   x01: { name: "X01", status: "playable", options: ["startingScore", "legsToWin", "setsToWin", "inRule", "outRule"] },
-  cricket: { name: "Cricket", status: "specified", options: ["scoring", "roundLimit", "numbers"] },
+  cricket: { name: "Cricket", status: "playable", options: ["variant", "winByTwo", "roundLimit"] },
   aroundTheClock: { name: "Around the Clock", status: "specified", options: ["targetOrder", "bullFinish"] },
   shanghai: { name: "Shanghai", status: "specified", options: ["rounds", "instantShanghaiWin"] },
   countUp: { name: "Count-Up", status: "specified", options: ["rounds"] },

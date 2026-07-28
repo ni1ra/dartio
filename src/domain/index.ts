@@ -5,3 +5,5 @@ export * from "./modes";
 export * from "./x01";
 export * from "./x01-log";
 export * from "./x01-persistence";
+export * from "./cricket";
+export * from "./cricket-log";
