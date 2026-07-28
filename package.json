@@ -16,7 +16,8 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "test:browser": "playwright test",
-    "test:browser:install": "playwright install --with-deps chromium"
+    "test:browser:install": "playwright install --with-deps chromium",
+    "verify:auth": "node scripts/verify-production-auth.mjs"
   },
   "dependencies": {
     "@better-auth/api-key": "1.6.13",
