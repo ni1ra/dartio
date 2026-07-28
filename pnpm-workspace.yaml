@@ -3,7 +3,13 @@ packages:
 
 allowBuilds:
   core-js: false
-  esbuild: true
+  # esbuild's postinstall only re-runs `esbuild --version` to confirm the
+  # platform binary matches. With three esbuild majors in the store (vite 8,
+  # drizzle-kit, and a transitive 0.18) that check resolves the wrong binary and
+  # fails the whole install with "Expected 0.28.1 but got 0.25.12". The binary
+  # itself ships in the @esbuild/<platform> package and needs no build step, so
+  # skipping the self-check costs nothing and makes a clean install reproducible.
+  esbuild: false
   sharp: true
   unrs-resolver: true
 
