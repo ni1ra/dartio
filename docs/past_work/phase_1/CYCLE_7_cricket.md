@@ -1,6 +1,6 @@
 # Cycle 7 — A Second Mode, and the Architecture That Made It One
 
-Status: active
+Status: closed 2026-07-28
 
 Derived from: `PHASE_1_v1_foundation.md` and gap 3 of
 `artifacts/GAP_AUDIT_2026-07-28.md`.

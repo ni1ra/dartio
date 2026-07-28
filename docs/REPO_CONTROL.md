@@ -38,6 +38,10 @@
 - Club Checkout is closed: `PLAN_CATALOG.club.checkout` is `unavailable`, `POST /api/billing/checkout` returns 409 for any non-`self_serve` plan before Stripe is called, and the pricing surface disables the action. Existing Club subscribers keep their projected entitlements.
 - The canonical record of a match is its event log, not its state: `src/domain/x01-log.ts` folds the pure reducers over what was thrown. Events carry the dart, not the thrower — turn order derives the player — so a visit is corrected by rewinding to it, never by excising it from the middle. The log is versioned and zod-validated on read (`src/domain/x01-persistence.ts`); an unknown version is discarded rather than migrated.
 - Active matches resume from local storage with no account, because free play requires no account. Completed-match history in Neon is still unwritten; `matches`, `players`, `turns`, and `darts` have no writer as of 2026-07-28.
+- Playable modes as of 2026-07-28: X01, Cricket (standard / cut-throat / tactics), Around the Clock, Shanghai, Count-Up, and Bob's 27. Checkout Lab, Doubles Matrix, and Scoring Sprint are catalogue rows only and are labelled as such.
+- Every mode owns its rules and its log and imports nothing from another mode. What they share is the regulation board (`src/components/dartboard.tsx`), the per-dart pad, the keyboard scheme, visit rewind, and local resume. Adding a mode must not require editing an existing one.
+- `pnpm test:browser` runs against production by setting `DARTIO_BASE_URL`. On 2026-07-28 it passed 102/102 against `https://dartioopus46.vercel.app`.
+- Known unfixed defect: `/api/auth/get-session` answers 500 when Neon Auth's upstream is unreachable, where Dartio's own routes answer a deliberate 503. A real Neon outage would report a server fault instead of degrading to local free play.
 - Supabase is explicitly out of scope.
 - Never store secret values in repository files or documentation.
 

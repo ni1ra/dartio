@@ -1,6 +1,6 @@
 # Cycle 9 — Twenty Levels That Play Differently
 
-Status: active
+Status: closed 2026-07-28
 
 Derived from: `PHASE_1_v1_foundation.md` and gaps 8 and 9 of
 `artifacts/GAP_AUDIT_2026-07-28.md`.

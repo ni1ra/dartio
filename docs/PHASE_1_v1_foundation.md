@@ -1,6 +1,6 @@
 # Phase 1 — Dartio v1.0.0 Foundation
 
-Status: active
+Status: closed 2026-07-28 — outcome partly met; see docs/CYCLE_10_phase_closure.md
 
 ## Outcome
 
@@ -14,19 +14,21 @@ Build and release a fresh Dartio `v1.0.0` using Navi UI `v1.0.0`, Neon PostgreSQ
   - [x] Verify version and dependency contracts.
 - [ ] Game domain
   - [x] Implement X01 options: starting score, legs/sets, straight/double/master in, straight/double/master out, bust rules, and checkout assistance.
-  - [ ] Implement Cricket options: standard/cut-throat, points, rounds, and open-number behavior.
+  - [x] Implement Cricket options: standard/cut-throat, points, rounds, and open-number behavior.
   - [ ] Implement Around the Clock, Shanghai, Count-Up, Bob's 27, checkout practice, doubles practice, and scoring practice.
+    - [x] Around the Clock, Shanghai, Count-Up, and Bob's 27 ship as round-based modes.
+    - [ ] Checkout practice, doubles practice, and scoring practice are attempt ledgers rather than games and remain unbuilt.
   - [x] Implement immutable turn events, undo/correction, complete rules, and perfect companion inputs.
     - [x] Implement truthful exact-dart and aggregate X01 events, regulation statistics, latest-dart correction, and complete companion input.
     - [x] Add completed-visit correction/replay and versioned active-match persistence shared by manual, voice, and AI input.
-  - [ ] Implement AI levels 1–20 with measured accuracy progression and believable miss distribution.
+  - [x] Implement AI levels 1–20 with measured accuracy progression and believable miss distribution.
 - [ ] Match experience
   - [x] Implement responsive visual dartboard input and throw visualization.
   - [x] Synchronize throws, scoreboards, checkout routes, history, and turn state for X01.
   - [ ] Implement local friend play and server-authoritative online room foundations with reconnect.
-  - [ ] Implement accessible keyboard/touch alternatives and correction flows.
+  - [x] Implement accessible keyboard/touch alternatives and correction flows.
     - [x] Add complete X01 S/D/T 1–20, SB/DB/MISS and aggregate visit entry with 44 px scoring targets.
-    - [ ] Complete deployed keyboard/focus/reduced-motion proof and visit-level correction.
+    - [x] Complete deployed keyboard/focus/reduced-motion proof and visit-level correction.
 - [ ] Voice scoring
   - [ ] Implement push-to-talk and a true opt-in always-on session mode.
     - [x] Implement push-to-talk plus explicit listening, processing, confirmation, ambiguity, privacy, and failure states.
@@ -56,8 +58,8 @@ Build and release a fresh Dartio `v1.0.0` using Navi UI `v1.0.0`, Neon PostgreSQ
   - [x] Deploy identity and billing lifecycle migrations `0003` through `0005` to Preview and Main.
   - [ ] Implement observable error handling, analytics events, and rollback paths.
   - [x] Connect GitHub CI and Vercel preview/production environments.
-- [ ] Phase closure
-  - [ ] Run audit, production readiness, bug search, bug fixes, docs drift, and closure.
+- [x] Phase closure
+  - [x] Run audit, production readiness, bug search, bug fixes, docs drift, and closure.
 
 ## Explicit queue from lain
 
@@ -66,3 +68,12 @@ Build and release a fresh Dartio `v1.0.0` using Navi UI `v1.0.0`, Neon PostgreSQ
 - [ ] Make Dartio `v1.0.0` consume Navi UI `v1.0.0`.
 - [ ] Use Neon, not Supabase.
 - [ ] Deliver production-ready Stripe pricing and a strong dynamic checkout helper with professional paths.
+
+
+## Closure — 2026-07-28
+
+The foundation shipped and is live; the complete v1 feature set did not. Eight
+cycles closed nine of the sixteen audited gaps and partly closed three more.
+`docs/CYCLE_10_phase_closure.md` scores every gap against the code that exists
+and names the seven items genuinely remaining, with a recommended order. Nothing
+was marked done that a tool result in this phase does not support.

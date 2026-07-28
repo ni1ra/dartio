@@ -1,6 +1,6 @@
 # Cycle 8 — The Round-Based Modes
 
-Status: active
+Status: closed 2026-07-28
 
 Derived from: `PHASE_1_v1_foundation.md` and gap 3 of
 `artifacts/GAP_AUDIT_2026-07-28.md`.

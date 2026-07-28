@@ -1,6 +1,6 @@
 # Cycle 5 — The Match Is a Log
 
-Status: active
+Status: closed 2026-07-28
 
 Derived from: `PHASE_1_v1_foundation.md`, the deterministic-correction and
 active-match-resume rows carried forward from Cycle 2, and gaps 4, 7, and 14 of
