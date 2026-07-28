@@ -1,6 +1,6 @@
 # Cycle 6 — Input Parity and Accessibility
 
-Status: active
+Status: closed 2026-07-28
 
 Derived from: `PHASE_1_v1_foundation.md` and the accessible keyboard/touch
 alternatives row, plus the stale-copy finding in gap 6 of
