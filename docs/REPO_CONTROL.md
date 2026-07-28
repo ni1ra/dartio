@@ -36,6 +36,8 @@
 - Preview has a branch-scoped `NEXT_PUBLIC_APP_URL` override for `cycle-2-identity-billing-voice`, targeting its stable Vercel alias. The global Preview and Production values were not changed.
 - Paid features are authorized server-side only. `voice_always_on` gates `POST /api/voice/transcribe` before body parsing; `advanced_ai` gates `POST /api/ai/turn` for levels 9–20 while 1–8 stay local; `advanced_checkout` gates `POST /api/checkout/advice` for alternates, setup plans, and preference ranking while Free computes one route locally. All three read the server's own access snapshot and accept no client plan, access, or seed claim.
 - Club Checkout is closed: `PLAN_CATALOG.club.checkout` is `unavailable`, `POST /api/billing/checkout` returns 409 for any non-`self_serve` plan before Stripe is called, and the pricing surface disables the action. Existing Club subscribers keep their projected entitlements.
+- The canonical record of a match is its event log, not its state: `src/domain/x01-log.ts` folds the pure reducers over what was thrown. Events carry the dart, not the thrower — turn order derives the player — so a visit is corrected by rewinding to it, never by excising it from the middle. The log is versioned and zod-validated on read (`src/domain/x01-persistence.ts`); an unknown version is discarded rather than migrated.
+- Active matches resume from local storage with no account, because free play requires no account. Completed-match history in Neon is still unwritten; `matches`, `players`, `turns`, and `darts` have no writer as of 2026-07-28.
 - Supabase is explicitly out of scope.
 - Never store secret values in repository files or documentation.
 

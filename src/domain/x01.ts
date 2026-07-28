@@ -47,6 +47,20 @@ export interface X01PlayerStats {
   readonly dartsThrown: number;
   readonly visits: number;
   readonly threeDartAverage: number;
+  /**
+   * Average over the first three visits of each leg. The standard measure of
+   * scoring power, because it is taken before the checkout phase distorts it.
+   */
+  readonly firstNineAverage: number;
+  /** Visits that ended on a finishable score under the active out rule. */
+  readonly checkoutAttempts: number;
+  readonly checkoutsHit: number;
+  /** Percentage, 0–100. Zero attempts reads as 0 rather than as undefined. */
+  readonly checkoutPercentage: number;
+  readonly bustCount: number;
+  /** Highest completed visit score. Busts count as zero, as they score zero. */
+  readonly bestVisit: number;
+  readonly legsWon: number;
 }
 
 interface X01Snapshot {
@@ -135,7 +149,44 @@ export function x01PlayerStats(state: X01State, playerId: string): X01PlayerStat
     dartsThrown += state.currentDarts.length;
     visits += 1;
   }
-  return { playerId, pointsScored, dartsThrown, visits, threeDartAverage: dartsThrown === 0 ? 0 : pointsScored * 3 / dartsThrown };
+  // First nine: the opening three visits of every leg this player has thrown in.
+  const openingVisits = new Map<number, TurnRecord[]>();
+  for (const turn of completed) {
+    const forLeg = openingVisits.get(turn.legNumber) ?? [];
+    if (forLeg.length < 3) forLeg.push(turn);
+    openingVisits.set(turn.legNumber, forLeg);
+  }
+  const opening = [...openingVisits.values()].flat();
+  const openingPoints = opening.reduce((total, turn) => total + turn.scoreBefore - turn.scoreAfter, 0);
+  const openingDarts = opening.reduce((total, turn) => total + turn.dartsThrown, 0);
+
+  // A visit is a checkout attempt when the player arrived on a score the out
+  // rule can finish from in three darts — not merely when they happened to win.
+  const maxFinish = state.options.outRule === "double" ? 170 : 180;
+  const minFinish = state.options.outRule === "straight" ? 1 : 2;
+  const attempts = completed.filter(
+    (turn) => turn.scoreBefore >= minFinish && turn.scoreBefore <= maxFinish,
+  );
+  const checkoutsHit = attempts.filter((turn) => !turn.bust && turn.scoreAfter === 0).length;
+  const bestVisit = completed.reduce(
+    (best, turn) => Math.max(best, turn.bust ? 0 : turn.scoreBefore - turn.scoreAfter),
+    0,
+  );
+
+  return {
+    playerId,
+    pointsScored,
+    dartsThrown,
+    visits,
+    threeDartAverage: dartsThrown === 0 ? 0 : pointsScored * 3 / dartsThrown,
+    firstNineAverage: openingDarts === 0 ? 0 : openingPoints * 3 / openingDarts,
+    checkoutAttempts: attempts.length,
+    checkoutsHit,
+    checkoutPercentage: attempts.length === 0 ? 0 : checkoutsHit * 100 / attempts.length,
+    bustCount: completed.filter((turn) => turn.bust).length,
+    bestVisit,
+    legsWon: state.legs[currentIndex] ?? 0,
+  };
 }
 
 function advance(state: X01State, before: X01Snapshot, turn: TurnRecord, opened: readonly boolean[]): X01State {
