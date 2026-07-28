@@ -16,9 +16,9 @@ Build and release a fresh Dartio `v1.0.0` using Navi UI `v1.0.0`, Neon PostgreSQ
   - [x] Implement X01 options: starting score, legs/sets, straight/double/master in, straight/double/master out, bust rules, and checkout assistance.
   - [ ] Implement Cricket options: standard/cut-throat, points, rounds, and open-number behavior.
   - [ ] Implement Around the Clock, Shanghai, Count-Up, Bob's 27, checkout practice, doubles practice, and scoring practice.
-  - [ ] Implement immutable turn events, undo/correction, complete rules, and perfect companion inputs.
+  - [x] Implement immutable turn events, undo/correction, complete rules, and perfect companion inputs.
     - [x] Implement truthful exact-dart and aggregate X01 events, regulation statistics, latest-dart correction, and complete companion input.
-    - [ ] Add completed-visit correction/replay and versioned active-match persistence shared by manual, voice, and AI input.
+    - [x] Add completed-visit correction/replay and versioned active-match persistence shared by manual, voice, and AI input.
   - [ ] Implement AI levels 1–20 with measured accuracy progression and believable miss distribution.
 - [ ] Match experience
   - [x] Implement responsive visual dartboard input and throw visualization.

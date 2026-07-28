@@ -164,11 +164,18 @@ describe("X01 regulation statistics", () => {
     state = applyDart(state, dart(19));
     state = applyDart(state, dart(20, 2));
 
-    expect(x01PlayerStats(state, "a")).toEqual({
+    // The bust visit scored nothing but still cost two darts, and the finish
+    // that followed took one. Both count toward the regulation average.
+    expect(x01PlayerStats(state, "a")).toMatchObject({
       playerId: "a",
       pointsScored: 40,
       dartsThrown: 3,
       visits: 2,
+      bustCount: 1,
+      bestVisit: 40,
+      checkoutAttempts: 2,
+      checkoutsHit: 1,
+      legsWon: 1,
       threeDartAverage: 40,
     });
   });
