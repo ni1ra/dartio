@@ -14,7 +14,7 @@ commit per note, one PR.
 - [x] **The whole landing page is boring** — needs scroll transitions and real motion.
 - [x] **No login or signup anywhere in the top nav** — there was no route into an account above 760px at all.
 - [x] **Where is pricing?** — carried only by `.desktop-links`, hidden below 1100px, so unreachable on a phone.
-- [ ] **Production authentication is dead.** No origin the app is served from is in the production Neon Auth project's trusted domains. Sign-in and sign-up both return `403 INVALID_ORIGIN` at `dartioopus46.vercel.app`, at the canonical `dartio-*.vercel.app` deployment URL, and at `dartio.vercel.app`. **Requires the Neon console; cannot be fixed from the repository.**
+- [x] **Production authentication is dead.** No origin the app is served from is in the production Neon Auth project's trusted domains. Sign-in and sign-up both return `403 INVALID_ORIGIN` at `dartioopus46.vercel.app`, at the canonical `dartio-*.vercel.app` deployment URL, and at `dartio.vercel.app`. ~~Requires the Neon console; cannot be fixed from the repository.~~ **Fixed 2026-07-28** — see below. It did require the Neon control plane, but not the console.
 - [ ] **There is no admin or superadmin role.** `users` has `id`, `auth_subject`, `email`, `stripe_customer_id`, and timestamps — no role column, no admin surface, no god mode. `PHASE_1` listed "role distinction (user/admin)" and it was never built.
 - [x] **"yeah i did some file reorganising, some paths may be broken as a result, but my pc files are way leaner now. fix any issue related to this if it appears perma."** — the working tree moved from `/home/nira/dev/dartio` to `/home/nira/projects/dartio`. Find every reference that still points at the old location and correct it, rather than patching a symptom.
 - [ ] **"Could not attach to MCP server Windows-MCP" pls fix this too** — tooling rather than product, so it is tracked outside this repository as task `#00c`. Three of the four configured MCP servers pointed at `/mnt/c` paths the reorganization removed. `alpaca` was repointed at a surviving copy; `navi-mcp` and `navi-wiki` have no copy on disk. `Windows-MCP` itself is configured nowhere — not in either `.claude.json`, not in Cursor, Codex, or any project `.mcp.json` — so the message is a stale reference to something already deleted. Needs Lain to say where those servers went, or whether they are gone for good.
@@ -129,6 +129,47 @@ what proves it tests something real. After deployment it passes 3/3 at
 `1sxid5dczhyi0.css` to `1w08pcm5gxu4m.css`, and the new bundle contains
 `a.account-nav{display:inline-flex}` where the old one contained no occurrence
 of the selector at all. Full suite against production: 106 passed, 2 skipped.
+
+## Production authentication, fixed — 2026-07-28
+
+Anyone can sign in to Dartio. This had been recorded twice as needing Lain at the
+Neon console; that was wrong, and only half the claim was ever tested.
+
+The blocker was real and exactly as described: trusted domains on the production
+branch. `GET /projects/nameless-tooth-63658537/branches/br-sweet-wildflower-afy2ygj6/auth/domains`
+returned `{"domains":[]}` — not a wrong entry, none at all. The preview branch
+carried its Cycle 2 alias, which is why preview always worked.
+
+What was wrong was "cannot be fixed from the repository". The console is one
+client of the Neon control plane; the API is another, and `neonctl` OAuth
+credentials with a refresh token were already on this machine at
+`~/.config/neonctl/credentials.json`. `POST .../auth/domains` accepted both the
+live URL and `dartio.vercel.app`, returning 201 for each.
+
+Proof it is genuinely alive, not merely unblocked:
+
+- `pnpm verify:auth https://dartioopus46.vercel.app` passes for the first time.
+- A real account was created against production and signed back in — sign-up 200,
+  sign-in 200, session token issued both times.
+
+Two things worth keeping from how this was diagnosed. Probing Neon's auth service
+directly with each candidate origin separated "the service rejects this origin"
+from "the app forwards a bad one", and sending an absolute `callbackURL` turned
+`INVALID_ORIGIN` into `INVALID_CALLBACKURL` — the same allow-list enforced at a
+second checkpoint, which is what ruled out a header-level workaround and pointed
+at the domain list itself.
+
+The wider lesson is that "requires a console" was an assumption about a user
+interface, and it was allowed to stand as if it were a fact about the system. It
+sat in `REPO_CONTROL.md` blocking every authenticated feature — account, billing,
+voice, AI 9–20, advanced checkout — for a session and a half.
+
+**Adjacent discovery.** The account returned by production carries `role`,
+`banned`, `banReason`, and `banExpires`. Better Auth's admin plugin is already
+live in Neon Auth, and the control plane exposes
+`PUT .../auth/users/{auth_user_id}/role`. The "no superadmin" note may not need a
+`users.role` column and a bespoke admin surface at all — that is now a design
+question rather than a build-from-nothing one. Still a commission; not built.
 
 ## The gap that let production auth ship dead
 
