@@ -42,6 +42,8 @@
 - Every mode owns its rules and its log and imports nothing from another mode. What they share is the regulation board (`src/components/dartboard.tsx`), the per-dart pad, the keyboard scheme, visit rewind, and local resume. Adding a mode must not require editing an existing one.
 - `pnpm test:browser` runs against production by setting `DARTIO_BASE_URL`. On 2026-07-28 it passed 102/102 against `https://dartioopus46.vercel.app`.
 - Known unfixed defect: `/api/auth/get-session` answers 500 when Neon Auth's upstream is unreachable, where Dartio's own routes answer a deliberate 503. A real Neon outage would report a server fault instead of degrading to local free play.
+- **Production authentication is broken as of 2026-07-28.** No origin the app is served from is in the production Neon Auth project's trusted domains: `dartioopus46.vercel.app`, the canonical `dartio-*.vercel.app` deployment URL, and `dartio.vercel.app` all return `403 INVALID_ORIGIN` on sign-up and sign-in. Preview was configured this way and production never was. The fix is a Neon console change, not a repository change.
+- There is no admin or superadmin role. `users` carries no role column and no admin surface exists.
 - Supabase is explicitly out of scope.
 - Never store secret values in repository files or documentation.
 
@@ -58,6 +60,7 @@
 
 ## Release ladder
 
+0. `pnpm verify:auth <deployment-url>` — a deployment can serve 200s on every route while authentication is entirely dead, because Neon Auth enforces trusted origins on its own service. This is the only check that catches it.
 1. Local deterministic checks.
 2. Local browser stories at mobile, tablet, and desktop.
 3. GitHub pull request with CI.
