@@ -118,6 +118,14 @@ Two things made it invisible:
 three viewports, and asserts sign-up only above 1100px, where it is a deliberate
 choice rather than an accident.
 
+**Production evidence, 2026-07-28.** The new test was confirmed red against
+production before the fix — mobile and tablet failed, desktop passed — which is
+what proves it tests something real. After deployment it passes 3/3 at
+`https://dartioopus46.vercel.app`. The deployed stylesheet changed hash from
+`1sxid5dczhyi0.css` to `1w08pcm5gxu4m.css`, and the new bundle contains
+`a.account-nav{display:inline-flex}` where the old one contained no occurrence
+of the selector at all. Full suite against production: 106 passed, 2 skipped.
+
 ## The gap that let production auth ship dead
 
 The browser suite passed 102/102 against production while nobody could sign in.
