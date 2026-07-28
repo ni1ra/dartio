@@ -817,3 +817,236 @@ html[data-lp-motion] [data-reveal][data-inview] {
   vertical-align: -0.125em;
   flex-shrink: 0;
 }
+
+/* ── The board must not paint over its neighbour ───────────────────────────
+ * `.board-wrap` resolved to a flat 600 px at every desktop width while its grid
+ * column measured 423–598 px, so the board overhung the checkout companion by
+ * 40 px at 1440 and 216 px at 1120 — the numbers 1, 18, 13, 6 and the "10" sat
+ * on top of the card a player reads every visit.
+ *
+ * The page itself never scrolled sideways, because the overflow is between two
+ * grid children rather than past the document edge. That is why the browser
+ * suite passed: it asserts the document does not scroll horizontally, which was
+ * true the whole time.
+ *
+ * `100%` is added inside the `min()` rather than left to the `max-width` in
+ * globals.css, so the clamp travels with the width instead of depending on a
+ * declaration in a different file continuing to apply.
+ */
+.board-wrap {
+  width: min(64vh, 600px, 100%);
+  max-width: 100%;
+}
+
+/* ── Use the height the match already reserves ─────────────────────────────
+ * `.match-page` reserves `100vh - 76px` and `.match-grid` was a fixed 690 px
+ * inside it, so on a tall viewport the grid stopped short and left a dead band
+ * of canvas between the dock and the bottom of the reserved area.
+ *
+ * Making the page a column and letting the grid take the remaining space means
+ * the board, the companion and the history rail grow into the screen instead of
+ * the page ending early in empty space.
+ */
+@media (min-width: 1101px) {
+  .match-page {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .match-grid {
+    flex: 1 1 auto;
+    min-height: 0;
+    align-content: stretch;
+  }
+}
+
+/* ── The command dock ──────────────────────────────────────────────────────
+ * Its inner row set `justify-content: space-between` with no padding of its
+ * own, so the status text and the buttons were pinned to opposite edges of the
+ * dock with nothing holding them off it, and the two buttons read as one
+ * because only the last carried a border.
+ *
+ * The label is also the only place a player is told how many darts are in hand,
+ * and it was rendering at 12 px.
+ */
+.navi-command-dock__inner {
+  gap: 16px;
+  padding-inline: 4px;
+}
+
+.navi-command-dock__inner > span {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.navi-command-dock__inner > div {
+  gap: 12px;
+}
+
+.navi-command-dock__inner > div > button:not(:last-child) {
+  padding: 10px 14px;
+  border-radius: var(--navi-radius-md, 8px);
+}
+
+.navi-command-dock__inner > div > button:not(:last-child):hover:not(:disabled) {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+
+/* ── Account command grid ──────────────────────────────────────────────────
+ * globals.css styles `.account-command-grid > div`, but `Surface` renders a
+ * `<section>`. The selector never matched, so the 32 px padding and the
+ * `42px 1fr` index column were both silently absent and the cards' content sat
+ * flush against their own edges.
+ *
+ * Matching on the child rather than its tag name means a future `Surface` that
+ * renders something else again does not lose its padding a second time.
+ */
+.account-command-grid > * {
+  padding: 32px;
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 760px) {
+  .account-command-grid > * {
+    padding: 24px;
+  }
+}
+
+/* ── Type scale floor ──────────────────────────────────────────────────────
+ * Measured on production at 1440×1000: 214 of 337 visible text nodes — 64% —
+ * rendered below 14 px, with copy at 7 px, 8 px and 9 px. The scale had 100 px
+ * display headings sitting beside 8 px body with nothing in between, so the
+ * page read as loud and unreadable at the same time.
+ *
+ * The sizes are hardcoded px inside globals.css, which is one minified line and
+ * cannot be edited in place safely, so the floor is raised here where load
+ * order wins. Every selector below is one that globals.css sets under 14 px,
+ * lifted along a fixed curve: 7→11, 8→11, 9→12, 10→12.5, 11→13, 12→14, 13→15.
+ * The curve compresses the bottom of the scale upward rather than shifting it,
+ * so tracked uppercase micro-labels stay visibly smaller than body copy while
+ * both become readable.
+ */
+.button-link { font-size: 15px; }
+.eyebrow { font-size: 14px; }
+.proof-line { font-size: 13px; }
+.floating-score span,.floating-ai span { font-size: 12.5px; }
+.floating-score small,.floating-ai small { font-size: 12.5px; }
+.signal-track { font-size: 14px; }
+.story-steps b,.catalog-number { font-size: 13px; }
+.mode-list span { font-size: 12.5px; }
+.closing-cta>p { font-size: 14px; }
+.closing-cta span { font-size: 14px; }
+.setup-number { font-size: 13px; }
+.level-scale { font-size: 12.5px; }
+.ticket-kicker { font-size: 12.5px; }
+.ticket-versus span { font-size: 12px; }
+.ticket-versus strong { font-size: 15px; }
+.match-ticket dl div { font-size: 14px; }
+.match-ticket>small { font-size: 12.5px; }
+.match-header { font-size: 12.5px; }
+.score-player>span i { font-size: 12px; }
+.score-player>small { font-size: 12.5px; }
+.leg-score span { font-size: 12px; }
+.board-number { font-size: 12px; }
+.throw-mark text { font-size: 11px; }
+.board-caption span { font-size: 14px; }
+.board-caption small { font-size: 12.5px; }
+.checkout-heading span,.checkout-alternates>span { font-size: 12.5px; }
+.checkout-owner span { font-size: 12px; }
+.checkout-leave span { font-size: 11px; }
+.checkout-empty { font-size: 15px; }
+.checkout-meta { font-size: 12px; }
+.checkout-explanation { font-size: 13px; }
+.checkout-tier-note { font-size: 13px; }
+.checkout-alternate { font-size: 12.5px; }
+.current-darts span { font-size: 11px; }
+.current-darts small { font-size: 11px; }
+.quick-darts button { font-size: 12.5px; }
+.voice-panel span small { font-size: 12px; }
+.voice-panel i { font-size: 12px; }
+.voice-panel>p { font-size: 12px; }
+.history-strip header button { font-size: 12.5px; }
+.history-strip li>span { font-size: 11px; }
+.history-strip li div b { font-size: 11px; }
+.history-strip li>small { font-size: 11px; }
+.empty-history p { font-size: 13px; }
+.match-dock>span { font-size: 14px; }
+.input-guidance,.visit-guidance { font-size: 13px; }
+.dart-number-grid button,.dart-special-grid button { font-size: 14px; }
+.dart-special-grid button span { font-size: 12px; }
+.match-result__lead>span { font-size: 12px; }
+.match-result__stats dt { font-size: 12px; }
+.match-result__stats dd span { font-size: 11px; }
+.match-result__actions>button { font-size: 14px; }
+.catalog-row p { font-size: 15px; }
+.catalog-row small { font-size: 13px; }
+.catalog-row>a>b { font-size: 12px; }
+.friends-actions small { font-size: 12.5px; }
+.form-error { font-size: 13px; }
+.room-foundation { font-size: 12.5px; }
+.billing-note { font-size: 14px; }
+.plan-flag { font-size: 12px; }
+.plan>p { font-size: 15px; }
+.price span { font-size: 12.5px; }
+.plan li { font-size: 14px; }
+.pricing-fineprint { font-size: 12.5px; }
+.match-dock .navi-command-dock__inner>span { font-size: 14px; }
+.dartboard .board-number { font-size: 12.5px; }
+.mobile-nav a { font-size: 12.5px; }
+.score-player>span { font-size: 14px; }
+.match-dock>span { font-size: 12px; }
+.match-dock>div>button:not(:last-child) { font-size: 12.5px; }
+.mobile-nav a { font-size: 13px; }
+.auth-promise li { font-size: 15px; }
+.auth-privacy { font-size: 12.5px; }
+.account-success p { font-size: 13px; }
+.account-state-code { font-size: 12px; }
+.account-signed-out>aside>b { font-size: 15px; }
+.account-signed-out li { font-size: 13px; }
+.account-signed-out li span { font-size: 12px; }
+.account-loading>p { font-size: 12px; }
+.identity-signal { font-size: 12px; }
+.account-command-grid p { font-size: 14px; }
+.command-index { font-size: 12.5px; }
+.account-action-error { font-size: 13px; }
+.account-trust { font-size: 12.5px; }
+.interval-switch button span { font-size: 11px; }
+.auth-readiness { font-size: 12px; }
+.pricing-error { font-size: 13px; }
+.plan-signal { font-size: 11px; }
+.plan-head>span { font-size: 12px; }
+.plan-head p { font-size: 14px; }
+.price-v2>small { font-size: 11px; }
+.plan-v2 li { font-size: 13px; }
+.plan-v2>small { font-size: 11px; }
+.pricing-assurance p { font-size: 12.5px; }
+.voice-kicker { font-size: 11px; }
+.voice-state { font-size: 11px; }
+.voice-guidance { font-size: 12px; }
+.voice-hold .mic { font-size: 12.5px; }
+.voice-hold b { font-size: 12.5px; }
+.always-toggle span { font-size: 11px; }
+.always-toggle i { font-size: 11px; }
+.voice-result>span { font-size: 11px; }
+.voice-result blockquote { font-size: 15px; }
+.voice-result p { font-size: 12px; }
+.voice-result button { font-size: 12px; }
+.voice-error b { font-size: 13px; }
+.voice-error p { font-size: 11px; }
+.voice-error button { font-size: 11px; }
+.voice-privacy { font-size: 12px; }
+.voice-privacy span { font-size: 11px; }
+.level-access b { font-size: 11px; }
+.level-access span { font-size: 12.5px; }
+.level-access a,.level-access button,.voice-access-actions a,.voice-access-actions button,.membership-status button,.account-success button { font-size: 12px; }
+.plan-v2 li>span { font-size: 11px; }
+.membership-status small { font-size: 12px; }
+.ai-access-status b { font-size: 11px; }
+.ai-access-status span { font-size: 12.5px; }
+.match-dock .ai-access-recovery { font-size: 12px; }
+.match-dock .ai-access-actions>button { font-size: 12px; }
+.throw-mark.off-board text { font-size: 14px; }
