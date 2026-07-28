@@ -36,7 +36,10 @@ function contrast(foreground: readonly number[], background: readonly number[]):
 for (const theme of THEMES) {
   test(`${theme} keeps match text legible`, async ({ page }) => {
     await page.goto("/play/match?start=501&level=8&best=5&out=double", { waitUntil: "networkidle" });
-    await page.locator(`button:has-text("${theme}")`).first().click();
+    // Themes moved from inline buttons to a single-icon menu: open the
+    // trigger, then pick the theme by its menu-item role and label.
+    await page.locator(".theme-menu__trigger").first().click();
+    await page.getByRole("menuitemradio", { name: theme }).click();
     await page.waitForTimeout(300);
 
     const measured = await page.evaluate((selectors) => {

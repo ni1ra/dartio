@@ -548,3 +548,178 @@
 .hero-board-shell .board-caption {
   display: none;
 }
+
+/* ── Landing page motion ───────────────────────────────────────────────────
+ * The rules here split into three tiers by how they degrade:
+ *
+ *  1. Load-time hero entrance — pure CSS keyframes, no JS required. Under
+ *     prefers-reduced-motion the global blanket collapses them to .01ms, so
+ *     the page snaps straight to its final state.
+ *  2. Scroll reveals — gated behind html[data-lp-motion], which LandingMotion
+ *     sets only with JS running and motion allowed. Without either, no
+ *     element ever starts hidden.
+ *  3. Scroll-driven parallax — @supports (animation-timeline: view()), pure
+ *     CSS progressive enhancement; browsers without it just skip it.
+ *
+ * All motion is transform/opacity only, so nothing shifts layout (no CLS),
+ * and vertical-only translation on full-width elements so nothing can create
+ * horizontal overflow at 390px.
+ */
+
+/* Tier 1 — hero entrance. Copy rises line by line, the board settles in
+ * behind it, and the two stat cards land last, like darts after the throw. */
+@keyframes lp-rise {
+  from { opacity: 0; transform: translateY(26px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes lp-settle {
+  from { opacity: 0; transform: scale(0.94); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.hero-copy > * {
+  animation: lp-rise 0.7s var(--navi-motion-ease, cubic-bezier(0.22, 0.61, 0.2, 1)) both;
+}
+
+.hero-copy > *:nth-child(2) { animation-delay: 0.08s; }
+.hero-copy > *:nth-child(3) { animation-delay: 0.16s; }
+.hero-copy > *:nth-child(4) { animation-delay: 0.24s; }
+.hero-copy > *:nth-child(5) { animation-delay: 0.32s; }
+
+.hero-board-shell {
+  animation: lp-settle 0.9s 0.15s var(--navi-motion-ease, cubic-bezier(0.22, 0.61, 0.2, 1)) both;
+}
+
+.hero-orbit .floating-score,
+.hero-orbit .floating-ai {
+  animation: lp-rise 0.6s var(--navi-motion-ease, cubic-bezier(0.22, 0.61, 0.2, 1)) both;
+}
+
+.hero-orbit .floating-ai { animation-delay: 0.55s; }
+.hero-orbit .floating-score { animation-delay: 0.7s; }
+
+/* Cursor parallax. LandingMotion writes --lp-px/--lp-py (-1..1) on the orbit;
+ * the board leans toward the cursor, the cards drift the other way for depth.
+ * `translate` is used so it stacks with the entrance `transform` above. */
+.hero-board-shell {
+  translate: calc(var(--lp-px, 0) * 14px) calc(var(--lp-py, 0) * 10px);
+  transition: translate 0.35s var(--navi-motion-ease, ease-out);
+}
+
+.hero-orbit .floating-score,
+.hero-orbit .floating-ai {
+  translate: calc(var(--lp-px, 0) * -20px) calc(var(--lp-py, 0) * -12px);
+  transition: translate 0.45s var(--navi-motion-ease, ease-out);
+}
+
+/* Tier 2 — scroll reveals. Hidden state exists only under html[data-lp-motion]
+ * (see landing-motion.tsx); --lp-i staggers siblings by 90ms. */
+html[data-lp-motion] [data-reveal] {
+  opacity: 0;
+  translate: 0 30px;
+  transition:
+    opacity 0.65s var(--navi-motion-ease, ease-out),
+    translate 0.65s var(--navi-motion-ease, ease-out);
+  transition-delay: calc(var(--lp-i, 0) * 90ms);
+}
+
+/* Mode rows slide in from the left instead — a negative X offset can never
+ * widen the scrollable area, and it matches their hover direction. */
+html[data-lp-motion] [data-reveal="left"] {
+  translate: -34px 0;
+}
+
+html[data-lp-motion] [data-reveal][data-inview] {
+  opacity: 1;
+  translate: 0 0;
+}
+
+/* The marquee text renders twice (second run aria-hidden) so the existing
+ * translateX(-50%) keyframe loops without a visible jump. The old globals rule
+ * painted `i` as an accent bullet; it now wraps a phrase, so repaint it. */
+.signal-track {
+  display: flex;
+  width: max-content;
+}
+
+.signal-track span {
+  display: inline-flex;
+  white-space: nowrap;
+}
+
+.signal-track i {
+  color: inherit;
+  margin: 0;
+  font-style: normal;
+  display: inline-flex;
+  align-items: center;
+}
+
+.signal-track b {
+  color: var(--accent);
+  margin: 0 28px;
+}
+
+/* Mode-row micro-interaction: the arrow chases the row's hover slide and the
+ * index number takes the accent, so the row answers the cursor twice over. */
+.mode-list a b {
+  transition: translate 0.2s var(--navi-motion-ease, ease-out);
+}
+
+.mode-list a:hover b {
+  translate: 6px 0;
+}
+
+.mode-list a span {
+  transition: color 0.2s;
+}
+
+.mode-list a:hover span {
+  color: var(--accent);
+}
+
+/* Tier 3 — scroll-driven parallax, CSS only. The giant "20" climbs into the
+ * closing section as it scrolls into view; the hero board drifts up slightly
+ * as the hero scrolls away, which reads as depth against the copy. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    @keyframes lp-twenty {
+      from { transform: translateY(160px); opacity: 0; }
+      to { transform: translateY(0); opacity: 0.1; }
+    }
+
+    .closing-cta:after {
+      opacity: 0.1;
+      animation: lp-twenty linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 55%;
+    }
+
+    @keyframes lp-orbit-drift {
+      from { transform: translateY(0) rotate(0deg); }
+      to { transform: translateY(-48px) rotate(4deg); }
+    }
+
+    .hero-orbit {
+      animation: lp-orbit-drift linear both;
+      animation-timeline: view();
+      animation-range: exit 0% exit 100%;
+    }
+  }
+}
+
+/* Reduced motion: the global blanket already zeroes durations; this pins the
+ * parallax offsets so a cached custom property cannot leave the board askew. */
+@media (prefers-reduced-motion: reduce) {
+  .hero-board-shell,
+  .hero-orbit .floating-score,
+  .hero-orbit .floating-ai {
+    translate: 0 0;
+    animation: none;
+  }
+
+  .hero-copy > * {
+    animation: none;
+  }
+}
