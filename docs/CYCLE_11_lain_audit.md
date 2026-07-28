@@ -17,6 +17,7 @@ commit per note, one PR.
 - [ ] **Production authentication is dead.** No origin the app is served from is in the production Neon Auth project's trusted domains. Sign-in and sign-up both return `403 INVALID_ORIGIN` at `dartioopus46.vercel.app`, at the canonical `dartio-*.vercel.app` deployment URL, and at `dartio.vercel.app`. **Requires the Neon console; cannot be fixed from the repository.**
 - [ ] **There is no admin or superadmin role.** `users` has `id`, `auth_subject`, `email`, `stripe_customer_id`, and timestamps — no role column, no admin surface, no god mode. `PHASE_1` listed "role distinction (user/admin)" and it was never built.
 - [x] **"yeah i did some file reorganising, some paths may be broken as a result, but my pc files are way leaner now. fix any issue related to this if it appears perma."** — the working tree moved from `/home/nira/dev/dartio` to `/home/nira/projects/dartio`. Find every reference that still points at the old location and correct it, rather than patching a symptom.
+- [ ] **"Could not attach to MCP server Windows-MCP" pls fix this too** — tooling rather than product, so it is tracked outside this repository as task `#00c`. Three of the four configured MCP servers pointed at `/mnt/c` paths the reorganization removed. `alpaca` was repointed at a surviving copy; `navi-mcp` and `navi-wiki` have no copy on disk. `Windows-MCP` itself is configured nowhere — not in either `.claude.json`, not in Cursor, Codex, or any project `.mcp.json` — so the message is a stale reference to something already deleted. Needs Lain to say where those servers went, or whether they are gone for good.
 
 ## Verified receipts — 2026-07-28
 
@@ -73,10 +74,13 @@ have missed all three:
   — an environment fault that reads exactly like 102 product regressions. The
   script now installs browsers only and CI asks for the system libraries in its
   own step. 102/102 pass locally at all three viewports.
-- **`/mnt/c/navi-mcp` no longer exists.** It held the Discord bot token for
-  posting progress to `#general`. It is not at that path, and a search of
-  `/mnt/c` and `/home/nira` finds no copy anywhere. This is unrecoverable
-  from the repository and blocks Discord posting until Lain restores it.
+- **`/mnt/c/navi-mcp` no longer exists**, and neither does `navi-wiki`. Both
+  held server code that is gone from disk. The Discord capability survived
+  anyway: the bot token lives in the `navi-wiki` entry's env in `~/.claude.json`,
+  and that config outlived the code it pointed at. Verified against the Discord
+  API — the token authenticates and the bot can read `#general` — so posting
+  works over REST without either server. `alpaca` was repointed at a surviving
+  copy under `StockTransformer`.
 
 The lesson is the same shape as the auth one. The gates assert nothing about
 the machine the gates run on, and every one of these broke outside the tree the
