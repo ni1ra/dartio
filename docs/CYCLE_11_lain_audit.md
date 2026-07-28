@@ -16,6 +16,7 @@ commit per note, one PR.
 - [x] **Where is pricing?** — carried only by `.desktop-links`, hidden below 1100px, so unreachable on a phone.
 - [ ] **Production authentication is dead.** No origin the app is served from is in the production Neon Auth project's trusted domains. Sign-in and sign-up both return `403 INVALID_ORIGIN` at `dartioopus46.vercel.app`, at the canonical `dartio-*.vercel.app` deployment URL, and at `dartio.vercel.app`. **Requires the Neon console; cannot be fixed from the repository.**
 - [ ] **There is no admin or superadmin role.** `users` has `id`, `auth_subject`, `email`, `stripe_customer_id`, and timestamps — no role column, no admin surface, no god mode. `PHASE_1` listed "role distinction (user/admin)" and it was never built.
+- [x] **"yeah i did some file reorganising, some paths may be broken as a result, but my pc files are way leaner now. fix any issue related to this if it appears perma."** — the working tree moved from `/home/nira/dev/dartio` to `/home/nira/projects/dartio`. Find every reference that still points at the old location and correct it, rather than patching a symptom.
 
 ## Verified receipts — 2026-07-28
 
@@ -46,6 +47,46 @@ commit per note, one PR.
 - `pnpm verify:auth <url>` is a new release gate. It probes the sign-up endpoint
   and asserts only that the origin was accepted. It fails against production
   today, which is the point.
+
+## The reorganization sweep — 2026-07-28
+
+The checkout moved to `/home/nira/projects/dartio`. Nothing in the
+application broke: no source file, config, or test carries an absolute path,
+so `pnpm typecheck`, `pnpm lint`, and 367 unit tests pass unchanged at the
+new location. The Vercel project link in `.vercel/project.json` is by project
+ID and survived the move.
+
+What did break was outside the source tree, and a repository-only sweep would
+have missed all three:
+
+- **`docs/REPO_CONTROL.md` named a dead canonical path.** Corrected, with both
+  dead paths recorded as dead. This is a documentation fix and has no
+  production surface to verify against — its evidence is the corrected file
+  and the green gates, not a deployed observation.
+- **Playwright's browser binaries were gone, and the repo could not put them
+  back.** They live in `~/.cache/ms-playwright`, outside the repo, and did not
+  survive. Reinstalling exposed a standing defect: `test:browser:install` ran
+  `playwright install --with-deps chromium`, and `--with-deps` installs system
+  libraries through apt, so it requires passwordless sudo. CI has that; a
+  workstation does not, where it aborts on a password prompt having downloaded
+  nothing. The suite then failed 102 times on a missing `chrome-headless-shell`
+  — an environment fault that reads exactly like 102 product regressions. The
+  script now installs browsers only and CI asks for the system libraries in its
+  own step. 102/102 pass locally at all three viewports.
+- **`/mnt/c/navi-mcp` no longer exists.** It held the Discord bot token for
+  posting progress to `#general`. It is not at that path, and a search of
+  `/mnt/c` and `/home/nira` finds no copy anywhere. This is unrecoverable
+  from the repository and blocks Discord posting until Lain restores it.
+
+The lesson is the same shape as the auth one. The gates assert nothing about
+the machine the gates run on, and every one of these broke outside the tree the
+release ladder inspects.
+
+A second lesson, cheaper and more embarrassing: `pnpm test:browser 2>&1 | tail
+-25` reports the exit status of `tail`, not of the suite. Both the failed
+browser run and the failed browser *install* returned 0 that way, and the
+truncation cut the error off the top of the output. Gate commands are run
+unpiped, with the exit code read, or they are not gates.
 
 ## The gap that let production auth ship dead
 

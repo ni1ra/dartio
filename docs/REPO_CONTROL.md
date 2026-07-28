@@ -2,13 +2,13 @@
 
 ## Canonical identity
 
-- Local path: `\\wsl.localhost\Ubuntu-24.04\home\nira\dev\dartio` (WSL: `/home/nira/dev/dartio`)
-- Prior local path: `C:\Users\nira\Documents\Codex\2026-07-17\rec\dartio`, retained read-only. Work moved to the WSL-native filesystem on 2026-07-28 because pnpm on `/mnt/c` aborts its modules-directory check without a TTY and pays the DrvFs IO penalty on every install and build; the same install takes 13 s in WSL.
+- Local path: `\\wsl.localhost\Ubuntu-24.04\home\nira\projects\dartio` (WSL: `/home/nira/projects/dartio`)
+- Prior local paths, both dead: `/home/nira/dev/dartio`, moved during a machine-wide reorganization on 2026-07-28; and `C:\Users\nira\Documents\Codex\2026-07-17\rec\dartio`, retained read-only. The checkout stays WSL-native wherever it moves, because pnpm on `/mnt/c` aborts its modules-directory check without a TTY and pays the DrvFs IO penalty on every install and build; the same install takes 13 s in WSL.
 - GitHub target: `https://github.com/ni1ra/dartio`
 - Vercel project: `dartio` (`prj_tYySUSn7wfIjqFQA1KZsVJtDbLIM`)
 - Product version: `1.0.0`
 - UI dependency: Navi UI `1.0.0`
-- Git author: `andreashoug <andreashoug@gmail.com>`
+- Git author: `ni1ra <andreashoug@gmail.com>`. The address is what attributes a commit to the `ni1ra` GitHub account; the name had drifted to `andreashoug` and `Andreas` across earlier commits because Windows and WSL hold separate git configs. History is left as it stands — rewriting nine cycles of shared commits to fix a display name is not worth it.
 
 ## Operating facts
 
