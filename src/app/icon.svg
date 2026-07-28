@@ -1,7 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#070908"/>
-  <circle cx="32" cy="32" r="23" fill="#ece7dd"/>
-  <circle cx="32" cy="32" r="15" fill="#b41f2c"/>
-  <circle cx="32" cy="32" r="6" fill="#070908"/>
-  <path d="M32 32 51 13M43 13h8v8" fill="none" stroke="#ece7dd" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Dartio mark: a dart striking dead centre of the bull. Three shapes so it
+       survives 16px — dark tile, orange bull disc, white dart at 45 degrees. -->
+  <rect width="64" height="64" rx="14" fill="#090a0a"/>
+  <circle cx="25" cy="39" r="17" fill="#ff542e"/>
+  <!-- Dart drawn along +x with its point at the origin, then rotated onto the
+       diagonal so the tip lands exactly on the bull centre. -->
+  <g fill="#f4f2ed" transform="translate(25 39) rotate(-45)">
+    <!-- Needle, barrel, and shaft as one tapered silhouette -->
+    <path d="M0 0 9 -1.5 10.5 -3.1 21.5 -3.1 23.5 -1.4 28.5 -1.4 28.5 1.4 23.5 1.4 21.5 3.1 10.5 3.1 9 1.5Z"/>
+    <!-- Chevron flight; butt overlaps the shaft so the dart stays one object -->
+    <path d="M27 -1.7 38.5 -8.5 34.5 0 38.5 8.5 27 1.7Z"/>
+  </g>
 </svg>

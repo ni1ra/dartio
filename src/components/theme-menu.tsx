@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { useNaviTheme, type ThemeName } from "navi-ui";
+import { CheckIcon } from "./icons";
 
 /**
  * The theme control, as one icon rather than a row of names.
@@ -133,7 +134,7 @@ export function ThemeMenu() {
                 <b>{entry.label}</b>
                 <small>{entry.note}</small>
               </span>
-              <span className="theme-menu__check" aria-hidden="true">{entry.id === theme ? "✓" : ""}</span>
+              <span className="theme-menu__check" aria-hidden="true">{entry.id === theme ? <CheckIcon /> : null}</span>
             </button>
           ))}
         </div>

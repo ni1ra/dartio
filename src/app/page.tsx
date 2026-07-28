@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { HeroBoard } from "@/components/hero-board";
+import { ArrowRightIcon, ArrowUpRightIcon } from "@/components/icons";
 import { LandingMotion } from "@/components/landing-motion";
 import { Surface } from "navi-ui";
 
@@ -31,7 +32,7 @@ export default function HomePage() {
         <p className="eyebrow"><span className="live-dot" /> Your board. Fully alive.</p>
         <h1>Every dart<br /><em>tells a story.</em></h1>
         <p className="lede">A fast, expressive darts companion for solo sessions, serious practice, and match night. Tap the board, call the score, or enter each dart—the rest moves with you.</p>
-        <div className="hero-actions"><Link className="button-link button-link-lg" href="/play">Play X01 now <span aria-hidden="true">↗</span></Link><Link className="text-link" href="/practice">Explore the game modes →</Link></div>
+        <div className="hero-actions"><Link className="button-link button-link-lg" href="/play">Play X01 now <ArrowUpRightIcon /></Link><Link className="text-link" href="/practice">Explore the game modes →</Link></div>
         <div className="proof-line"><span>AI levels 1–20</span><span>Push-to-talk scoring</span><span>Pro checkout paths</span></div>
       </div>
       <div className="hero-orbit" aria-label="Live match preview">
@@ -50,7 +51,7 @@ export default function HomePage() {
         <article data-reveal style={{ "--lp-i": 2 } as React.CSSProperties}><b>03</b><h3>Finish your way</h3><p>See the professional route, safer alternatives, setup shots, and why the route changed.</p></article>
       </div>
     </section>
-    <section className="page-frame mode-ribbon"><div className="mode-intro" data-reveal><p className="eyebrow">More than X01</p><h2>A mode for every kind of session.</h2><Link className="button-link button-link-secondary" href="/practice">See all modes</Link></div><div className="mode-list">{modes.map((mode, i) => <Link href={i === 0 ? "/play" : "/practice"} key={mode} data-reveal="left" style={{ "--lp-i": i } as React.CSSProperties}><span>0{i + 1}</span>{mode}<b>→</b></Link>)}</div></section>
+    <section className="page-frame mode-ribbon"><div className="mode-intro" data-reveal><p className="eyebrow">More than X01</p><h2>A mode for every kind of session.</h2><Link className="button-link button-link-secondary" href="/practice">See all modes</Link></div><div className="mode-list">{modes.map((mode, i) => <Link href={i === 0 ? "/play" : "/practice"} key={mode} data-reveal="left" style={{ "--lp-i": i } as React.CSSProperties}><span>0{i + 1}</span>{mode}<b><ArrowRightIcon /></b></Link>)}</div></section>
     <section className="page-frame closing-cta" data-reveal><p>Meet your next favourite opponent.</p><h2>They never cancel.<br />They do get better.</h2><div><Link className="button-link button-link-lg inverted" href="/play">Challenge the AI</Link><Link className="text-link" href="/pricing">See Free and Pro →</Link><span>20 levels · no waiting room</span></div></section>
   </>;
 }
