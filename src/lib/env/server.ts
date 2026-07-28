@@ -15,9 +15,10 @@ export const databaseEnvSchema = z.object({ DATABASE_URL: databaseUrl });
 export const authEnvSchema = z.object({ NEON_AUTH_BASE_URL: authBaseUrl, NEON_AUTH_COOKIE_SECRET: z.string().min(32) });
 export const voiceEnvSchema = z.object({ OPENAI_API_KEY: z.string().min(20) });
 export const stripeClientEnvSchema = z.object({ STRIPE_SECRET_KEY: z.string().startsWith("sk_") });
-export const billingCheckoutEnvSchema = stripeClientEnvSchema.extend({ STRIPE_PRO_MONTHLY_PRICE_ID: z.string().startsWith("price_"), STRIPE_PRO_ANNUAL_PRICE_ID: z.string().startsWith("price_"), NEXT_PUBLIC_APP_URL: appOrigin });
+export const billingPriceEnvSchema = z.object({ STRIPE_PRO_MONTHLY_PRICE_ID: z.string().startsWith("price_"), STRIPE_PRO_ANNUAL_PRICE_ID: z.string().startsWith("price_"), STRIPE_CLUB_MONTHLY_PRICE_ID: z.string().startsWith("price_"), STRIPE_CLUB_ANNUAL_PRICE_ID: z.string().startsWith("price_") });
+export const billingCheckoutEnvSchema = stripeClientEnvSchema.merge(billingPriceEnvSchema).extend({ NEXT_PUBLIC_APP_URL: appOrigin });
 export const billingPortalEnvSchema = stripeClientEnvSchema.extend({ NEXT_PUBLIC_APP_URL: appOrigin });
-export const billingWebhookEnvSchema = stripeClientEnvSchema.extend({ STRIPE_WEBHOOK_SECRET: z.string().startsWith("whsec_") });
+export const billingWebhookEnvSchema = stripeClientEnvSchema.merge(billingPriceEnvSchema).extend({ STRIPE_WEBHOOK_SECRET: z.string().startsWith("whsec_") });
 export const billingEnvSchema = billingCheckoutEnvSchema.merge(billingWebhookEnvSchema);
 export const serverEnvSchema = databaseEnvSchema.merge(authEnvSchema).merge(voiceEnvSchema).merge(billingEnvSchema);
 

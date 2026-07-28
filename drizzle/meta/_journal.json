@@ -22,6 +22,27 @@
       "when": 1784248452845,
       "tag": "0002_daffy_red_ghost",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784251623119,
+      "tag": "0003_plain_sharon_ventura",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784251714043,
+      "tag": "0004_abandoned_marauders",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784257587290,
+      "tag": "0005_salty_felicia_hardy",
+      "breakpoints": true
     }
   ]
 }

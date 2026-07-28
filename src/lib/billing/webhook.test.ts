@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type Stripe from "stripe";
-import { processStripeEvent, type WebhookStore } from "./webhook";
+import { currentSubscriptionForEvent, processStripeEvent, type WebhookStore } from "./webhook";
 
 class MemoryStore implements WebhookStore {
   readonly ids = new Set<string>(); projections = 0;
@@ -24,5 +24,19 @@ describe("Stripe webhook processing", () => {
     const event = { id: "evt_retry", type: "checkout.session.completed" } as Stripe.Event;
     await expect(processStripeEvent(event, store)).rejects.toThrow("db unavailable");
     expect(store.ids.has(event.id)).toBe(false);
+  });
+
+  it.each(["customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"] as const)("retrieves current Stripe state for %s instead of trusting delivery order", async (type) => {
+    const retrieve = vi.fn(async (id: string) => ({ id, status: "active" }) as Stripe.Subscription);
+    const event = { type, data: { object: { id: "sub_1", status: type.endsWith("deleted") ? "canceled" : "past_due" } } } as Stripe.Event;
+    expect((await currentSubscriptionForEvent(event, { retrieve }))?.status).toBe("active");
+    expect(retrieve).toHaveBeenCalledWith("sub_1");
+  });
+
+  it("retrieves the Checkout subscription and ignores unrelated events", async () => {
+    const retrieve = vi.fn(async (id: string) => ({ id }) as Stripe.Subscription);
+    const checkout = { type: "checkout.session.completed", data: { object: { subscription: "sub_checkout" } } } as Stripe.Event;
+    expect((await currentSubscriptionForEvent(checkout, { retrieve }))?.id).toBe("sub_checkout");
+    expect(await currentSubscriptionForEvent({ type: "invoice.created", data: { object: {} } } as Stripe.Event, { retrieve })).toBeNull();
   });
 });

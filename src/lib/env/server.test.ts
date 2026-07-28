@@ -10,6 +10,8 @@ const valid = {
   STRIPE_WEBHOOK_SECRET: "whsec_example",
   STRIPE_PRO_MONTHLY_PRICE_ID: "price_monthly",
   STRIPE_PRO_ANNUAL_PRICE_ID: "price_annual",
+  STRIPE_CLUB_MONTHLY_PRICE_ID: "price_club_monthly",
+  STRIPE_CLUB_ANNUAL_PRICE_ID: "price_club_annual",
   NEXT_PUBLIC_APP_URL: "https://dartio.app",
 };
 
@@ -22,10 +24,10 @@ describe("server environment", () => {
     expect(authEnvSchema.safeParse(authOnly).success).toBe(true);
   });
   it("checkout validates without auth, database, voice, or webhook configuration", () => {
-    const checkoutOnly = { STRIPE_SECRET_KEY: valid.STRIPE_SECRET_KEY, STRIPE_PRO_MONTHLY_PRICE_ID: valid.STRIPE_PRO_MONTHLY_PRICE_ID, STRIPE_PRO_ANNUAL_PRICE_ID: valid.STRIPE_PRO_ANNUAL_PRICE_ID, NEXT_PUBLIC_APP_URL: valid.NEXT_PUBLIC_APP_URL };
+    const checkoutOnly = { STRIPE_SECRET_KEY: valid.STRIPE_SECRET_KEY, STRIPE_PRO_MONTHLY_PRICE_ID: valid.STRIPE_PRO_MONTHLY_PRICE_ID, STRIPE_PRO_ANNUAL_PRICE_ID: valid.STRIPE_PRO_ANNUAL_PRICE_ID, STRIPE_CLUB_MONTHLY_PRICE_ID: valid.STRIPE_CLUB_MONTHLY_PRICE_ID, STRIPE_CLUB_ANNUAL_PRICE_ID: valid.STRIPE_CLUB_ANNUAL_PRICE_ID, NEXT_PUBLIC_APP_URL: valid.NEXT_PUBLIC_APP_URL };
     expect(getBillingCheckoutEnv(checkoutOnly)).toEqual(checkoutOnly);
   });
-  it.each(["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRO_MONTHLY_PRICE_ID", "STRIPE_PRO_ANNUAL_PRICE_ID", "NEXT_PUBLIC_APP_URL"] as const)("full billing contract rejects missing %s", (key) => {
+  it.each(["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRO_MONTHLY_PRICE_ID", "STRIPE_PRO_ANNUAL_PRICE_ID", "STRIPE_CLUB_MONTHLY_PRICE_ID", "STRIPE_CLUB_ANNUAL_PRICE_ID", "NEXT_PUBLIC_APP_URL"] as const)("full billing contract rejects missing %s", (key) => {
     const incomplete: Record<string, string | undefined> = { ...valid };
     delete incomplete[key];
     expect(billingEnvSchema.safeParse(incomplete).success).toBe(false);

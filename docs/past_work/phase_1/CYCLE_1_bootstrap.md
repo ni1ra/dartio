@@ -1,6 +1,6 @@
 # Cycle 1 — Greenfield Vertical Slice
 
-Status: active — GitHub CI and preview release tail
+Status: complete — greenfield X01 vertical slice released and verified
 
 Derived from: `PHASE_1_v1_foundation.md`
 
@@ -16,8 +16,8 @@ Derived from: `PHASE_1_v1_foundation.md`
 - [x] Verify unit/domain tests, types, lint, production build, and browser stories at phone/tablet/desktop widths.
 - [x] Update Phase 1 evidence and REPO_CONTROL with actual receipts.
 - [x] Resolve all high/critical dependency audit findings in the Neon Auth tree.
-- [ ] Push the greenfield repository and pass GitHub CI.
-- [ ] Deploy and verify the Cycle 1 user story on Vercel Preview.
+- [x] Push the greenfield repository and pass GitHub CI.
+- [x] Deploy and verify the Cycle 1 user story on Vercel Preview.
 
 ## Acceptance proof
 
@@ -35,4 +35,9 @@ Derived from: `PHASE_1_v1_foundation.md`
 - Browser proof: physical T20 click records T20 and 501→441 at 1440×1000, 834×1112, and 390×844; no distortion, overflow, console warnings/errors, network failures, or content overlap.
 - Neon Preview: migrations 0000–0002 applied; 10 public tables and 3 journal rows verified with strict dart/email/Stripe ownership constraints.
 - Vercel: GitHub connected to `ni1ra/dartio`, production branch `main`; separate encrypted Production/Preview database, Auth, cookie-secret, and Pro-price values are present.
+- GitHub: commit `80770b47d790411f0c5e72c92f9fd1aee326897a` passed CI run `29546595422`.
+- Vercel Preview: deployment `dpl_EtyTRgKt599di78gAKcogiheVpob` is ready at `https://dartio-h55ts0dj4-niras-projects-868b6f5f.vercel.app`; landing, match, and sign-in routes return 200.
+- Vercel Production: deployment `dpl_8rpA6xD1iydeTrjCm9JpztK4HFBy` is ready at `https://dartioopus46.vercel.app`; the physical T20 story passes with zero horizontal overflow, console warnings/errors, or failed observed application requests.
+- Neon Production: migrations 0000–0002 are applied on main; 10 public tables, 3 matching journal rows, and the strict dart/email/Stripe constraints are externally verified.
+- Visual artifacts: `docs/artifacts/dartio-production-match-{desktop,tablet,mobile}-t20.png` record the accepted regulation board and responsive cockpit.
 - Dependency security: Better Auth, passkey, and API-key are coherently pinned at 1.6.13; Neon beta declaration/import seams are reproducibly patched; peers pass; high/critical audit gate is clean. One disclosed moderate esbuild development-server advisory remains upstream and is not used by deployed runtime.
