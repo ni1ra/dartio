@@ -8,7 +8,7 @@
 - Vercel project: `dartio` (`prj_tYySUSn7wfIjqFQA1KZsVJtDbLIM`)
 - Product version: `1.0.0`
 - UI dependency: Navi UI `1.0.0`
-- Git author: `andreashoug <andreashoug@gmail.com>`
+- Git author: `ni1ra <andreashoug@gmail.com>`. The address is what attributes a commit to the `ni1ra` GitHub account; the name had drifted to `andreashoug` and `Andreas` across earlier commits because Windows and WSL hold separate git configs. History is left as it stands — rewriting nine cycles of shared commits to fix a display name is not worth it.
 
 ## Operating facts
 
