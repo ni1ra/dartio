@@ -50,8 +50,12 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # --with-deps installs system libraries through apt and therefore needs
+      # passwordless sudo. A CI runner has it; a workstation does not, where the
+      # same flag aborts on a password prompt. So the shared script installs
+      # browsers only, and the runner asks for the system libraries here.
       - name: Install browser
-        run: pnpm test:browser:install
+        run: pnpm exec playwright install --with-deps chromium
 
       # Placeholders only. Nothing here reaches a real service: they exist so the
       # server boots and answers as an anonymous Free visitor, which is exactly
