@@ -55,7 +55,8 @@ describe("AI levels", () => {
   });
 
   it("stops immediately when the generated dart busts the visit", () => {
-    const darts = generateAiVisit(20, {
+    // A novice does not plan: it throws its biggest number and busts from 3.
+    const darts = generateAiVisit(3, {
       score: 3,
       opened: true,
       inRule: "straight",
@@ -64,6 +65,19 @@ describe("AI levels", () => {
 
     expect(darts).toHaveLength(1);
     expect(darts[0]).toMatchObject({ segment: 20, multiplier: 3, score: 60 });
+  });
+
+  it("a tactical level plays the route out of 3 instead of busting on it", () => {
+    const darts = generateAiVisit(20, {
+      score: 3,
+      opened: true,
+      inRule: "straight",
+      outRule: "double",
+    }, () => 1);
+
+    // S1 then D1 is the only double-out from 3, and an expert takes it.
+    expect(darts.length).toBeGreaterThan(1);
+    expect(darts[0]).toMatchObject({ segment: 1, multiplier: 1 });
   });
 
   it("keeps throwing without scoring until a double-in is proven", () => {
@@ -138,9 +152,11 @@ describe("AI levels", () => {
   });
 
   it("uses the same treble as a bust under double-out and a finish under master-out", () => {
+    // Pinned to a novice level: the point of this case is the out rule, and a
+    // tactical level would route around the bust rather than walk into it.
     const context = { score: 60, opened: true, inRule: "straight" } as const;
-    const doubleDarts = generateAiVisit(20, { ...context, outRule: "double" }, () => 1);
-    const masterDarts = generateAiVisit(20, { ...context, outRule: "master" }, () => 1);
+    const doubleDarts = generateAiVisit(3, { ...context, outRule: "double" }, () => 1);
+    const masterDarts = generateAiVisit(3, { ...context, outRule: "master" }, () => 1);
     let doubleState = createX01({ ...context, startingScore: 60, legsToWin: 1, setsToWin: 1, outRule: "double" }, [{ id: "ai", name: "AI" }]);
     let masterState = createX01({ ...context, startingScore: 60, legsToWin: 1, setsToWin: 1, outRule: "master" }, [{ id: "ai", name: "AI" }]);
     for (const value of doubleDarts) doubleState = applyDart(doubleState, value);

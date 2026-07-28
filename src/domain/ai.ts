@@ -1,3 +1,4 @@
+import { checkoutAdvice } from "./checkout";
 import { representativePoint, scoreBoardPoint, type BoardNumber, type Dart, type Multiplier } from "./darts";
 import type { InRule, OutRule } from "./x01";
 
@@ -60,7 +61,8 @@ export function generateAiVisit(
   let opened = context.opened || context.inRule === "straight";
 
   while (darts.length < 3) {
-    const value = throwAiDart(level, chooseAiVisitAim(remaining, opened, context), random).dart;
+    const dartsLeft = (3 - darts.length) as 1 | 2 | 3;
+    const value = throwAiDart(level, chooseAiVisitAim(remaining, opened, context, dartsLeft, level), random).dart;
     darts.push(value);
 
     if (!opened && qualifiesIn(value, context.inRule)) opened = true;
@@ -75,7 +77,7 @@ export function generateAiVisit(
   return Object.freeze(darts);
 }
 
-function chooseAiVisitAim(remaining: number, opened: boolean, context: AiVisitContext): Aim {
+function chooseAiVisitAim(remaining: number, opened: boolean, context: AiVisitContext, dartsLeft: 1 | 2 | 3, level: number): Aim {
   if (!opened) {
     return context.inRule === "double"
       ? { segment: 20, multiplier: 2 }
@@ -84,7 +86,7 @@ function chooseAiVisitAim(remaining: number, opened: boolean, context: AiVisitCo
   if (context.outRule === "straight" && remaining >= 1 && remaining <= 20) {
     return { segment: remaining as BoardNumber, multiplier: 1 };
   }
-  return chooseAiAim(remaining);
+  return chooseTacticalAim({ remaining, dartsLeft, outRule: context.outRule, level });
 }
 
 function qualifiesIn(value: Dart, rule: InRule): boolean {
@@ -96,3 +98,53 @@ function qualifiesOut(value: Dart, rule: OutRule): boolean {
 }
 
 function validateLevel(level: number) { if (!Number.isInteger(level) || level < 1 || level > 20) throw new Error("AI level must be an integer from 1 to 20"); }
+
+/**
+ * How much tactical thinking a level is allowed.
+ *
+ * Accuracy alone made twenty levels into one player with twenty tremors: a
+ * level 3 and a level 19 chose identical targets and differed only in how badly
+ * they executed them. Decision quality is what separates a club player from a
+ * tournament player, so it ladders too.
+ *
+ *   novice     — aims the biggest number it knows, takes any double it lands on
+ *   competent  — finishes when a route exists, and knows which double it wants
+ *   expert     — plans the whole visit, and sets up a leave when it cannot finish
+ */
+export type AiTactics = "novice" | "competent" | "expert";
+
+export function aiTactics(level: number): AiTactics {
+  validateLevel(level);
+  return level <= 5 ? "novice" : level <= 12 ? "competent" : "expert";
+}
+
+export interface AiAimContext {
+  readonly remaining: number;
+  readonly dartsLeft: 1 | 2 | 3;
+  readonly outRule: OutRule;
+  readonly level: number;
+}
+
+/**
+ * The target this AI would actually pick, given how well it thinks.
+ *
+ * Competent and expert players route through the same checkout planner the
+ * product offers a human, so their decisions are defensible rather than
+ * arbitrary. An expert additionally plans a setup visit when no finish exists,
+ * which is what stops a strong bot grinding into a bogey number.
+ */
+export function chooseTacticalAim(context: AiAimContext): Aim {
+  const { remaining, dartsLeft, outRule, level } = context;
+  const tactics = aiTactics(level);
+  if (tactics === "novice") return chooseAiAim(remaining);
+
+  const advice = checkoutAdvice(remaining, dartsLeft, outRule);
+  const first = advice.primaryPlan?.darts[0];
+  if (first) return { segment: first.segment as BoardNumber, multiplier: first.multiplier };
+
+  if (tactics === "expert") {
+    const setup = advice.setupPlan?.darts[0];
+    if (setup) return { segment: setup.segment as BoardNumber, multiplier: setup.multiplier };
+  }
+  return chooseAiAim(remaining);
+}
