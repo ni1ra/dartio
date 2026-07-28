@@ -197,3 +197,43 @@
   font-size: 12px;
   color: var(--muted);
 }
+
+/* ── Keyboard scoring ──────────────────────────────────────────────────────
+ * The digits typed so far, plus the three keys that turn them into a dart.
+ * Present only while something is buffered, so it teaches the scheme at the
+ * moment it is useful rather than occupying the dock permanently.
+ */
+.keyboard-buffer {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--accent);
+  border-radius: var(--navi-radius-pill, 999px);
+  font: 600 10px var(--font-mono);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  /* The dock is already tight at 390 px; the hint would push the actions off. */
+  .keyboard-buffer {
+    display: none;
+  }
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────────────
+ * A blanket stop rather than a per-component opt-out. Everything decorative in
+ * this product is a transition or an ambient loop, and none of it carries
+ * meaning a still frame does not.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
