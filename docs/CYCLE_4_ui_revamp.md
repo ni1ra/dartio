@@ -89,6 +89,23 @@ Derived from: `PHASE_1_v1_foundation.md` and gaps 1, 2, 10, 11, 12, 13, and 15 o
   coordinate contract were not changed. The board is now asserted by test rather
   than by remembering to look.
 
+## Found while building the harness
+
+- **`/api/auth/get-session` answers 500 when Neon Auth's upstream is
+  unreachable.** Running the suite against an environment whose auth base URL
+  does not resolve produced a 500 on every page that reads the session — pricing,
+  account, and sign-in. Dartio's own routes return a deliberate 503 in the same
+  situation, which is what lets the client keep local free play alive; this one
+  reports a server fault instead. It is not a regression from this cycle and it
+  is not reachable with correct configuration, but a real Neon outage would hit
+  it. Recorded for Cycle 10 alongside the rest of the observability work.
+- **A clean install of the repository was broken.** With three esbuild majors in
+  the store, 0.28's postinstall re-runs `esbuild --version`, resolves the wrong
+  binary, and fails the whole install with "Expected 0.28.1 but got 0.25.12".
+  CI had never hit it because the lockfile it was given happened to avoid the
+  path. The self-check is disabled in `pnpm-workspace.yaml`; the binary it
+  validates ships prebuilt in the platform package and needs no build step.
+
 ## Open
 
 - The mobile match is still taller than one screen in board mode; the board is

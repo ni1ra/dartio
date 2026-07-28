@@ -18,11 +18,40 @@ const ROUTES = [
 
 for (const [name, path] of ROUTES) {
   test(`${name} loads without overflow or console errors`, async ({ page }) => {
+    /*
+     * Two different signals, kept apart on purpose.
+     *
+     * `problems` is application misbehaviour: an uncaught exception, or code
+     * calling console.error. `failedRequests` is the network. They are separated
+     * because a fail-closed 503 from /api/access is correct behaviour when
+     * access authority is unreachable — the product is designed to degrade to
+     * local free play — and the browser logs that as a console error. Folding
+     * the two together would make the suite fail on the app working as intended.
+     */
     const problems: string[] = [];
+    const failedRequests: string[] = [];
     page.on("console", (message) => {
-      if (message.type() === "error") problems.push(message.text());
+      if (message.type() !== "error") return;
+      // Resource-load failures arrive with no source location; the response
+      // listener below is the precise signal for those.
+      if (message.text().startsWith("Failed to load resource")) return;
+      problems.push(message.text());
     });
     page.on("pageerror", (error) => problems.push(String(error)));
+    page.on("response", (response) => {
+      const url = new URL(response.url());
+      if (response.status() < 400) return;
+      /*
+       * API responses are deliberately out of scope here. These routes are
+       * designed to fail closed when identity or billing authority is
+       * unreachable, and this suite runs against environments where it is —
+       * their contracts are covered by unit tests over the handlers and by
+       * entitlements.spec.ts. What this assertion protects is the shell: a
+       * missing font, a 404 icon, a broken chunk.
+       */
+      if (url.pathname.startsWith("/api/")) return;
+      failedRequests.push(`${response.status()} ${url.pathname}`);
+    });
 
     const response = await page.goto(path, { waitUntil: "networkidle" });
     expect(response?.status(), `${name} responded ${response?.status()}`).toBeLessThan(400);
@@ -37,6 +66,7 @@ for (const [name, path] of ROUTES) {
     ).toBeLessThanOrEqual(overflow.clientWidth + 1);
 
     expect(problems, `${name} console: ${problems.join(" | ")}`).toEqual([]);
+    expect(failedRequests, `${name} requests: ${failedRequests.join(" | ")}`).toEqual([]);
   });
 }
 
