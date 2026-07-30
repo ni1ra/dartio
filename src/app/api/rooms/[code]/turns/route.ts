@@ -57,9 +57,11 @@ export async function handleRoomTurnRequest(
   dependencies: RoomTurnDependencies = {},
 ): Promise<Response> {
   try {
-    const body = bodySchema.parse(await request.json());
+    // Authorized before the body is read: an unauthenticated write is refused for
+    // being unauthenticated, whatever it was carrying.
     const authorize = dependencies.authorize ?? defaultAuthorize;
     const { userId } = await authorize();
+    const body = bodySchema.parse(await request.json());
     const append = dependencies.append ?? appendRoomTurn;
     const result = await append(userId, code, body as AppendTurnInput);
     return NextResponse.json(result, { status: 201, headers: NO_STORE });

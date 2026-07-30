@@ -30,9 +30,12 @@ export async function handleCreateRoomRequest(
   dependencies: CreateRoomDependencies = {},
 ): Promise<Response> {
   try {
-    const body = bodySchema.parse(await request.json());
+    // Authorize before reading the body, the way the voice route does. A caller
+    // with no session should learn that and nothing else — not which of their
+    // fields was malformed.
     const authorize = dependencies.authorize ?? defaultAuthorize;
     const { userId, displayName } = await authorize();
+    const body = bodySchema.parse(await request.json());
     const create = dependencies.create ?? createRoom;
     const room = await create(userId, { ...body, displayName });
     return NextResponse.json(room, { status: 201, headers: NO_STORE });

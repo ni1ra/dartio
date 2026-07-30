@@ -67,6 +67,16 @@ describe("POST /api/rooms", () => {
     expect(response.status).toBe(401);
   });
 
+  it("refuses an unauthenticated caller for that reason, whatever their body carried", async () => {
+    // Caught by verify:rooms against production: the body was parsed first, so a
+    // request with no session and a malformed payload learned which field was wrong
+    // instead of simply being turned away.
+    const response = await handleCreateRoomRequest(post({ nonsense: true }), {
+      authorize: async () => { throw new AuthError(); },
+    });
+    expect(response.status).toBe(401);
+  });
+
   it("reports an unavailable store as 503 rather than as a server fault", async () => {
     const response = await handleCreateRoomRequest(post({ mode: "x01" }), {
       authorize: signedIn,
@@ -153,6 +163,17 @@ describe("POST /api/rooms/{code}/turns", () => {
       append: async () => { throw new RoomError(403, "wrong_seat", "You can only throw from your own seat"); },
     });
     expect(response.status).toBe(403);
+  });
+
+  it("turns away an unauthenticated write before reading what it was carrying", async () => {
+    const append = vi.fn();
+    const response = await handleRoomTurnRequest(post({ garbage: true }, "https://dartio.test/api/rooms/OCHE42/turns"), "OCHE42", {
+      authorize: async () => { throw new AuthError(); },
+      append,
+    });
+
+    expect(response.status).toBe(401);
+    expect(append).not.toHaveBeenCalled();
   });
 
   it.each([
