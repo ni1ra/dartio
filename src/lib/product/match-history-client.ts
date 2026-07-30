@@ -66,6 +66,54 @@ export async function recordCompletedMatch(
   return "unavailable";
 }
 
+const deepSchema = z.object({
+  x01Matches: z.number(),
+  firstNineAverage: z.number(),
+  checkoutAttempts: z.number(),
+  checkoutsHit: z.number(),
+  checkoutPercentage: z.number(),
+  bestVisit: z.number(),
+  bestLegDarts: z.number().nullable(),
+  busts: z.number(),
+  modes: z.array(z.object({ mode: z.string(), played: z.number(), won: z.number() }).strict()),
+}).strict();
+
+const statsSchema = z.object({
+  matchesPlayed: z.number(),
+  matchesWon: z.number(),
+  winPercentage: z.number(),
+  visits: z.number(),
+  dartsThrown: z.number(),
+  threeDartAverage: z.number(),
+  historyLimit: z.number().nullable(),
+  deep: deepSchema.nullable(),
+}).strict();
+
+export type CareerStatsView = z.infer<typeof statsSchema>;
+
+/**
+ * The player's career figures, or why they are not available.
+ *
+ * `locked` is not the same as `unavailable`: a Free player successfully read their
+ * stats and the deep ones were withheld, which the surface should explain rather
+ * than present as a failure. That distinction is carried by `deep` being null in a
+ * 200, never by an error.
+ */
+export async function fetchCareerStats(
+  options: MatchClientOptions = {},
+): Promise<CareerStatsView | null> {
+  const fetcher = options.fetcher ?? fetch;
+  let response: Response;
+  try {
+    response = await fetcher("/api/stats", { cache: "no-store", signal: options.signal });
+  } catch {
+    return null;
+  }
+  if (!response.ok) return null;
+  const parsed = statsSchema.safeParse(await response.json().catch(() => null));
+  return parsed.success ? parsed.data : null;
+}
+
 /** Returns null when history cannot be read, so a surface can say so instead of rendering an empty past. */
 export async function fetchMatchHistory(
   options: MatchClientOptions & { readonly limit?: number } = {},

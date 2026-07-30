@@ -11,3 +11,15 @@ export const GAME_MODES = {
 } as const;
 
 export type GameModeId = keyof typeof GAME_MODES;
+
+/**
+ * The player-facing name for a stored mode id.
+ *
+ * History reads mode ids back out of the database, where they are plain text and
+ * may outlive the catalogue — a mode removed from this list still has matches in
+ * somebody's record. Falling back to the id keeps that row readable instead of
+ * blank.
+ */
+export function modeName(id: string): string {
+  return (GAME_MODES as Record<string, { readonly name: string } | undefined>)[id]?.name ?? id;
+}
