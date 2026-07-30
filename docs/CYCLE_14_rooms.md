@@ -57,10 +57,32 @@ planned. A lobby that quietly never starts a match would be a worse lie than the
 - The lobby polls every four seconds and **stops after three consecutive failures**
   rather than hammering a dead endpoint, then says the seat is still held.
 
+## The bug only a real deployment could show
+
+Filing a visit answered 503 on preview while all 473 unit tests passed. Drizzle
+renders a column reference as `"matches"."state_version"`, which Postgres accepts
+everywhere in that statement except as the target of `SET`, where a qualified name
+is a syntax error.
+
+The fake database in the unit tests never renders SQL, so it cannot see this class
+of fault at all — the tests were asserting the *shape* of a write that the database
+would have rejected. Two real identities in a real room found it in one run. That
+is the argument for `scripts/verify-rooms-live.mjs` existing, and it is now in the
+repo: preview only, and it refuses to run against production, because a gate that
+grants temporary Pro rows must never be pointed at real billing state.
+
 ## Verified receipts — 2026-07-30
 
 - Deterministic gates: TypeScript clean, ESLint clean at `--max-warnings=0`,
   **473 tests across 37 files**, up from 435 across 35. Build green.
+- **A full room round trip on a preview deployment**, two throwaway identities
+  playing each other: host opened `YF7NTK` in seat 0, guest joined into seat 1, both
+  seats visible to both, host filed a visit taking the room to version 1, **the
+  guest's write against the stale version 0 was refused with 409 `version_conflict`**,
+  a throw from the host's seat was refused with 403 `wrong_seat`, the guest then
+  filed their own visit at version 2, and reading `since=1` returned exactly the one
+  visit that followed. The temporary Pro rows were removed afterwards.
+- Browser suite: **130 passed, 2 skipped** at all three viewports, up from 121.
 - `PRODUCT_AVAILABILITY` had gone stale: `history` and `deepStats` still read
   `coming_soon` after cycles 12 and 13 shipped them, and the access test asserted
   the stale value. Both now read `implemented`; `onlineMultiplayer` stays

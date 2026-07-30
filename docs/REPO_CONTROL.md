@@ -75,6 +75,7 @@
 0. `pnpm verify:auth <deployment-url>` — a deployment can serve 200s on every route while authentication is entirely dead, because Neon Auth enforces trusted origins on its own service. This is the only check that catches it.
 0b. `pnpm verify:history <deployment-url>`
 0c. `pnpm verify:rooms <deployment-url>` — asserts every room endpoint refuses a request with no session, and that a plan without online play is refused with 402 before a room exists. Checking the refusal is the part worth automating: a gate that quietly opens is the failure nobody notices. — signs in, files a match, reads it back, and asserts an anonymous request is refused. The browser suite exercises free play only, so everything behind the login wall is invisible to it; this is the gate that sees history, and from Cycle 13 the statistics computed from it.
+0d. `node scripts/verify-rooms-live.mjs <preview-url> <preview-db-url>` — the full room round trip: two throwaway identities, one room, a deliberate version collision. **Preview only, and it writes**: it grants temporary Pro rows and deletes them, and refuses to run against production. It exists because the room write was a Postgres syntax error that every unit test passed straight through — a fake database never renders SQL.
 1. Local deterministic checks.
 2. Local browser stories at mobile, tablet, and desktop.
 3. GitHub pull request with CI.
