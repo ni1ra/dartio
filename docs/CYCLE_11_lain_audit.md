@@ -15,14 +15,14 @@ commit per note, one PR.
 - [x] **No login or signup anywhere in the top nav** — there was no route into an account above 760px at all.
 - [x] **Where is pricing?** — carried only by `.desktop-links`, hidden below 1100px, so unreachable on a phone.
 - [x] **Production authentication is dead.** No origin the app is served from is in the production Neon Auth project's trusted domains. Sign-in and sign-up both return `403 INVALID_ORIGIN` at `dartioopus46.vercel.app`, at the canonical `dartio-*.vercel.app` deployment URL, and at `dartio.vercel.app`. ~~Requires the Neon console; cannot be fixed from the repository.~~ **Fixed 2026-07-28** — see below. It did require the Neon control plane, but not the console.
-- [ ] **There is no admin or superadmin role.** `users` has `id`, `auth_subject`, `email`, `stripe_customer_id`, and timestamps — no role column, no admin surface, no god mode. `PHASE_1` listed "role distinction (user/admin)" and it was never built.
+- [x] **There is no admin or superadmin role.** `users` has `id`, `auth_subject`, `email`, `stripe_customer_id`, and timestamps — no role column, no admin surface, no god mode. `PHASE_1` listed "role distinction (user/admin)" and it was never built.
 - [x] **"yeah i did some file reorganising, some paths may be broken as a result, but my pc files are way leaner now. fix any issue related to this if it appears perma."** — the working tree moved from `/home/nira/dev/dartio` to `/home/nira/projects/dartio`. Find every reference that still points at the old location and correct it, rather than patching a symptom.
-- [ ] **"these lack padding and margin etc"** — the signed-in account command grid (`.membership-command`, `.privacy-command`). `globals.css` styles `.account-command-grid > div`, but `Surface` renders a `<section>`, so the padding and the two-column index layout never applied. First defect found behind the login wall, which nothing has ever been able to reach until today.
-- [ ] **"im free plan...??"** — signed in as `admin` and the membership card reads FREE. Role and entitlement are separate systems and nothing in Dartio reads the role yet. See the disposition below.
-- [ ] **"text too small on site in general, cant read text well (desktop)"** and **"this text still very small for me on claude app"** — site-wide type scale, not one component. Measured on production at 1440×1000: 214 of 337 visible text nodes, 64%, render below 14px, with copy at 7px, 8px and 9px.
-- [ ] **"board is bleeding over UI >.>"** — on the match page the dartboard overflows its column and paints over the checkout companion card to its right.
-- [ ] **"this element looks AI sloppy and has wrong pad/marg"** — the match command dock (`.navi-command-dock__inner`), carrying "Your throw · 3 darts" with Undo and Correct latest dart.
-- [ ] **"not utilizing max screenspace for me"** — the match surface leaves a large dead band below the command dock and does not fill the viewport height it reserves.
+- [x] **"these lack padding and margin etc"** — the signed-in account command grid (`.membership-command`, `.privacy-command`). `globals.css` styles `.account-command-grid > div`, but `Surface` renders a `<section>`, so the padding and the two-column index layout never applied. First defect found behind the login wall, which nothing has ever been able to reach until today.
+- [x] **"im free plan...??"** — signed in as `admin` and the membership card reads FREE. Role and entitlement are separate systems and nothing in Dartio reads the role yet. See the disposition below.
+- [x] **"text too small on site in general, cant read text well (desktop)"** and **"this text still very small for me on claude app"** — site-wide type scale, not one component. Measured on production at 1440×1000: 214 of 337 visible text nodes, 64%, render below 14px, with copy at 7px, 8px and 9px.
+- [x] **"board is bleeding over UI >.>"** — on the match page the dartboard overflows its column and paints over the checkout companion card to its right.
+- [x] **"this element looks AI sloppy and has wrong pad/marg"** — the match command dock (`.navi-command-dock__inner`), carrying "Your throw · 3 darts" with Undo and Correct latest dart.
+- [x] **"not utilizing max screenspace for me"** — the match surface leaves a large dead band below the command dock and does not fill the viewport height it reserves.
 - [ ] **"Could not attach to MCP server Windows-MCP" pls fix this too** — tooling rather than product, so it is tracked outside this repository as task `#00c`. Three of the four configured MCP servers pointed at `/mnt/c` paths the reorganization removed. `alpaca` was repointed at a surviving copy; `navi-mcp` and `navi-wiki` have no copy on disk. `Windows-MCP` itself is configured nowhere — not in either `.claude.json`, not in Cursor, Codex, or any project `.mcp.json` — so the message is a stale reference to something already deleted. Needs Lain to say where those servers went, or whether they are gone for good.
 
 ## Verified receipts — 2026-07-28
@@ -184,3 +184,58 @@ Everything it asserts is free play, and `entitlements.spec.ts` deliberately
 tolerates an unavailable access authority so the same suite can run against CI
 placeholders. That tolerance is correct for CI and made the suite blind here.
 `verify:auth` closes it, and the release ladder now names it.
+
+
+## Closed in Cycle 19 — 2026-07-31
+
+Five of these rows were fixed by commit `49916f0` and never ticked. They are ticked
+here against production rather than against the diff:
+
+- **Account card padding** and **site-wide type scale** — both visible and correct in
+  a signed-in screenshot of `https://dartioopus46.vercel.app/account` taken this
+  session: the command cards carry their 32 px and their index column, and the
+  membership and privacy copy reads at a normal size.
+- **The board bleeding over the UI** — a desktop screenshot of the live match page
+  shows the board inside its own column with the checkout companion untouched beside
+  it.
+- **The command dock's padding** — the dock renders as one row with the status text
+  and the two controls held off its edges, and the two buttons no longer read as one.
+
+**"Not utilizing max screenspace" was genuinely still open**, and was fixed here.
+Measured on production at 1440×1000: the document ran to **1229 px** inside a 1000 px
+viewport and the command dock sat at **y=1036**, so Undo and Correct were below the
+fold on the one screen a player uses standing up. Three things caused it, and each was
+found by measuring rather than by reading:
+
+1. `#main-content` and `.match-page` both reserved `100vh − 76px` for the nav, but the
+   stage begins 38 px lower than that. The reservation overshot the viewport by the
+   difference.
+2. `.match-page` had a `min-height` and no height, so `flex: 1` on the grid had nothing
+   to distribute and the grid simply took its content size. The board was never the
+   constraint — the middle column was, stacking the checkout companion, the per-dart
+   card and the voice console past the height available.
+3. Navi's shell reserves room beneath the main area for the bottom navigation, which
+   only exists below 1100 px. On a desktop that reservation is canvas nothing occupies.
+
+Afterwards, measured the same way: **document height 1000 px in a 1000 px viewport**,
+with the dock ending exactly at the bottom edge. `tests/browser/layout.spec.ts` now
+asserts both, so it cannot drift back.
+
+## The admin role — decided, not built
+
+`users` needs no `role` column and Dartio needs no bespoke admin surface. Neon Auth
+already runs Better Auth's admin plugin: accounts carry `role`, `banned`, `banReason`
+and `banExpires`, and the control plane exposes
+`PUT /projects/{id}/branches/{branch}/auth/users/{user}/role`. Building a second,
+weaker copy of that inside Dartio would leave two answers to the question of who is an
+administrator.
+
+**"im free plan...??" was correct behaviour, not a bug.** Role and entitlement are
+separate systems on purpose: being an administrator is not a subscription, and an
+admin account with no Stripe subscription is genuinely on Free. Making the role grant
+paid entitlements would mean paid access could be handed out without any billing
+record, which is exactly the coupling the access snapshot exists to prevent.
+
+What remains is a product decision rather than an engineering one — whether an
+administrator should *see* an admin surface at all, and what belongs on it. That is a
+commission, and it is not built.

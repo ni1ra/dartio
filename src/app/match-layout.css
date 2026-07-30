@@ -833,8 +833,16 @@ html[data-lp-motion] [data-reveal][data-inview] {
  * globals.css, so the clamp travels with the width instead of depending on a
  * declaration in a different file continuing to apply.
  */
+/*
+ * Sized to the height that is actually left, not to the whole viewport.
+ *
+ * At 64vh the board alone was 600px, and header, scoreboard, board and dock came
+ * to 1003px inside the 886px a 1000px-tall desktop has below the nav — so the
+ * command dock sat 117px below the fold and the page scrolled to reach Undo.
+ * 56vh leaves it room; the 600px cap still applies on a taller screen.
+ */
 .board-wrap {
-  width: min(64vh, 600px, 100%);
+  width: min(56vh, 600px, 100%);
   max-width: 100%;
 }
 
@@ -848,9 +856,27 @@ html[data-lp-motion] [data-reveal][data-inview] {
  * the page ending early in empty space.
  */
 @media (min-width: 1101px) {
+  /*
+   * Navi's shell reserves room under the main area for the bottom navigation,
+   * which only exists below 1100px. On a desktop that reservation is a band of
+   * canvas the page scrolls into and nothing ever occupies.
+   */
+  .navi-app-shell__main {
+    padding-bottom: 0;
+  }
+
   .match-page {
     display: flex;
     flex-direction: column;
+    /*
+     * A real height, not just a floor. `flex: 1` on the grid distributes space
+     * only when the container has one — with `min-height` alone the grid took its
+     * content size, the page grew to 1003px inside the 886px available, and the
+     * dock went under the fold.
+     */
+    height: calc(100dvh - var(--nav-height) - var(--stage-inset));
+    min-height: 560px;
+    overflow: hidden;
   }
 
   .match-grid {
@@ -1050,3 +1076,28 @@ html[data-lp-motion] [data-reveal][data-inview] {
 .match-dock .ai-access-recovery { font-size: 12px; }
 .match-dock .ai-access-actions>button { font-size: 12px; }
 .throw-mark.off-board text { font-size: 14px; }
+
+
+/* ── The match fits the screen it reserves ─────────────────────────────────
+ * Lain's note was "not utilizing max screenspace for me". Measured on production
+ * at 1440x1000 the page ran to 1229px and the command dock sat at y=1036 — Undo
+ * and Correct were below the fold, on the one screen a player uses standing up.
+ *
+ * The board was not the constraint. The middle column is: checkout companion,
+ * the per-dart card and the voice console stack to more than the height the
+ * match has. So that column scrolls inside the grid rather than growing the page,
+ * which keeps the dock where a player can always reach it. `min-height: 0` is
+ * what lets a grid child shrink below its content at all.
+ */
+@media (min-width: 1101px) {
+  .match-grid > .match-side {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .board-zone {
+    min-height: 0;
+    align-self: start;
+  }
+}

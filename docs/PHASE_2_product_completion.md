@@ -49,8 +49,9 @@ gap-filling first, simplification and audit last.
 - [x] **Cycle 18 — Continuous voice.** Clips shaped by speech rather than by a
   stopwatch, automatic re-arming, `confirm`/`cancel` given something to act on, and
   a vocabulary per mode. See `CYCLE_18_voice.md`.
-- [ ] **Cycle 19 — Cycle 11's remainder.** Command-dock padding, the dead band
-  below it, role versus entitlement, and the admin-role decision.
+- [x] **Cycle 19 — Cycle 11's remainder.** Five rows ticked against production
+  rather than against the diff, the screenspace complaint measured and fixed, and the
+  admin role decided rather than built. See `CYCLE_19_audit_remainder.md`.
 - [ ] **Cycle 20 — Observability, analytics, rollback**, including the
   `get-session` 500 that should be a 503.
 - [ ] **Cycle 21 — Simplification and the dead-code sweep.**
