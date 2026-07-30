@@ -1,5 +1,12 @@
 import { dart, type BoardNumber, type Dart, type Multiplier } from "./darts";
 import { applyCricketDart, createCricket, type CricketOptions, type CricketPlayer, type CricketState } from "./cricket";
+import {
+  recordedDarts,
+  recordedPlayer,
+  type MatchRecord,
+  type RecordedTurn,
+  type SeatIdentity,
+} from "./match-record";
 
 /**
  * The Cricket event log, deliberately the same shape as X01's.
@@ -38,6 +45,12 @@ export function cricketDartEvent(value: Dart): CricketEvent {
   };
 }
 
+function toDart(event: CricketEvent): Dart {
+  return event.x === undefined || event.y === undefined
+    ? dart(event.segment, event.multiplier)
+    : dart(event.segment, event.multiplier, { x: event.x, y: event.y });
+}
+
 export function createCricketLog(options: CricketOptions, players: readonly CricketPlayer[]): CricketLog {
   createCricket(options, players);
   return { options, players, events: [] };
@@ -52,10 +65,7 @@ export function replayCricket(log: CricketLog): CricketReplay {
       return;
     }
     try {
-      const value = event.x === undefined || event.y === undefined
-        ? dart(event.segment, event.multiplier)
-        : dart(event.segment, event.multiplier, { x: event.x, y: event.y });
-      state = applyCricketDart(state, value);
+      state = applyCricketDart(state, toDart(event));
     } catch (problem) {
       rejected.push({ index, reason: problem instanceof Error ? problem.message : "Rejected by the rules" });
     }
@@ -72,6 +82,59 @@ export function undoLastCricketEvent(log: CricketLog): CricketLog {
 }
 
 /**
+ * Reduces a finished Cricket match to the shape history is written in.
+ *
+ * Two things are worth knowing about the numbers it records. Cricket has no legs,
+ * so every visit belongs to leg 1 — the round is recoverable from the turn order
+ * and the seat count, so it is not stored twice. And the before/after pair is the
+ * thrower's *own* points: in cut-throat a visit adds points to everyone else, so
+ * the thrower's total can sit still through a huge visit. The darts are recorded
+ * either way, so the full game is always replayable from them.
+ */
+export function cricketMatchRecord(log: CricketLog, seats: readonly SeatIdentity[] = []): MatchRecord {
+  const seatOf = new Map(log.players.map((player, seat) => [player.id, seat]));
+  let state = createCricket(log.options, log.players);
+  let pointsBefore = state.points;
+  const turns: RecordedTurn[] = [];
+
+  for (const event of log.events) {
+    if (state.status === "complete") break;
+    let next: CricketState;
+    try {
+      next = applyCricketDart(state, toDart(event));
+    } catch {
+      // A dart the rules refused belongs to no visit, exactly as in replay.
+      continue;
+    }
+    if (next.turns.length > state.turns.length) {
+      const turn = next.turns[next.turns.length - 1]!;
+      const seat = seatOf.get(turn.playerId) ?? 0;
+      turns.push({
+        seat,
+        turnNumber: turns.length + 1,
+        legNumber: 1,
+        scoreBefore: pointsBefore[seat] ?? 0,
+        scoreAfter: next.points[seat] ?? 0,
+        bust: false,
+        dartsThrown: turn.dartsThrown,
+        darts: recordedDarts(turn.darts),
+      });
+      pointsBefore = next.points;
+    }
+    state = next;
+  }
+
+  const winnerSeat = state.winnerId === undefined ? undefined : seatOf.get(state.winnerId);
+  return {
+    mode: "cricket",
+    options: { ...log.options },
+    players: log.players.map((player, seat) => recordedPlayer(seat, player.name, seats[seat])),
+    turns,
+    ...(winnerSeat === undefined ? {} : { winnerSeat }),
+  };
+}
+
+/**
  * Rewinds to just before a completed visit, for the same reason X01 does:
  * events record what was thrown and turn order decides who threw it, so
  * excising a visit from the middle would reassign every later one.
@@ -84,10 +147,7 @@ export function rewindCricketToVisit(log: CricketLog, visitIndex: number): Crick
   for (const [index, event] of log.events.entries()) {
     let next: CricketState;
     try {
-      const value = event.x === undefined || event.y === undefined
-        ? dart(event.segment, event.multiplier)
-        : dart(event.segment, event.multiplier, { x: event.x, y: event.y });
-      next = applyCricketDart(state, value);
+      next = applyCricketDart(state, toDart(event));
     } catch {
       continue;
     }

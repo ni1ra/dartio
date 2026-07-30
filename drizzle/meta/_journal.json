@@ -43,6 +43,13 @@
       "when": 1784257587290,
       "tag": "0005_salty_felicia_hardy",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785445093330,
+      "tag": "0006_special_wraith",
+      "breakpoints": true
     }
   ]
 }

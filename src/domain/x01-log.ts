@@ -1,5 +1,12 @@
 import { dart, type BoardNumber, type Dart, type Multiplier } from "./darts";
 import {
+  recordedDarts,
+  recordedPlayer,
+  type MatchRecord,
+  type RecordedTurn,
+  type SeatIdentity,
+} from "./match-record";
+import {
   applyAggregateVisit,
   createX01,
   type X01Options,
@@ -176,6 +183,40 @@ export function visitRange(log: X01Log, visitIndex: number): { readonly start: n
 
   return null;
 }
+/**
+ * Reduces a finished X01 match to the one shape history is written in.
+ *
+ * `seats` carries the only thing the log does not know: whether a seat was played
+ * by the AI and at what level. The log records what was thrown, not who or what
+ * threw it, and that is deliberate — turn order decides the thrower — so the
+ * caller that set the match up supplies it.
+ */
+export function x01MatchRecord(log: X01Log, seats: readonly SeatIdentity[] = []): MatchRecord {
+  const { state } = replay(log);
+  const seatOf = new Map(log.players.map((player, seat) => [player.id, seat]));
+  const turns: RecordedTurn[] = state.turns.map((turn, index) => ({
+    seat: seatOf.get(turn.playerId) ?? 0,
+    turnNumber: index + 1,
+    legNumber: turn.legNumber,
+    scoreBefore: turn.scoreBefore,
+    scoreAfter: turn.scoreAfter,
+    bust: turn.bust,
+    dartsThrown: turn.dartsThrown,
+    ...(turn.source === "aggregate" && turn.aggregateScore !== undefined
+      ? { aggregateScore: turn.aggregateScore }
+      : {}),
+    darts: recordedDarts(turn.darts),
+  }));
+  const winnerSeat = state.winnerId === undefined ? undefined : seatOf.get(state.winnerId);
+  return {
+    mode: "x01",
+    options: { ...log.options },
+    players: log.players.map((player, seat) => recordedPlayer(seat, player.name, seats[seat])),
+    turns,
+    ...(winnerSeat === undefined ? {} : { winnerSeat }),
+  };
+}
+
 function assertIndex(log: X01Log, index: number): void {
   if (!Number.isInteger(index) || index < 0 || index >= log.events.length) {
     throw new RangeError(`No event at index ${index}`);
