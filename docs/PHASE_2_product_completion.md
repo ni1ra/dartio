@@ -46,8 +46,9 @@ gap-filling first, simplification and audit last.
   own idea of what to aim at, and the two modes with only one right answer say so
   rather than inventing variety. Levels 1–8, matching the free tier. See
   `CYCLE_17_mode_ai.md`.
-- [ ] **Cycle 18 — Continuous voice.** Activity detection, silence segmentation,
-  re-arming, a correction queue, a vocabulary per mode.
+- [x] **Cycle 18 — Continuous voice.** Clips shaped by speech rather than by a
+  stopwatch, automatic re-arming, `confirm`/`cancel` given something to act on, and
+  a vocabulary per mode. See `CYCLE_18_voice.md`.
 - [ ] **Cycle 19 — Cycle 11's remainder.** Command-dock padding, the dead band
   below it, role versus entitlement, and the admin-role decision.
 - [ ] **Cycle 20 — Observability, analytics, rollback**, including the

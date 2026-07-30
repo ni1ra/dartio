@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Button, Surface } from "navi-ui";
 import type { VoiceCommand } from "@/lib/voice/commands";
+import { createSegmenter, frameLevel, observeLevel } from "@/lib/voice/segmenter";
 import { hasAccessEntitlement, isProductAvailable } from "@/lib/product/access-contract";
 import { RecordDotIcon } from "./icons";
 import { useAccess } from "./access-provider";
@@ -40,6 +41,9 @@ export function VoiceControl({
     [alwaysOn, setAlwaysOn] = useState(false),
     [result, setResult] = useState<VoiceResult | null>(null),
     [error, setError] = useState<string | null>(null);
+  const audio = useRef<AudioContext | null>(null),
+    monitorFrame = useRef<number | null>(null),
+    segmenter = useRef(createSegmenter());
   const recorder = useRef<MediaRecorder | null>(null),
     stream = useRef<MediaStream | null>(null),
     chunks = useRef<Blob[]>([]),
@@ -89,8 +93,52 @@ export function VoiceControl({
     stream.current?.getTracks().forEach((track) => track.stop());
     stream.current = null;
   }
+  function stopMonitor() {
+    if (monitorFrame.current !== null) window.cancelAnimationFrame(monitorFrame.current);
+    monitorFrame.current = null;
+    void audio.current?.close().catch(() => undefined);
+    audio.current = null;
+    segmenter.current = createSegmenter();
+  }
+
+  /**
+   * Watches how loud the room is and decides where a clip begins and ends.
+   *
+   * Runs on animation frames rather than a timer so it stops when the tab is
+   * hidden — a phone on a stool with the screen off should not be holding a
+   * microphone open and sending audio.
+   */
+  function startMonitor(media: MediaStream) {
+    stopMonitor();
+    try {
+      const context = new AudioContext();
+      audio.current = context;
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 1024;
+      context.createMediaStreamSource(media).connect(analyser);
+      const frame = new Float32Array(analyser.fftSize);
+
+      const tick = () => {
+        if (!alive.current || recorder.current?.state !== "recording") return;
+        analyser.getFloatTimeDomainData(frame);
+        const step = observeLevel(segmenter.current, frameLevel(frame), context.currentTime * 1000);
+        segmenter.current = step.state;
+        if (step.event.kind === "clip") { stop(false); return; }
+        // Too short to be a score: drop it and keep listening without a word.
+        if (step.event.kind === "discarded") { stop(true); return; }
+        monitorFrame.current = window.requestAnimationFrame(tick);
+      };
+      monitorFrame.current = window.requestAnimationFrame(tick);
+    } catch {
+      // No analyser available: fall back to the old fixed clip rather than
+      // recording until the tab is closed.
+      cycleTimer.current = window.setTimeout(() => stop(false), 4500);
+    }
+  }
+
   function cleanupRecorder() {
     clearCycle();
+    stopMonitor();
     stopStream();
     recorder.current = null;
   }
@@ -154,8 +202,10 @@ export function VoiceControl({
       next.onstop = () => void finishRecording(next.mimeType || "audio/webm");
       next.start(250);
       setPhase(mode === "always" ? "listening" : "recording");
-      if (mode === "always")
-        cycleTimer.current = window.setTimeout(() => stop(false), 4500);
+      // A clip is a sentence, not a stopwatch: the segmenter closes it when the
+      // room goes quiet, and throws away anything too short to be a score — which
+      // is mostly darts hitting the board.
+      if (mode === "always") startMonitor(media);
       if (mode === "push" && !holdActive.current)
         window.setTimeout(() => stop(false), 120);
     } catch (problem) {
@@ -187,7 +237,12 @@ export function VoiceControl({
     cleanupRecorder();
     chunks.current = [];
     if (ignored) {
-      if (alive.current) setPhase(alwaysRef.current ? "paused" : "idle");
+      if (!alive.current) return;
+      // A cough, a chair, a dart in the board. Always-on goes back to listening
+      // without saying anything — stopping to be restarted after every noise in
+      // the room is exactly what made the old mode unusable.
+      if (alwaysRef.current) { void begin("always"); return; }
+      setPhase("idle");
       return;
     }
     if (!blob.size) {
@@ -223,6 +278,15 @@ export function VoiceControl({
         transcript: payload.transcript?.trim() || "",
         command: payload.command ?? null,
       };
+      // Always-on applies what it understood and goes straight back to listening.
+      // Stopping to be confirmed after every visit is what made the old mode a
+      // single clip with extra steps; a misheard dart is corrected by saying
+      // "undo", which is in the vocabulary.
+      if (alwaysRef.current && next.command) {
+        setResult(null);
+        if (applyCommand(next.command, next.transcript)) { void begin("always"); return; }
+        return;
+      }
       setResult(next);
       setPhase(next.command ? "confirm" : "ambiguous");
     } catch (problem) {
@@ -233,20 +297,29 @@ export function VoiceControl({
     }
   }
 
-  function apply() {
-    const command = result?.command;
-    if (!command) return;
+  /**
+   * Applies a command directly rather than reading it back out of state.
+   *
+   * Always-on has to apply the visit it just heard and immediately start listening
+   * again; reading `result` would see the value from before this render.
+   */
+  function applyCommand(command: VoiceCommand, transcript: string): boolean {
     if (command.type === "dart") onDart(command.segment, command.multiplier);
     else if (command.type === "turn_score") onTurnScore(command.score);
     else if (command.type === "undo") onUndo();
     else if (command.type === "next_player") onNextPlayer();
     else {
-      setError(
-        `“${result?.transcript}” is a voice-control word, not a score to apply here.`,
-      );
+      setError(`“${transcript}” is a voice-control word, not a score to apply here.`);
       setPhase("ambiguous");
-      return;
+      return false;
     }
+    return true;
+  }
+
+  function apply() {
+    const command = result?.command;
+    if (!command) return;
+    if (!applyCommand(command, result?.transcript ?? "")) return;
     setResult(null);
     setPhase(alwaysOn ? "paused" : "idle");
   }
