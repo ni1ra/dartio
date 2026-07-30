@@ -39,8 +39,9 @@ gap-filling first, simplification and audit last.
   from the room's own record makes join, reload, and catch-up one code path. See
   `CYCLE_15_room_play.md`. Spectators and host handover split out, still marked
   planned on `/friends`.
-- [ ] **Cycle 16 — The three practice drills.** Checkout Lab, Doubles Matrix,
-  Scoring Sprint — the last `href="#"` rows in the catalogue.
+- [x] **Cycle 16 — The three practice drills.** Checkout Lab, Doubles Matrix, and
+  Scoring Sprint. All nine catalogue rows are playable and the COMING NEXT branch is
+  gone. See `CYCLE_16_drills.md`.
 - [ ] **Cycle 17 — AI opponents for Cricket and the round modes.** Each mode needs
   its own policy against its own rules; `chooseAiAim` is X01-shaped.
 - [ ] **Cycle 18 — Continuous voice.** Activity detection, silence segmentation,

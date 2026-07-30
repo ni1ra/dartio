@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { CricketMatch } from "@/components/cricket-match";
+import { DrillMatch } from "@/components/drill-match";
+import { DRILLS, type DrillId } from "@/domain";
 import { RoomMatch } from "@/components/room-match";
 import { RoundMatch } from "@/components/round-match";
 import { ROUND_MODES, type RoundModeId } from "@/domain";
@@ -18,6 +20,8 @@ export default async function MatchPage({ searchParams }: { searchParams: Promis
   // the query: the room is the record, not the link that reached it.
   const room = params.room;
   if (typeof room === "string" && /^[A-Za-z0-9]{6}$/.test(room)) return <RoomMatch code={room.toUpperCase()} />;
+  const drill = params.drill;
+  if (typeof drill === "string" && drill in DRILLS) return <DrillMatch drill={drill as DrillId} />;
   const mode = params.mode;
   if (mode === "cricket") return <CricketMatch />;
   if (typeof mode === "string" && mode in ROUND_MODES) return <RoundMatch mode={mode as RoundModeId} />;
