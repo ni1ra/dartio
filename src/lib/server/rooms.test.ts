@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   appendRoomTurn,
+  completeRoomMatch,
   createRoom,
   generateRoomCode,
   joinRoom,
@@ -40,7 +41,13 @@ function fakeDatabase(options: { queue?: unknown[][]; failBatch?: readonly (Erro
   const batches: Statement[][] = [];
   const database = {
     insert: (table: unknown) => ({ values: (rows: unknown) => ({ kind: "insert", table, rows: Array.isArray(rows) ? rows : [rows] }) }),
-    update: (table: unknown) => ({ set: (rows: unknown) => ({ where: () => ({ kind: "update", table, rows: [rows] }) }) }),
+    // `where` is awaited directly when an update stands alone, and used as a value
+    // when it goes into a batch, so it has to be both.
+    update: (table: unknown) => ({
+      set: (rows: unknown) => ({
+        where: () => Object.assign(Promise.resolve(), { kind: "update", table, rows: [rows] }),
+      }),
+    }),
     batch: async (statements: Statement[]) => {
       const failure = failures.shift();
       if (failure) throw failure;
@@ -193,5 +200,35 @@ describe("the error contract", () => {
     const error = new RoomError(409, "version_conflict", "Somebody else threw first");
     expect(error).toMatchObject({ status: 409, code: "version_conflict" });
     expect(error.message).toContain("Somebody else");
+  });
+});
+
+describe("closing a room's match", () => {
+  it("names the winner and marks the match complete", async () => {
+    const { database, batches } = fakeDatabase({ queue: [[room()]] });
+    await expect(completeRoomMatch("user-1", "OCHE42", 1, database)).resolves.toEqual({ alreadyComplete: false });
+    // The update goes out on its own, not through a batch.
+    expect(batches).toHaveLength(0);
+  });
+
+  it("agrees with the second player rather than fighting them", async () => {
+    // Both replay the same log, both see the same finish, both report it.
+    const { database } = fakeDatabase({ queue: [[room({ status: "complete" })]] });
+    await expect(completeRoomMatch("user-2", "OCHE42", 1, database)).resolves.toEqual({ alreadyComplete: true });
+  });
+
+  it("refuses a seat that is not in the room", async () => {
+    const { database } = fakeDatabase({ queue: [[room()]] });
+    await expect(completeRoomMatch("user-1", "OCHE42", 6, database)).rejects.toMatchObject({ status: 422, code: "unknown_seat" });
+  });
+
+  it("refuses somebody who is not in the room", async () => {
+    const { database } = fakeDatabase({ queue: [[room()]] });
+    await expect(completeRoomMatch("stranger", "OCHE42", 1, database)).rejects.toMatchObject({ status: 403, code: "not_a_member" });
+  });
+
+  it("accepts a match that ended with no winner", async () => {
+    const { database } = fakeDatabase({ queue: [[room()]] });
+    await expect(completeRoomMatch("user-1", "OCHE42", null, database)).resolves.toEqual({ alreadyComplete: false });
   });
 });
