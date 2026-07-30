@@ -97,7 +97,7 @@ function HistoryPanel({ load }: { load: Load<readonly MatchHistoryEntryView[]> }
           </div>
           <div className="history-meta">
             <span className={won ? "history-won" : "history-lost"}>{match.winnerSeat === null ? "Unfinished" : won ? "Won" : "Lost"}</span>
-            <small>{match.dartCount} darts · {formatDate(match.completedAt)}</small>
+            <small>{match.dartCount} {match.dartCount === 1 ? "dart" : "darts"} · {formatDate(match.completedAt)}</small>
           </div>
         </li>;
       })}

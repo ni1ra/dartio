@@ -30,16 +30,13 @@ gap-filling first, simplification and audit last.
   tables that had never held a row now hold one. See `CYCLE_12_match_history.md`.
 - [ ] **Cycle 13 — Statistics and the account hub.** Three-dart average, checkout
   percentage, doubles, best leg, mode breakdown, recent matches, on `/account`.
-- [ ] **Cycle 14 — Server-authoritative rooms.** Create and join by code, versioned
-  events, optimistic locking by turn number. **Decided before starting:** `/friends`
-  already labels reconnect, spectators, and server-authoritative play as `Planned ·`,
-  so the page is honest today and must stay honest at every point in between. Cycle
-  14 promotes only the claim it makes true and leaves the other two marked planned;
-  a room that cannot yet survive a reconnect says so where a player will see it
-  before joining. The hazard is a run that stops between 14 and 15 leaving
-  production with live rooms under promises 15 was going to keep.
-- [ ] **Cycle 15 — Rooms: reconnect, ownership handoff, spectators**, and honest
-  degradation to polling.
+- [x] **Cycle 14 — Rooms exist.** Open one, join by code, one shared record with a
+  writer lock. **Scope moved, deliberately:** wiring the match screen to a room turned
+  out to be cycle-sized on its own, so playing inside a room moved to 15 and this
+  cycle ends at the lobby — which says so on the page. See `CYCLE_14_rooms.md`.
+- [ ] **Cycle 15 — Playing inside a room**, then reconnect, ownership handoff,
+  spectators, and honest degradation to polling. `/friends` marks each of these
+  planned until it is true.
 - [ ] **Cycle 16 — The three practice drills.** Checkout Lab, Doubles Matrix,
   Scoring Sprint — the last `href="#"` rows in the catalogue.
 - [ ] **Cycle 17 — AI opponents for Cricket and the round modes.** Each mode needs
