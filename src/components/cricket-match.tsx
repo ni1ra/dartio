@@ -1,20 +1,48 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button, CommandDock, IconButton, Modal } from "navi-ui";
 import {
-  appendCricketEvent, createCricketLog, CRICKET_NUMBERS, cricketDartEvent, cricketMatchRecord,
+  aiTactics, applyCricketDart,
+  appendCricketEvent, chooseCricketAim, createCricketLog, CRICKET_NUMBERS, cricketDartEvent, cricketMatchRecord,
   cricketPlayerStats,
-  dartMarks, hasClosed, isCricketNumber, notation, replayCricket, rewindCricketToVisit,
+  dartMarks, hasClosed, isCricketNumber, notation, replayCricket, rewindCricketToVisit, seededRandom, throwAiDart,
   undoLastCricketEvent,
-  type CricketLog, type CricketOptions, type CricketVariant, type Dart,
+  type CricketLog, type CricketOptions, type CricketState, type CricketVariant, type Dart,
 } from "@/domain";
 import { clearCricketMatch, loadCricketMatch, matchesCricketSetup, saveCricketMatch } from "@/lib/product/cricket-store";
 import { DartInputPad } from "./dart-input-pad";
 import { Dartboard } from "./dartboard";
+import { useAiVisit } from "./use-ai-visit";
 import { useMatchKeyboard } from "./use-match-keyboard";
 import { useRecordMatch } from "./use-record-match";
+
+/**
+ * Plays out one opponent visit and returns the darts, not the resulting state.
+ *
+ * Everything that scores reaches the match as events, so a corrected or resumed
+ * game replays the opponent's throws exactly as it replays the player's. The seed
+ * comes from the completed-visit count, so the same log always produces the same
+ * visit.
+ *
+ * Levels stop at eight because that is exactly the free tier. Nine to twenty are
+ * server-authorized for X01, and the route that authorizes them speaks X01 —
+ * extending it would mean teaching the server Cricket's rules, which is the one
+ * thing the architecture is built to avoid.
+ */
+function cricketAiDarts(state: CricketState, level: number): readonly Dart[] {
+  const rng = seededRandom(state.turns.length * 101 + level);
+  const tactics = aiTactics(level);
+  let next = state;
+  const thrown: Dart[] = [];
+  while (next.status === "playing" && next.currentPlayer === 1) {
+    const value = throwAiDart(level, chooseCricketAim(next, 1, tactics), rng).dart;
+    thrown.push(value);
+    next = applyCricketDart(next, value);
+  }
+  return thrown;
+}
 
 const VARIANTS: readonly CricketVariant[] = ["standard", "cut-throat", "tactics"];
 const VARIANT_LABEL: Record<CricketVariant, string> = {
@@ -38,13 +66,24 @@ export function CricketMatch() {
   const roundParam = Number(params.get("rounds"));
   const roundLimit = Number.isInteger(roundParam) && roundParam >= 1 && roundParam <= 99 ? roundParam : null;
 
+  const isAi = params.get("opponent") === "ai";
+  const requestedLevel = Number(params.get("level"));
+  const level = Number.isInteger(requestedLevel) ? Math.min(8, Math.max(1, requestedLevel)) : 5;
+
   const options = useMemo<CricketOptions>(() => ({ variant, winByTwo, roundLimit }), [variant, winByTwo, roundLimit]);
   const freshLog = useMemo(
-    () => createCricketLog(options, [{ id: "you", name: "Player 1" }, { id: "them", name: "Player 2" }]),
-    [options],
+    () => createCricketLog(options, [{ id: "you", name: "Player 1" }, { id: "them", name: isAi ? "The Navigator" : "Player 2" }]),
+    [options, isAi],
   );
 
   const [log, setLog] = useState<CricketLog>(freshLog);
+  /*
+   * The authoritative log, readable synchronously. The opponent commits from
+   * inside a timer whose closure was created a visit earlier, so it must fold over
+   * what has actually happened rather than over what it captured — the mistake
+   * that once had X01's AI playing the entire match by itself.
+   */
+  const logRef = useRef<CricketLog>(freshLog);
   const [resumed, setResumed] = useState(false);
   const [correction, setCorrection] = useState(false);
   const [message, setMessage] = useState("Your throw · 3 darts");
@@ -54,6 +93,7 @@ export function CricketMatch() {
     const frame = window.requestAnimationFrame(() => {
       const stored = loadCricketMatch();
       if (!stored || stored.events.length === 0 || !matchesCricketSetup(stored, freshLog)) return;
+      logRef.current = stored;
       setLog(stored);
       setResumed(true);
       setMessage("Match resumed where you left off");
@@ -62,31 +102,54 @@ export function CricketMatch() {
   }, [freshLog]);
   useEffect(() => { if (log.events.length > 0) saveCricketMatch(log); }, [log]);
   useEffect(() => { if (game.status === "complete") clearCricketMatch(); }, [game.status]);
-  // Cricket has no AI opponent yet, so every seat here was played by a person.
+  // Seat one is the opponent's when there is one; the log records what was thrown,
+  // never who threw it, so that is supplied here.
   const completedRecord = useMemo(
-    () => (game.status === "complete" ? cricketMatchRecord(log) : null),
-    [game.status, log],
+    () => (game.status === "complete" ? cricketMatchRecord(log, [{}, { isBot: isAi, ...(isAi ? { botLevel: level } : {}) }]) : null),
+    [game.status, log, isAi, level],
   );
   useRecordMatch(completedRecord);
 
-  const disabled = game.status === "complete";
+  const disabled = game.status === "complete" || (isAi && game.currentPlayer !== 0);
+
+  function commit(darts: readonly Dart[]) {
+    if (darts.length === 0) return;
+    const appended = darts.reduce((current, value) => appendCricketEvent(current, cricketDartEvent(value)), logRef.current);
+    logRef.current = appended;
+    setLog(appended);
+  }
 
   function addDart(value: Dart) {
     if (disabled) return;
-    setLog((current) => appendCricketEvent(current, cricketDartEvent(value)));
+    commit([value]);
     const marks = dartMarks(value);
     setMessage(isCricketNumber(value.segment)
       ? `${notation(value)} · ${marks} mark${marks === 1 ? "" : "s"}`
       : `${notation(value)} · no mark`);
   }
+
+  useAiVisit({
+    ready: isAi && game.status === "playing" && game.currentPlayer === 1,
+    play: () => {
+      const current = replayCricket(logRef.current).state;
+      if (current.status !== "playing" || current.currentPlayer !== 1) return;
+      commit(cricketAiDarts(current, level));
+      setMessage("Your throw · 3 darts");
+    },
+  });
   function undo() {
     if (log.events.length === 0) return;
-    setLog(undoLastCricketEvent(log));
+    const undone = undoLastCricketEvent(log);
+    logRef.current = undone;
+    setLog(undone);
     setMessage("Last entry removed");
   }
   function rewind(visitIndex: number) {
     const rewound = rewindCricketToVisit(log, visitIndex);
     const dropped = log.events.length - rewound.events.length;
+    // The ref moves with the state, or the opponent's next visit folds over the
+    // log as it was before the correction.
+    logRef.current = rewound;
     setLog(rewound);
     setCorrection(false);
     setMessage(`Rewound ${dropped} ${dropped === 1 ? "entry" : "entries"} · throw the visit again`);
