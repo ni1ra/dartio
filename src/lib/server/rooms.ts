@@ -191,9 +191,13 @@ export async function appendRoomTurn(
 
   let claimed: { version: number } | undefined;
   try {
+    // The SET target is written unqualified on purpose. Drizzle renders a column
+    // reference as "matches"."state_version", which Postgres accepts everywhere in
+    // this statement except as the thing being assigned — there it is a syntax
+    // error, and the whole write came back 503 until the target was spelled out.
     const result = await db.execute<{ version: number }>(sql`
       update ${matches}
-         set ${matches.stateVersion} = ${matches.stateVersion} + 1
+         set state_version = ${matches.stateVersion} + 1
        where ${matches.id} = ${room.matchId}
          and ${matches.stateVersion} = ${input.expectedVersion}
       returning ${matches.stateVersion} as "version"
