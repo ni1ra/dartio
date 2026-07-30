@@ -60,6 +60,35 @@ test("Count-Up counts everything and Bob's 27 starts on 27", async ({ page }) =>
   await expect(total(page)).toHaveText("29");
 });
 
+test("a finished match stops offering to rewind itself", async ({ page }) => {
+  await page.goto("/play/match?mode=shanghai", { waitUntil: "networkidle" });
+
+  // Shanghai is won outright by taking the single, double and treble of the round's
+  // number in one visit, which makes it the shortest complete match in the product.
+  await page.keyboard.press("1");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("1");
+  await page.keyboard.press("d");
+  await page.keyboard.press("1");
+  await page.keyboard.press("t");
+  await expect(page.locator(".match-complete")).toContainText("MATCH COMPLETE");
+
+  /*
+   * Every undo and correction control, on both the header and the dock. They were
+   * gated only on whether there was anything to undo, so they stayed live on a
+   * finished match — and a match corrected after it ended would have left the
+   * pre-correction version in history, which is filed once and never revised.
+   */
+  for (const name of [/undo/i, /correct/i]) {
+    const controls = page.getByRole("button", { name });
+    const count = await controls.count();
+    expect(count).toBeGreaterThan(0);
+    for (let index = 0; index < count; index += 1) {
+      await expect(controls.nth(index)).toBeDisabled();
+    }
+  }
+});
+
 test("a round mode resumes after a reload", async ({ page }) => {
   await page.goto("/play/match?mode=countUp", { waitUntil: "networkidle" });
   await page.getByRole("button", { name: "Treble 20, 60 points" }).click();

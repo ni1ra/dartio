@@ -112,8 +112,8 @@ export function RoundMatch({ mode }: { mode: RoundModeId }) {
         <b>{rules.name}</b>
       </div>
       <div className="match-tools">
-        <IconButton label="Correct a visit" onClick={() => setCorrection(true)} disabled={game.visits.length === 0}>✎</IconButton>
-        <IconButton label="Undo last dart" onClick={undo} disabled={log.events.length === 0}>↶</IconButton>
+        <IconButton label="Correct a visit" onClick={() => setCorrection(true)} disabled={disabled || game.visits.length === 0}>✎</IconButton>
+        <IconButton label="Undo last dart" onClick={undo} disabled={disabled || log.events.length === 0}>↶</IconButton>
       </div>
     </header>
 
@@ -161,8 +161,8 @@ export function RoundMatch({ mode }: { mode: RoundModeId }) {
       {keyboard.pending !== "" && <span className="keyboard-buffer" aria-hidden="true">{keyboard.pending} · Enter single · D double · T treble</span>}
       <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">{keyboard.announcement}</span>
       <div>
-        <button onClick={undo} disabled={log.events.length === 0}>Undo</button>
-        <button onClick={() => setCorrection(true)} disabled={game.visits.length === 0}>Correct a visit</button>
+        <button onClick={undo} disabled={disabled || log.events.length === 0}>Undo</button>
+        <button onClick={() => setCorrection(true)} disabled={disabled || game.visits.length === 0}>Correct a visit</button>
       </div>
     </CommandDock>
 

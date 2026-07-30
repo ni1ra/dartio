@@ -3,6 +3,7 @@ import { desc, eq, sql } from "drizzle-orm";
 import { createDatabase } from "@/db/client";
 import { darts, matches, players, turns } from "@/db/schema";
 import type { MatchRecord } from "@/domain/match-record";
+import type { StatMatch, StatTurn } from "@/domain/match-stats";
 
 /**
  * Writes a finished match down, and reads back what a player has played.
@@ -192,6 +193,67 @@ async function queryMatches(userId: string, limit: number, db: Database): Promis
     limit ${limit}
   `);
   return [...result.rows];
+}
+
+interface StatRow extends Record<string, unknown> {
+  id: string;
+  mode: string;
+  outRule: string | null;
+  won: boolean;
+  turns: readonly StatTurn[];
+}
+
+/**
+ * The player's own visits, match by match, for the statistics computed from them.
+ *
+ * Deliberately not `listMatches` with more columns: history is about opponents and
+ * results, statistics are about what this player threw. Joining from `players`
+ * rather than from `matches` is what keeps a local opponent's visits out of the
+ * numbers — a two-person match on one phone stores both seats, and only one of them
+ * belongs to this account.
+ */
+export async function readStatMatches(
+  userId: string,
+  limit: number | null,
+  db: Database = createDatabase(),
+): Promise<readonly StatMatch[]> {
+  try {
+    const result = await db.execute<StatRow>(sql`
+      select
+        ${matches.id} as "id",
+        ${matches.mode} as "mode",
+        ${matches.options}->>'outRule' as "outRule",
+        (${matches.winnerPlayerId} = ${players.id}) as "won",
+        coalesce(
+          json_agg(
+            json_build_object(
+              'legNumber', ${turns.legNumber},
+              'scoreBefore', ${turns.scoreBefore},
+              'scoreAfter', ${turns.scoreAfter},
+              'bust', ${turns.bust},
+              'dartsThrown', ${turns.dartsThrown}
+            ) order by ${turns.turnNumber}
+          ) filter (where ${turns.id} is not null),
+          '[]'::json
+        ) as "turns"
+      from ${players}
+      join ${matches} on ${matches.id} = ${players.matchId}
+      left join ${turns} on ${turns.playerId} = ${players.id}
+      where ${players.userId} = ${userId}
+      group by ${matches.id}, ${players.id}
+      order by ${desc(matches.completedAt)}
+      ${limit === null ? sql`` : sql`limit ${limit}`}
+    `);
+    return result.rows.map((row) => ({
+      id: row.id,
+      mode: row.mode,
+      outRule: row.outRule === "straight" || row.outRule === "master" || row.outRule === "double" ? row.outRule : null,
+      won: row.won === true,
+      turns: row.turns,
+    }));
+  } catch (cause) {
+    throw new MatchHistoryError({ cause });
+  }
 }
 
 function toEntry(row: MatchRow): MatchHistoryEntry {
