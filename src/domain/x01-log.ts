@@ -217,6 +217,44 @@ export function x01MatchRecord(log: X01Log, seats: readonly SeatIdentity[] = [])
   };
 }
 
+/**
+ * Rebuilds a log from visits that were stored, which is the inverse of
+ * `x01MatchRecord`.
+ *
+ * A room's canonical record lives on the server as rows, not as a log, so joining
+ * or rejoining one means turning those rows back into events and replaying them.
+ * The same path serves the first load and a reconnect — they are the same question
+ * asked at different times, and writing it twice is how they drift apart.
+ *
+ * Visits are taken in turn order. A visit with darts becomes one event per dart; a
+ * visit typed as a total becomes the aggregate event it was entered as, which is
+ * why the stored row keeps the score it claimed even when the visit busted.
+ */
+export function x01LogFromTurns(
+  options: X01Options,
+  players: readonly X01Player[],
+  turns: readonly RecordedTurn[],
+): X01Log {
+  const ordered = [...turns].sort((left, right) => left.turnNumber - right.turnNumber);
+  const events: X01Event[] = [];
+  for (const turn of ordered) {
+    if (turn.darts.length > 0) {
+      for (const thrown of turn.darts) {
+        events.push({
+          kind: "dart",
+          segment: thrown.segment as BoardNumber | 0,
+          multiplier: thrown.multiplier,
+          ...(thrown.x === undefined ? {} : { x: thrown.x }),
+          ...(thrown.y === undefined ? {} : { y: thrown.y }),
+        });
+      }
+      continue;
+    }
+    events.push(visitEvent(turn.aggregateScore ?? 0, turn.dartsThrown));
+  }
+  return { options, players, events };
+}
+
 function assertIndex(log: X01Log, index: number): void {
   if (!Number.isInteger(index) || index < 0 || index >= log.events.length) {
     throw new RangeError(`No event at index ${index}`);

@@ -34,9 +34,11 @@ gap-filling first, simplification and audit last.
   writer lock. **Scope moved, deliberately:** wiring the match screen to a room turned
   out to be cycle-sized on its own, so playing inside a room moved to 15 and this
   cycle ends at the lobby — which says so on the page. See `CYCLE_14_rooms.md`.
-- [ ] **Cycle 15 — Playing inside a room**, then reconnect, ownership handoff,
-  spectators, and honest degradation to polling. `/friends` marks each of these
-  planned until it is true.
+- [x] **Cycle 15 — Playing inside a room, and reconnect.** Two accounts throw at the
+  same match from different screens, and either can reload and come back. Rebuilding
+  from the room's own record makes join, reload, and catch-up one code path. See
+  `CYCLE_15_room_play.md`. Spectators and host handover split out, still marked
+  planned on `/friends`.
 - [ ] **Cycle 16 — The three practice drills.** Checkout Lab, Doubles Matrix,
   Scoring Sprint — the last `href="#"` rows in the catalogue.
 - [ ] **Cycle 17 — AI opponents for Cricket and the round modes.** Each mode needs

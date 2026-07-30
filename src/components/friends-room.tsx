@@ -14,10 +14,9 @@ import { useAccess } from "./access-provider";
  * always answer "that room isn't live" — there was nothing behind it. There is now:
  * a room is a real row, a seat is a real row, and the code is what connects them.
  *
- * What is deliberately *not* claimed is playing inside the room. The shared record
- * and its writer lock exist and are tested; wiring the match screen to them is the
- * next cycle, and the lobby says so rather than leaving somebody waiting at a table
- * that never starts.
+ * The lobby is where a table fills up. Once two people are seated it hands off to
+ * the match itself, which rebuilds the game from the room's own record — so the
+ * lobby holds no game state of its own and nothing is lost by leaving it.
  */
 
 /** Poll only while somebody is looking at the lobby, and give up rather than hammer a dead endpoint. */
@@ -31,6 +30,8 @@ const FAILURE_COPY: Record<RoomFailure, string> = {
   room_full: "That room is full.",
   room_closed: "That room’s match has already finished.",
   invalid_room_request: "That code doesn’t look right.",
+  version_conflict: "Somebody threw first. Catching up.",
+  wrong_seat: "That seat isn’t yours.",
   rooms_unavailable: "Rooms are unreachable right now. Nothing was lost.",
 };
 
@@ -124,7 +125,8 @@ export function FriendsRoom() {
     <div className="room-foundation">
       <span>Live · one shared record, in one order</span>
       <span>Live · a seat is yours and nobody can throw from it</span>
-      <span>Planned · playing inside the room, reconnect, and spectators</span>
+      <span>Live · rejoin from any screen and the match rebuilds itself</span>
+      <span>Planned · spectators and host handover</span>
     </div>
   </div>;
 }
@@ -146,8 +148,11 @@ function RoomLobby({ room, lost, onLeave }: { room: RoomStateView; lost: boolean
         <small>{seat.role}</small>
       </li>)}
     </ol>
+    {room.seats.length > 1
+      ? <Link className="button-link button-link-lg" href={`/play/match?room=${room.code}`}>Go to the oche</Link>
+      : <p className="room-lobby-note">Waiting for somebody to join. Send them the code — the match starts as soon as a second player sits down.</p>}
     {lost
       ? <p className="form-error" role="alert">Lost contact with the room. Your seat is still held — reopen this page to pick it back up.</p>
-      : <p className="room-lobby-note">Playing inside the room lands in the next cycle. The shared record and its writer lock are already here: the room is at version {room.version}, and a visit filed against an old version is refused rather than silently overwriting somebody.</p>}
+      : <p className="room-lobby-note">The room is at version {room.version}. A visit filed against an older version is refused rather than silently overwriting somebody.</p>}
   </Surface>;
 }

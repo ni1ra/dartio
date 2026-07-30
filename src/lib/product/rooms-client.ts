@@ -38,13 +38,16 @@ export type RoomFailure =
   | "room_full"
   | "room_closed"
   | "invalid_room_request"
+  | "version_conflict"
+  | "wrong_seat"
   | "rooms_unavailable";
 
 export type RoomResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly failure: RoomFailure };
 
 const FAILURES: readonly RoomFailure[] = [
   "upgrade_required", "authentication_required", "room_not_found",
-  "room_full", "room_closed", "invalid_room_request", "rooms_unavailable",
+  "room_full", "room_closed", "invalid_room_request", "version_conflict",
+  "wrong_seat", "rooms_unavailable",
 ];
 
 async function readFailure(response: Response): Promise<RoomFailure> {
@@ -114,4 +117,43 @@ async function send<T extends z.ZodType>(
   if (!response.ok) return { ok: false, failure: await readFailure(response) };
   const parsed = schema.safeParse(await response.json().catch(() => null));
   return parsed.success ? { ok: true, value: parsed.data } : { ok: false, failure: "rooms_unavailable" };
+}
+
+const versionSchema = z.object({ version: z.number().int() }).strict();
+const completeSchema = z.object({ alreadyComplete: z.boolean() }).strict();
+
+export interface FiledTurn {
+  readonly expectedVersion: number;
+  readonly seat: number;
+  readonly turn: {
+    readonly legNumber: number;
+    readonly scoreBefore: number;
+    readonly scoreAfter: number;
+    readonly bust: boolean;
+    readonly dartsThrown: 1 | 2 | 3;
+    readonly aggregateScore?: number;
+    readonly darts: readonly { ordinal: 1 | 2 | 3; segment: number; multiplier: 1 | 2 | 3; x?: number; y?: number }[];
+  };
+}
+
+/**
+ * Files one finished visit. A `version_conflict` is the expected answer when
+ * somebody threw while this visit was being entered — it is a race being resolved,
+ * not a fault, and the caller catches up rather than retrying blindly.
+ */
+export async function fileRoomTurn(
+  code: string,
+  input: FiledTurn,
+  options: RoomClientOptions = {},
+): Promise<RoomResult<z.infer<typeof versionSchema>>> {
+  return send(versionSchema, `/api/rooms/${encodeURIComponent(code)}/turns`, input, options);
+}
+
+/** Reports the finish. Both players report it; the second is agreement. */
+export async function completeRoomMatch(
+  code: string,
+  winnerSeat: number | null,
+  options: RoomClientOptions = {},
+): Promise<RoomResult<z.infer<typeof completeSchema>>> {
+  return send(completeSchema, `/api/rooms/${encodeURIComponent(code)}/complete`, { winnerSeat }, options);
 }

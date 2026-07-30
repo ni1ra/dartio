@@ -246,6 +246,45 @@ export async function appendRoomTurn(
   return { version: claimed.version };
 }
 
+/**
+ * Closes a room's match and names its winner.
+ *
+ * Two things make this deliberately unlike `appendRoomTurn`.
+ *
+ * It does **not** touch `state_version`. That counter is also the turn number —
+ * every accepted visit increments it and takes its value — so incrementing without
+ * appending a visit would desync the two and hand the next turn a number that skips
+ * one.
+ *
+ * And it is idempotent. Both players replay the same log and both see the same
+ * finish, so both will report it; the second report is agreement, not a conflict.
+ */
+export async function completeRoomMatch(
+  userId: string,
+  code: string,
+  winnerSeat: number | null,
+  db: Database = createDatabase(),
+): Promise<{ readonly alreadyComplete: boolean }> {
+  const room = await findRoom(normalizeRoomCode(code), db);
+  const seated = room.seats.find((seat) => seat.userId === userId);
+  if (!seated) throw new RoomError(403, "not_a_member", "You are not in this room");
+  if (room.status === "complete") return { alreadyComplete: true };
+
+  const winner = winnerSeat === null ? null : room.seats.find((seat) => seat.seat === winnerSeat);
+  if (winnerSeat !== null && !winner) {
+    throw new RoomError(422, "unknown_seat", "That seat is not in this room");
+  }
+
+  try {
+    await db.update(matches)
+      .set({ status: "complete", winnerPlayerId: winner?.playerId ?? null, completedAt: new Date() })
+      .where(eq(matches.id, room.matchId));
+  } catch (cause) {
+    throw new RoomServiceError({ cause });
+  }
+  return { alreadyComplete: false };
+}
+
 /** The room as it stands, with only the visits the caller has not already seen. */
 export async function readRoom(
   userId: string | null,

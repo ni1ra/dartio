@@ -135,5 +135,46 @@ if (final.body.turns.length !== 1 || final.body.turns[0].turnNumber !== 2) {
 }
 console.log("OK   reading since a version returns only what arrived after it");
 
+// A visit that takes a player out, then the finish reported the way both clients
+// report it. The server never judges the visit; it records it and closes the room.
+const finishing = await api(`/${code}/turns`, host.cookie, {
+  method: "POST",
+  body: JSON.stringify({
+    expectedVersion: 2,
+    seat: 0,
+    turn: {
+      legNumber: 1, scoreBefore: 40, scoreAfter: 0, bust: false, dartsThrown: 1,
+      darts: [{ ordinal: 1, segment: 20, multiplier: 2 }],
+    },
+  }),
+});
+if (finishing.status !== 201) await fail(`the finishing visit returned ${finishing.status}`, JSON.stringify(finishing.body));
+console.log(`OK   host filed a finishing visit, room at version ${finishing.body.version}`);
+
+const closed = await api(`/${code}/complete`, host.cookie, { method: "POST", body: JSON.stringify({ winnerSeat: 0 }) });
+if (closed.status !== 200 || closed.body.alreadyComplete !== false) {
+  await fail(`closing the match returned ${closed.status}`, JSON.stringify(closed.body));
+}
+console.log("OK   host closed the match");
+
+// The other client reports the same finish; agreement, not a conflict.
+const echoed = await api(`/${code}/complete`, guest.cookie, { method: "POST", body: JSON.stringify({ winnerSeat: 0 }) });
+if (echoed.status !== 200 || echoed.body.alreadyComplete !== true) {
+  await fail(`the second report of the same finish returned ${echoed.status}`, JSON.stringify(echoed.body));
+}
+console.log("OK   the guest reporting the same finish is agreement, not a conflict");
+
+const after = await api(`/${code}?since=0`, guest.cookie);
+if (after.body.status !== "complete") await fail(`the room reads ${after.body.status}, expected complete`);
+if (after.body.turns.length !== 3) await fail(`the room holds ${after.body.turns.length} visits, expected 3`);
+console.log(`OK   the room reads complete and holds all ${after.body.turns.length} visits`);
+
+// A closed room takes no more darts.
+const late = await api(`/${code}/turns`, guest.cookie, visit(3, 1));
+if (late.status !== 409 || late.body.error !== "room_closed") {
+  await fail(`a visit filed after the finish returned ${late.status}, expected 409 room_closed`, JSON.stringify(late.body));
+}
+console.log("OK   a finished room takes no more visits (409 room_closed)");
+
 await cleanup();
 console.log("\nALL ROOM CHECKS PASSED");
