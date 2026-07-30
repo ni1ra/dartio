@@ -87,7 +87,25 @@ if (!found) fail("the match was recorded but does not appear in history", JSON.s
 console.log(`OK   history returned it: ${found.mode}, ${found.turnCount} visit(s), ${found.dartCount} dart(s), winner seat ${found.winnerSeat}`);
 console.log(`OK   roster: ${found.players.map((p) => `${p.displayName}${p.isYou ? " (you)" : ""}${p.isBot ? ` [bot ${p.botLevel}]` : ""}`).join(" vs ")}`);
 
+const statsResponse = await fetch(`${origin}/api/stats`, { headers: { cookie, origin } });
+if (!statsResponse.ok) fail(`reading statistics returned ${statsResponse.status}`, await statsResponse.text());
+const stats = await statsResponse.json();
+if (!(stats.matchesPlayed >= 1)) fail("statistics do not count the match that was just filed", JSON.stringify(stats));
+console.log(`OK   statistics: ${stats.matchesPlayed} match(es), ${stats.matchesWon} won, ${stats.threeDartAverage.toFixed(2)} 3DA`);
+
+// The paid figures are withheld on the server, so a Free payload must not carry
+// them at all — hiding them on the client would not be enforcement.
+const raw = JSON.stringify(stats);
+if (stats.deep === null) {
+  if (raw.includes("checkoutPercentage")) fail("a locked payload still carried the paid figures", raw.slice(0, 300));
+  console.log(`OK   deep statistics withheld from this plan, and absent from the payload (history window ${stats.historyLimit})`);
+} else {
+  console.log(`OK   deep statistics present: checkout ${stats.deep.checkoutPercentage.toFixed(1)}%, best leg ${stats.deep.bestLegDarts ?? "—"}`);
+}
+
 // Ownership is the whole claim: without a session there is nothing to see.
-const anonymous = await fetch(`${origin}/api/matches`, { headers: { origin } });
-if (anonymous.status !== 401) fail(`history without a session answered ${anonymous.status}, expected 401`);
-console.log("OK   history refuses a request with no session (401)");
+for (const path of ["/api/matches", "/api/stats"]) {
+  const anonymous = await fetch(`${origin}${path}`, { headers: { origin } });
+  if (anonymous.status !== 401) fail(`${path} without a session answered ${anonymous.status}, expected 401`);
+}
+console.log("OK   history and statistics both refuse a request with no session (401)");

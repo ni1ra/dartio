@@ -32,12 +32,12 @@ gap-filling first, simplification and audit last.
   percentage, doubles, best leg, mode breakdown, recent matches, on `/account`.
 - [ ] **Cycle 14 — Server-authoritative rooms.** Create and join by code, versioned
   events, optimistic locking by turn number. **Decided before starting:** `/friends`
-  today advertises reconnect, spectators, and server-authoritative matches, none of
-  which exist. Cycle 14 removes the two claims it does not make true and gates room
-  entry behind an explicit "still building this" state, because if the run stops
-  between 14 and 15 the alternative is production carrying live rooms that silently
-  lose a turn under three false promises. Cycle 15 restores each claim as it becomes
-  true.
+  already labels reconnect, spectators, and server-authoritative play as `Planned ·`,
+  so the page is honest today and must stay honest at every point in between. Cycle
+  14 promotes only the claim it makes true and leaves the other two marked planned;
+  a room that cannot yet survive a reconnect says so where a player will see it
+  before joining. The hazard is a run that stops between 14 and 15 leaving
+  production with live rooms under promises 15 was going to keep.
 - [ ] **Cycle 15 — Rooms: reconnect, ownership handoff, spectators**, and honest
   degradation to polling.
 - [ ] **Cycle 16 — The three practice drills.** Checkout Lab, Doubles Matrix,
