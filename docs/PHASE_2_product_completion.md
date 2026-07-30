@@ -42,8 +42,10 @@ gap-filling first, simplification and audit last.
 - [x] **Cycle 16 — The three practice drills.** Checkout Lab, Doubles Matrix, and
   Scoring Sprint. All nine catalogue rows are playable and the COMING NEXT branch is
   gone. See `CYCLE_16_drills.md`.
-- [ ] **Cycle 17 — AI opponents for Cricket and the round modes.** Each mode needs
-  its own policy against its own rules; `chooseAiAim` is X01-shaped.
+- [x] **Cycle 17 — Opponents for Cricket and the round modes.** Each mode brings its
+  own idea of what to aim at, and the two modes with only one right answer say so
+  rather than inventing variety. Levels 1–8, matching the free tier. See
+  `CYCLE_17_mode_ai.md`.
 - [ ] **Cycle 18 — Continuous voice.** Activity detection, silence segmentation,
   re-arming, a correction queue, a vocabulary per mode.
 - [ ] **Cycle 19 — Cycle 11's remainder.** Command-dock padding, the dead band

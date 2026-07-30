@@ -11,5 +11,7 @@ export * from "./x01-log";
 export * from "./x01-persistence";
 export * from "./cricket";
 export * from "./cricket-log";
+export * from "./cricket-ai";
 export * from "./round-modes";
 export * from "./round-log";
+export * from "./round-ai";

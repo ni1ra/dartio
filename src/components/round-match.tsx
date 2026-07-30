@@ -1,17 +1,41 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button, CommandDock, IconButton, Modal } from "navi-ui";
 import {
-  appendRoundEvent, createRoundLog, notation, replayRound, rewindRoundToVisit, ROUND_MODES,
-  liveRoundView, roundDartEvent, roundMatchRecord, undoLastRoundEvent,
-  type Dart, type RoundLog, type RoundModeId,
+  aiTactics, applyRoundDart,
+  appendRoundEvent, chooseRoundAim, createRoundLog, notation, replayRound, rewindRoundToVisit, ROUND_MODES,
+  liveRoundView, roundDartEvent, roundMatchRecord, seededRandom, throwAiDart, undoLastRoundEvent,
+  type Dart, type RoundLog, type RoundModeId, type RoundState,
 } from "@/domain";
 import { DartInputPad } from "./dart-input-pad";
 import { Dartboard } from "./dartboard";
+import { useAiVisit } from "./use-ai-visit";
 import { useMatchKeyboard } from "./use-match-keyboard";
 import { useRecordMatch } from "./use-record-match";
+
+/**
+ * One opponent visit, as darts rather than as a resulting state, so a corrected or
+ * resumed game replays them exactly as it replays the player's. Seeded from the
+ * completed-visit count, so the same log always produces the same visit.
+ *
+ * Levels stop at eight because that is the free tier exactly. Nine to twenty are
+ * server-authorized, and the route that authorizes them speaks X01 — extending it
+ * would mean teaching the server every mode's rules.
+ */
+function roundAiDarts(state: RoundState, level: number): readonly Dart[] {
+  const rng = seededRandom(state.visits.length * 101 + level);
+  const tactics = aiTactics(level);
+  let next = state;
+  const thrown: Dart[] = [];
+  while (next.status === "playing" && next.currentPlayer === 1) {
+    const value = throwAiDart(level, chooseRoundAim(next, 1, tactics, next.currentDarts), rng).dart;
+    thrown.push(value);
+    next = applyRoundDart(next, value);
+  }
+  return thrown;
+}
 
 const STORAGE_PREFIX = "dartio:round-log:v1:";
 
@@ -26,15 +50,24 @@ const STORAGE_PREFIX = "dartio:round-log:v1:";
  */
 export function RoundMatch({ mode }: { mode: RoundModeId }) {
   const params = useSearchParams();
-  const solo = params.get("opponent") !== "local";
+  const opponent = params.get("opponent");
+  const isAi = opponent === "ai";
+  // Solo remains the default: these modes are practice first, and an opponent is
+  // something you ask for.
+  const solo = !isAi && opponent !== "local";
+  const requestedLevel = Number(params.get("level"));
+  const level = Number.isInteger(requestedLevel) ? Math.min(8, Math.max(1, requestedLevel)) : 5;
   const rules = ROUND_MODES[mode];
 
   const freshLog = useMemo(() => createRoundLog(
     mode,
-    solo ? [{ id: "you", name: "Player 1" }] : [{ id: "you", name: "Player 1" }, { id: "them", name: "Player 2" }],
-  ), [mode, solo]);
+    solo ? [{ id: "you", name: "Player 1" }] : [{ id: "you", name: "Player 1" }, { id: "them", name: isAi ? "The Navigator" : "Player 2" }],
+  ), [mode, solo, isAi]);
 
   const [log, setLog] = useState<RoundLog>(freshLog);
+  // Read synchronously by the opponent, which commits from a timer created a visit
+  // earlier and must fold over what actually happened. See use-ai-visit.ts.
+  const logRef = useRef<RoundLog>(freshLog);
   const [resumed, setResumed] = useState(false);
   const [correction, setCorrection] = useState(false);
   const [message, setMessage] = useState("Your throw · 3 darts");
@@ -52,6 +85,7 @@ export function RoundMatch({ mode }: { mode: RoundModeId }) {
         // Replaying the stored log is the validation: a corrupted one throws
         // here rather than resuming into a score that never happened.
         replayRound(stored);
+        logRef.current = stored;
         setLog(stored);
         setResumed(true);
         setMessage("Match resumed where you left off");
@@ -70,30 +104,51 @@ export function RoundMatch({ mode }: { mode: RoundModeId }) {
     if (game.status !== "complete") return;
     try { window.localStorage.removeItem(key); } catch { /* ignored */ }
   }, [game.status, key]);
-  // These modes have no AI opponent yet, so every seat was played by a person.
+  // Seat one is the opponent's when one was asked for.
   const completedRecord = useMemo(
-    () => (game.status === "complete" ? roundMatchRecord(log) : null),
-    [game.status, log],
+    () => (game.status === "complete" ? roundMatchRecord(log, [{}, { isBot: isAi, ...(isAi ? { botLevel: level } : {}) }]) : null),
+    [game.status, log, isAi, level],
   );
   useRecordMatch(completedRecord);
 
-  const disabled = game.status === "complete";
+  const disabled = game.status === "complete" || (isAi && game.currentPlayer !== 0);
   // Projected so the target moves and the total climbs as the visit is thrown.
   const { target, totals } = liveRoundView(game);
 
+  function commit(darts: readonly Dart[]) {
+    if (darts.length === 0) return;
+    const appended = darts.reduce((current, value) => appendRoundEvent(current, roundDartEvent(value)), logRef.current);
+    logRef.current = appended;
+    setLog(appended);
+  }
+
   function addDart(value: Dart) {
     if (disabled) return;
-    setLog((current) => appendRoundEvent(current, roundDartEvent(value)));
+    commit([value]);
     setMessage(`${notation(value)} recorded`);
   }
+
+  useAiVisit({
+    ready: isAi && game.status === "playing" && game.currentPlayer === 1,
+    play: () => {
+      const current = replayRound(logRef.current).state;
+      if (current.status !== "playing" || current.currentPlayer !== 1) return;
+      commit(roundAiDarts(current, level));
+      setMessage("Your throw · 3 darts");
+    },
+  });
   function undo() {
     if (log.events.length === 0) return;
-    setLog(undoLastRoundEvent(log));
+    const undone = undoLastRoundEvent(log);
+    logRef.current = undone;
+    setLog(undone);
     setMessage("Last entry removed");
   }
   function rewind(visitIndex: number) {
     const rewound = rewindRoundToVisit(log, visitIndex);
     const dropped = log.events.length - rewound.events.length;
+    // The ref moves with the state, or the opponent folds over the pre-correction log.
+    logRef.current = rewound;
     setLog(rewound);
     setCorrection(false);
     setMessage(`Rewound ${dropped} ${dropped === 1 ? "entry" : "entries"} · throw the visit again`);
