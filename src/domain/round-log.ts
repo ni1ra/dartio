@@ -1,5 +1,12 @@
 import { dart, type BoardNumber, type Dart, type Multiplier } from "./darts";
 import { applyRoundDart, createRoundMatch, type RoundModeId, type RoundPlayer, type RoundState } from "./round-modes";
+import {
+  recordedDarts,
+  recordedPlayer,
+  type MatchRecord,
+  type RecordedTurn,
+  type SeatIdentity,
+} from "./match-record";
 
 /**
  * The event log for the round-based modes. Same contract as X01's and
@@ -58,6 +65,56 @@ export function appendRoundEvent(log: RoundLog, event: RoundEvent): RoundLog {
 
 export function undoLastRoundEvent(log: RoundLog): RoundLog {
   return log.events.length === 0 ? log : { ...log, events: log.events.slice(0, -1) };
+}
+
+/**
+ * Reduces a finished round-mode match to the shape history is written in.
+ *
+ * These modes have no legs and no bust, so every visit is leg 1 and never busted.
+ * The before/after pair is the player's running total, which Bob's 27 can drive
+ * below zero — that is the mode working, not a corrupt row.
+ */
+export function roundMatchRecord(log: RoundLog, seats: readonly SeatIdentity[] = []): MatchRecord {
+  const seatOf = new Map(log.players.map((player, seat) => [player.id, seat]));
+  let state = createRoundMatch(log.mode, log.players);
+  let totalsBefore = state.totals;
+  const turns: RecordedTurn[] = [];
+
+  for (const event of log.events) {
+    if (state.status === "complete") break;
+    let next: RoundState;
+    try {
+      next = applyRoundDart(state, toDart(event));
+    } catch {
+      continue;
+    }
+    if (next.visits.length > state.visits.length) {
+      const visit = next.visits[next.visits.length - 1]!;
+      const seat = seatOf.get(visit.playerId) ?? 0;
+      turns.push({
+        seat,
+        turnNumber: turns.length + 1,
+        legNumber: 1,
+        scoreBefore: totalsBefore[seat] ?? 0,
+        scoreAfter: next.totals[seat] ?? 0,
+        bust: false,
+        dartsThrown: (visit.darts.length || 1) as 1 | 2 | 3,
+        darts: recordedDarts(visit.darts),
+      });
+      totalsBefore = next.totals;
+    }
+    state = next;
+  }
+
+  const winnerSeat = state.winnerId === undefined ? undefined : seatOf.get(state.winnerId);
+  return {
+    mode: log.mode,
+    // These modes take no settings; the empty object is the honest record of that.
+    options: {},
+    players: log.players.map((player, seat) => recordedPlayer(seat, player.name, seats[seat])),
+    turns,
+    ...(winnerSeat === undefined ? {} : { winnerSeat }),
+  };
 }
 
 /** Rewinds to just before a completed visit, for the reason every mode does. */

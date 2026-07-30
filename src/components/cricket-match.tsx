@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button, CommandDock, IconButton, Modal } from "navi-ui";
 import {
-  appendCricketEvent, createCricketLog, CRICKET_NUMBERS, cricketDartEvent, cricketPlayerStats,
+  appendCricketEvent, createCricketLog, CRICKET_NUMBERS, cricketDartEvent, cricketMatchRecord,
+  cricketPlayerStats,
   dartMarks, hasClosed, isCricketNumber, notation, replayCricket, rewindCricketToVisit,
   undoLastCricketEvent,
   type CricketLog, type CricketOptions, type CricketVariant, type Dart,
@@ -13,6 +14,7 @@ import { clearCricketMatch, loadCricketMatch, matchesCricketSetup, saveCricketMa
 import { DartInputPad } from "./dart-input-pad";
 import { Dartboard } from "./dartboard";
 import { useMatchKeyboard } from "./use-match-keyboard";
+import { useRecordMatch } from "./use-record-match";
 
 const VARIANTS: readonly CricketVariant[] = ["standard", "cut-throat", "tactics"];
 const VARIANT_LABEL: Record<CricketVariant, string> = {
@@ -60,6 +62,12 @@ export function CricketMatch() {
   }, [freshLog]);
   useEffect(() => { if (log.events.length > 0) saveCricketMatch(log); }, [log]);
   useEffect(() => { if (game.status === "complete") clearCricketMatch(); }, [game.status]);
+  // Cricket has no AI opponent yet, so every seat here was played by a person.
+  const completedRecord = useMemo(
+    () => (game.status === "complete" ? cricketMatchRecord(log) : null),
+    [game.status, log],
+  );
+  useRecordMatch(completedRecord);
 
   const disabled = game.status === "complete";
 

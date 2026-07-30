@@ -1,6 +1,7 @@
 export * from "./ai";
 export * from "./checkout";
 export * from "./darts";
+export * from "./match-record";
 export * from "./modes";
 export * from "./x01";
 export * from "./x01-log";

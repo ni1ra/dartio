@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button, CommandDock, IconButton, Modal } from "navi-ui";
-import { AggregateVisitRequiresDartsError, applyDart, basicCheckoutAdvice, chooseAiAim, createLog, dart, dartEvent, notation, replay, rewindToVisit, seededRandom, throwAiDart, undoLastEvent, visitEvent, x01PlayerStats, type Dart, type InRule, type OutRule, type X01Event, type X01Log, type X01State } from "@/domain";
+import { AggregateVisitRequiresDartsError, applyDart, basicCheckoutAdvice, chooseAiAim, createLog, dart, dartEvent, notation, replay, rewindToVisit, seededRandom, throwAiDart, undoLastEvent, visitEvent, x01MatchRecord, x01PlayerStats, type Dart, type InRule, type OutRule, type X01Event, type X01Log, type X01State } from "@/domain";
 import { clearActiveMatch, loadActiveMatch, matchesSetup, saveActiveMatch } from "@/lib/product/match-store";
 import { AiTurnClientError, requestPremiumAiTurn } from "@/lib/product/ai-turn-client";
 import { Dartboard, positioned } from "./dartboard";
@@ -15,6 +15,7 @@ import { useMatchKeyboard } from "./use-match-keyboard";
 import { VoiceControl } from "./voice-control";
 import { CheckoutCompanion } from "./checkout-companion";
 import { MatchResult } from "./match-result";
+import { useRecordMatch } from "./use-record-match";
 import { VisitEntry } from "./visit-entry";
 
 /**
@@ -88,6 +89,10 @@ export function X01Match() {
   useEffect(()=>{const frame=window.requestAnimationFrame(()=>{const stored=loadActiveMatch();if(!stored||stored.events.length===0||!matchesSetup(stored,freshLog))return;logRef.current=stored;setLog(stored);setResumed(true);setMessage("Match resumed where you left off")});return()=>window.cancelAnimationFrame(frame)},[freshLog]);
   useEffect(()=>{if(log.events.length===0)return;saveActiveMatch(log)},[log]);
   useEffect(()=>{if(game.status==="complete")clearActiveMatch()},[game.status]);
+  // A finished match goes to the player's history. Seat 1 is the AI when there is
+  // one; the log records what was thrown, never who threw it, so that is added here.
+  const completedRecord=useMemo(()=>game.status==="complete"?x01MatchRecord(log,[{},{isBot:isAi,...(isAi?{botLevel:level}:{})}]):null,[game.status,log,isAi,level]);
+  useRecordMatch(completedRecord);
 
   function cancelAi(){aiGeneration.current+=1;if(aiTimer.current!==null){window.clearTimeout(aiTimer.current);aiTimer.current=null}aiController.current?.abort();aiController.current=null}
   function settledMessage(result:X01State){return result.status==="complete"?`${result.players.find(player=>player.id===result.winnerId)?.name} wins the match`:"Your throw · 3 darts"}

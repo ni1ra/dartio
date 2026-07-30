@@ -5,12 +5,13 @@ import { useSearchParams } from "next/navigation";
 import { Button, CommandDock, IconButton, Modal } from "navi-ui";
 import {
   appendRoundEvent, createRoundLog, notation, replayRound, rewindRoundToVisit, ROUND_MODES,
-  liveRoundView, roundDartEvent, undoLastRoundEvent,
+  liveRoundView, roundDartEvent, roundMatchRecord, undoLastRoundEvent,
   type Dart, type RoundLog, type RoundModeId,
 } from "@/domain";
 import { DartInputPad } from "./dart-input-pad";
 import { Dartboard } from "./dartboard";
 import { useMatchKeyboard } from "./use-match-keyboard";
+import { useRecordMatch } from "./use-record-match";
 
 const STORAGE_PREFIX = "dartio:round-log:v1:";
 
@@ -69,6 +70,12 @@ export function RoundMatch({ mode }: { mode: RoundModeId }) {
     if (game.status !== "complete") return;
     try { window.localStorage.removeItem(key); } catch { /* ignored */ }
   }, [game.status, key]);
+  // These modes have no AI opponent yet, so every seat was played by a person.
+  const completedRecord = useMemo(
+    () => (game.status === "complete" ? roundMatchRecord(log) : null),
+    [game.status, log],
+  );
+  useRecordMatch(completedRecord);
 
   const disabled = game.status === "complete";
   // Projected so the target moves and the total climbs as the visit is thrown.
