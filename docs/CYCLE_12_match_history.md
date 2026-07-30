@@ -1,6 +1,6 @@
 # Cycle 12 — Persisted Match History
 
-Status: active
+Status: closed on production evidence, 2026-07-30. PR #15.
 
 Six tables shipped in migration `0005` on 2026-07-17 and never took a row.
 `matches`, `players`, `turns`, `darts`, `rooms`, and `room_members` were audit gap
@@ -70,6 +70,39 @@ a column drops its check constraints with it. A Neon branch of production,
 - The baseline browser suite was measured unpiped before any of this work:
   **118 passed, 2 skipped** at all three viewports. `REPO_CONTROL.md` had recorded
   117 checks; the suite is now 120, and that row is corrected here.
+
+## Production receipts — 2026-07-30
+
+Proven on the live deployment, not on a merge.
+
+- **The authenticated path was proven on preview first.** The PR's own deployment
+  origin was added to the preview branch's Neon Auth trusted domains, the probe ran
+  against it, and the origin was removed again. Preview and production run separate
+  Neon Auth projects, so the production QA identity does not exist on preview — the
+  probe signs up its own throwaway identity when sign-in is refused, which is what
+  lets one script run against either.
+- **On production:** `pnpm verify:auth` passed. A real sign-in as the QA identity
+  filed a match, read it back with the right mode, visit count, dart count, winner
+  seat, and roster — including `isYou` on the right seat and the bot's level — and
+  the same request without a session was refused with 401.
+- **The production database holds it.** `matches` 1, `players` 2, `turns` 1,
+  `darts` 1, where all four were 0. The stored visit reads `x01 · complete · leg 1 ·
+  1 dart · 40 → 0 · segment 20 × 2`, which is the double twenty that was thrown.
+- Browser suite against `https://dartioopus46.vercel.app`: **118 passed, 2 skipped**
+  at 390×844, 834×1112, and 1440×1000, run unpiped with the exit code read.
+
+## Found while reviewing this cycle, fixed in cycle 13
+
+**A corrected match would leave the wrong version in history.** Undo and Correct are
+gated on whether there is anything to undo, never on whether the match is over, so
+they stay live on a finished match in all three mode components. Finishing, then
+correcting, then finishing again would file nothing the second time —
+`useRecordMatch`'s one-shot guard is set once and never cleared. The record already
+written would be the pre-correction one.
+
+The fix is that a finished match is finished, which is already how every scoring
+input behaves (`manualInputDisabled` includes `status === "complete"`; the
+correction controls were simply never given the same condition).
 
 ## What this cycle deliberately did not do
 

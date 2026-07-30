@@ -25,12 +25,19 @@ gap-filling first, simplification and audit last.
 
 ## Queue
 
-- [x] **Cycle 12 — Persisted match history.** Give the event log a writer. See
-  `CYCLE_12_match_history.md`.
+- [x] **Cycle 12 — Persisted match history.** Give the event log a writer. Closed on
+  production evidence: a real signed-in match filed and read back, and the four
+  tables that had never held a row now hold one. See `CYCLE_12_match_history.md`.
 - [ ] **Cycle 13 — Statistics and the account hub.** Three-dart average, checkout
   percentage, doubles, best leg, mode breakdown, recent matches, on `/account`.
 - [ ] **Cycle 14 — Server-authoritative rooms.** Create and join by code, versioned
-  events, optimistic locking by turn number.
+  events, optimistic locking by turn number. **Decided before starting:** `/friends`
+  today advertises reconnect, spectators, and server-authoritative matches, none of
+  which exist. Cycle 14 removes the two claims it does not make true and gates room
+  entry behind an explicit "still building this" state, because if the run stops
+  between 14 and 15 the alternative is production carrying live rooms that silently
+  lose a turn under three false promises. Cycle 15 restores each claim as it becomes
+  true.
 - [ ] **Cycle 15 — Rooms: reconnect, ownership handoff, spectators**, and honest
   degradation to polling.
 - [ ] **Cycle 16 — The three practice drills.** Checkout Lab, Doubles Matrix,
