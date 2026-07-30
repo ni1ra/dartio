@@ -62,3 +62,16 @@ planned, and now marks rejoin-and-rebuild as live, because that became true.
   closed, **the guest's report of the same finish answered as agreement rather than
   a conflict**, the room reading `complete` with all three visits, and a late visit
   refused with 409 `room_closed`. Temporary Pro rows removed afterwards.
+
+## Production, and one flake worth naming
+
+The browser suite against production reported 129 passed, 2 skipped, and one
+failure: `net::ERR_ADDRESS_UNREACHABLE` navigating to the match page. Every other
+test in the same run loaded that same URL successfully, and re-running the spec
+gave 12/12. It was a transient name-resolution failure in the local runner, not a
+regression — recorded here so the next person reading the log does not go looking
+for a product fault that was never there.
+
+`pnpm verify:auth`, `pnpm verify:rooms`, and `pnpm verify:history` all passed
+against production, the last of them reporting four stored matches and the deep
+statistics correctly withheld from a Free plan.
