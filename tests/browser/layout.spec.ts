@@ -135,3 +135,29 @@ test("every interactive control on the match page takes visible keyboard focus",
     expect(ringed || shadowed, `${focused.tag} took focus with no visible ring`).toBe(true);
   }
 });
+
+/**
+ * The match has to fit the screen it reserves.
+ *
+ * Lain's note was "not utilizing max screenspace for me". Measured on production at
+ * 1440×1000 the page ran to 1229px and the command dock sat at y=1036 — so Undo and
+ * Correct were below the fold and the page scrolled to reach them, on the one screen
+ * a player uses while standing at the oche.
+ */
+test("the match fits the screen, with the dock reachable without scrolling", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "The reservation being tested is the desktop one");
+
+  await page.goto("/play/match?start=501&best=5&opponent=local", { waitUntil: "networkidle" });
+
+  // A pixel of tolerance: sub-pixel layout rounding puts the dock's edge at
+  // 1000.39 in a 1000px viewport, and a third of a pixel is not scrolling. The
+  // claim being tested is that a player can reach Undo without scrolling, not
+  // that the arithmetic is exact.
+  const viewport = page.viewportSize()!.height + 1;
+  const dock = await page.locator(".match-dock").boundingBox();
+  expect(dock).not.toBeNull();
+  expect(dock!.y + dock!.height).toBeLessThanOrEqual(viewport);
+
+  const documentHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+  expect(documentHeight).toBeLessThanOrEqual(viewport);
+});
