@@ -1,4 +1,4 @@
-import { dart, type BoardNumber, type Dart, type Multiplier } from "./darts";
+import { dartFromEvent, type BoardNumber, type Dart, type Multiplier } from "./darts";
 import {
   recordedDarts,
   recordedPlayer,
@@ -65,10 +65,9 @@ export function visitEvent(score: number, dartsThrown: 1 | 2 | 3): X01Event {
   return { kind: "visit", score, dartsThrown };
 }
 
+/** Kept as a name callers already use; the conversion itself is shared. */
 export function eventDart(event: Extract<X01Event, { kind: "dart" }>): Dart {
-  return event.x === undefined || event.y === undefined
-    ? dart(event.segment, event.multiplier)
-    : dart(event.segment, event.multiplier, { x: event.x, y: event.y });
+  return dartFromEvent(event);
 }
 
 export function createLog(options: X01Options, players: readonly X01Player[]): X01Log {

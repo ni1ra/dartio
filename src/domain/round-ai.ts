@@ -54,12 +54,3 @@ export function chooseRoundAim(
   }
   return on(target, 3);
 }
-
-/** True when this visit is one bed away from winning Shanghai outright. */
-export function shanghaiInReach(state: RoundState, thrownThisVisit: readonly Dart[]): boolean {
-  if (state.mode !== "shanghai") return false;
-  const target = roundTarget(state);
-  if (target === null) return false;
-  const taken = new Set(thrownThisVisit.filter((value) => value.segment === target).map((value) => value.multiplier));
-  return taken.size === 2 && thrownThisVisit.length === 2;
-}

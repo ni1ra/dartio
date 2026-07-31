@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { desc, eq, sql } from "drizzle-orm";
 import { createDatabase } from "@/db/client";
+import { dartRows } from "@/db/rows";
 import { darts, matches, players, turns } from "@/db/schema";
 import type { MatchRecord } from "@/domain/match-record";
 import type { StatMatch, StatTurn } from "@/domain/match-stats";
@@ -95,18 +96,7 @@ export async function recordMatch(
     aggregateScore: turn.aggregateScore ?? null,
   }));
 
-  const dartRows = record.turns.flatMap((turn) =>
-    turn.darts.map((thrown) => ({
-      turnId: turnIds.get(turn.turnNumber)!,
-      ordinal: thrown.ordinal,
-      segment: thrown.segment,
-      multiplier: thrown.multiplier,
-      // Stored as integer microunits, so a landing point survives the round trip
-      // without a float turning 0.1 into 0.09999999999999998.
-      x: thrown.x === undefined ? null : Math.round(thrown.x * 1_000_000),
-      y: thrown.y === undefined ? null : Math.round(thrown.y * 1_000_000),
-    })),
-  );
+  const thrownRows = record.turns.flatMap((turn) => dartRows(turnIds.get(turn.turnNumber)!, turn.darts));
 
   const winnerPlayerId = record.winnerSeat === undefined ? null : playerIds.get(record.winnerSeat) ?? null;
 
@@ -120,7 +110,7 @@ export async function recordMatch(
     }),
     db.insert(players).values(playerRows),
     db.insert(turns).values(turnRows),
-    ...(dartRows.length > 0 ? [db.insert(darts).values(dartRows)] : []),
+    ...(thrownRows.length > 0 ? [db.insert(darts).values(thrownRows)] : []),
     ...(winnerPlayerId
       ? [db.update(matches).set({ winnerPlayerId }).where(eq(matches.id, matchId))]
       : []),

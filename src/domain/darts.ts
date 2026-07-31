@@ -74,3 +74,18 @@ export function notation(value: Dart): string {
   if (value.segment === 25) return value.multiplier === 2 ? "DB" : "SB";
   return `${value.multiplier === 3 ? "T" : value.multiplier === 2 ? "D" : "S"}${value.segment}`;
 }
+
+/**
+ * The dart an event describes.
+ *
+ * Every mode's log stores the same thing — a bed, a multiplier, and where it
+ * physically landed if it was thrown at a board — and every one of them had its own
+ * copy of this conversion. Four copies of three lines is three chances for them to
+ * disagree about what an absent landing point means. It lives here because `darts`
+ * is what they all already share; no mode learns anything about another by using it.
+ */
+export function dartFromEvent(event: { readonly segment: BoardNumber | 0; readonly multiplier: Multiplier; readonly x?: number; readonly y?: number }): Dart {
+  return event.x === undefined || event.y === undefined
+    ? dart(event.segment, event.multiplier)
+    : dart(event.segment, event.multiplier, { x: event.x, y: event.y });
+}

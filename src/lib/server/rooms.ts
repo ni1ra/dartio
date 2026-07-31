@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { createDatabase } from "@/db/client";
+import { dartRows } from "@/db/rows";
 import { darts, matches, players, roomMembers, rooms, turns } from "@/db/schema";
 import type { RecordedTurn } from "@/domain/match-record";
 import type { Database } from "./match-history";
 import { record, recordFailure } from "./observability";
+import { isUniqueViolation } from "@/db/errors";
 
 export type { Database };
 
@@ -233,16 +235,7 @@ export async function appendRoomTurn(
         dartsThrown: input.turn.dartsThrown,
         aggregateScore: input.turn.aggregateScore ?? null,
       }),
-      ...(input.turn.darts.length > 0
-        ? [db.insert(darts).values(input.turn.darts.map((thrown) => ({
-          turnId,
-          ordinal: thrown.ordinal,
-          segment: thrown.segment,
-          multiplier: thrown.multiplier,
-          x: thrown.x === undefined ? null : Math.round(thrown.x * 1_000_000),
-          y: thrown.y === undefined ? null : Math.round(thrown.y * 1_000_000),
-        })))]
-        : []),
+      ...(input.turn.darts.length > 0 ? [db.insert(darts).values([...dartRows(turnId, input.turn.darts)])] : []),
     ];
     await db.batch(statements as never);
   } catch (cause) {
@@ -415,13 +408,5 @@ function nextFreeSeat(taken: readonly number[]): number {
   throw new RoomError(409, "room_full", "This room has no free seat");
 }
 
-function isUniqueViolation(error: unknown): boolean {
-  let current: unknown = error;
-  for (let depth = 0; depth < 4 && current && typeof current === "object"; depth += 1) {
-    if ("code" in current && current.code === "23505") return true;
-    current = "cause" in current ? current.cause : undefined;
-  }
-  return false;
-}
 
 export { MAX_SEATS, ROOM_TTL_HOURS };
