@@ -1,6 +1,6 @@
 # Phase 2 — Product Completion
 
-Status: active. Opened 2026-07-30.
+Status: closed 2026-07-31. Opened 2026-07-30.
 
 Phase 1 shipped a live product and closed nine of sixteen audited gaps.
 `CYCLE_10_phase_closure.md` named the seven things genuinely left, and
@@ -58,7 +58,9 @@ gap-filling first, simplification and audit last.
 - [x] **Cycle 21 — Simplification and the dead-code sweep.** Three duplications
   removed and two unused functions deleted, with the test count identical before and
   after. See `CYCLE_21_simplify.md`.
-- [ ] **Cycle 22 — Audit, proof, closure.**
+- [x] **Cycle 22 — Audit, proof, closure.** Sixteen of sixteen audited gaps closed,
+  six of the seven remaining items delivered, and the seventh deliberately excluded.
+  See `CYCLE_22_phase_closure.md`.
 
 ## Phase-level gates
 
@@ -66,3 +68,19 @@ Nothing here is closed until the browser suite passes against the live productio
 deployment at 390×844, 834×1112, and 1440×1000, and `pnpm verify:auth` passes
 against it. A deployment can answer 200 on every route while nobody can sign in;
 that check is the only one that catches it.
+
+
+## Closure — 2026-07-31
+
+Eleven cycles, eleven pull requests, each green before merge and each verified on
+production after it. **All sixteen audited gaps are closed**, along with the
+`get-session` defect the harness found rather than the audit. Six of the seven
+items Cycle 10 called the honest remainder are delivered; the seventh, live Stripe
+activation, was excluded at the start of the phase and remains Lain's call.
+
+367 unit tests became 547, 120 browser checks became 159, and 19 routes became 25.
+
+`CYCLE_22_phase_closure.md` scores every gap individually and names what is
+honestly left: spectators and ownership handoff in rooms, levels 9–20 for the
+non-X01 modes, a confidence signal for voice, live Stripe, and the MCP tooling row
+that lives outside this repository.

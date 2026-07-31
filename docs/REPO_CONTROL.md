@@ -78,7 +78,7 @@
 - `pnpm test`
 - `pnpm build`
 - `pnpm test:browser:install` (once per machine)
-- `pnpm test:browser` — 120 checks across 390×844, 834×1112, and 1440×1000; 118 run and 2 skip by design, those being the sign-up assertion at the two widths where sign-up is deliberately absent. Measured unpiped on 2026-07-30; the row previously said 117 and had drifted. Set `DARTIO_BASE_URL` to run them against a preview or production deployment instead of a local build
+- `pnpm test:browser` — 159 checks across 390×844, 834×1112, and 1440×1000; 155 run and 4 skip by design, those being the sign-up assertion at the two widths where sign-up is deliberately absent and the screenspace assertion at the two widths whose reservation it does not describe. Measured unpiped on 2026-07-31. Set `DARTIO_BASE_URL` to run them against a preview or production deployment instead of a local build
 - `pnpm db:generate` — writes the migration; it does not apply it
 - `DATABASE_URL=<branch-uri> npx drizzle-kit migrate` — applies pending migrations to one branch and reconciles the journal. Preview first, then main. The repo has no `db:migrate` script because the URL is never the one in `.env.local` for production work
 
@@ -123,6 +123,12 @@ changed deliberately and one at a time, and each is recorded above.
 - Recoverable pre-greenfield production target: `dpl_2CiBPFdxJzJe6vYwu8vk4QEzLm4x`. It serves the legacy build and is rollback-only, never greenfield v1 proof.
 - Database changes require forward-safe migrations and an explicit escape path.
 - Stripe remains in sandbox until live transaction proof is explicitly authorized.
+
+## Phase 2 closure — 2026-07-31
+
+- Eleven cycles, eleven pull requests, each green before merge and each verified on production after it. **All sixteen gaps in `artifacts/GAP_AUDIT_2026-07-28.md` are closed**, along with the `get-session` defect the harness found rather than the audit. `docs/CYCLE_22_phase_closure.md` scores each one.
+- 367 unit tests became **547** across 44 files; 120 browser checks became **159**; 19 routes became **25**.
+- Honestly still open: spectators and ownership handoff in rooms; levels 9–20 for Cricket and the round modes; a confidence signal from `POST /api/voice/transcribe` to feed the voice hold-queue that is already built; live Stripe activation, which was excluded from the phase at its start and is Lain's call; and the Cycle 11 MCP tooling row, which lives outside this repository.
 
 ## Known release gates
 
