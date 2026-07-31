@@ -1,6 +1,6 @@
 # Cycle 22 — Phase Closure
 
-Status: active
+Status: closed 2026-07-31
 
 Closes the eleven-cycle run that began on 2026-07-30 with
 `PHASE_2_product_completion.md`. Every claim below is scored against the code on
@@ -100,3 +100,5 @@ Against `https://dartioopus46.vercel.app`:
   request.
 - The match page measures **1000 px of document in a 1000 px viewport**, with the
   command dock ending at the bottom edge.
+- **The full browser suite against production: 155 passed, 4 skipped**, at 390×844,
+  834×1112 and 1440×1000, run unpiped with the exit code read.
