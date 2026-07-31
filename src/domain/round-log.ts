@@ -1,4 +1,4 @@
-import { dart, type BoardNumber, type Dart, type Multiplier } from "./darts";
+import { dartFromEvent, type BoardNumber, type Dart, type Multiplier } from "./darts";
 import { applyRoundDart, createRoundMatch, type RoundModeId, type RoundPlayer, type RoundState } from "./round-modes";
 import {
   recordedDarts,
@@ -35,12 +35,6 @@ export function roundDartEvent(value: Dart): RoundEvent {
   };
 }
 
-function toDart(event: RoundEvent): Dart {
-  return event.x === undefined || event.y === undefined
-    ? dart(event.segment, event.multiplier)
-    : dart(event.segment, event.multiplier, { x: event.x, y: event.y });
-}
-
 export function createRoundLog(mode: RoundModeId, players: readonly RoundPlayer[]): RoundLog {
   createRoundMatch(mode, players);
   return { mode, players, events: [] };
@@ -51,7 +45,7 @@ export function replayRound(log: RoundLog): { state: RoundState; rejected: reado
   const rejected: number[] = [];
   log.events.forEach((event, index) => {
     try {
-      state = applyRoundDart(state, toDart(event));
+      state = applyRoundDart(state, dartFromEvent(event));
     } catch {
       rejected.push(index);
     }
@@ -84,7 +78,7 @@ export function roundMatchRecord(log: RoundLog, seats: readonly SeatIdentity[] =
     if (state.status === "complete") break;
     let next: RoundState;
     try {
-      next = applyRoundDart(state, toDart(event));
+      next = applyRoundDart(state, dartFromEvent(event));
     } catch {
       continue;
     }
@@ -125,7 +119,7 @@ export function rewindRoundToVisit(log: RoundLog, visitIndex: number): RoundLog 
   let start = 0;
   for (const [index, event] of log.events.entries()) {
     let next: RoundState;
-    try { next = applyRoundDart(state, toDart(event)); } catch { continue; }
+    try { next = applyRoundDart(state, dartFromEvent(event)); } catch { continue; }
     if (next.visits.length > state.visits.length) {
       if (completed === visitIndex) return { ...log, events: log.events.slice(0, start) };
       completed += 1;

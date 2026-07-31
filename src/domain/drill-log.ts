@@ -1,4 +1,4 @@
-import { dart, type BoardNumber, type Dart, type Multiplier } from "./darts";
+import { dartFromEvent, type BoardNumber, type Dart, type Multiplier } from "./darts";
 import { applyDrillDart, createDrill, DRILLS, type DrillId, type DrillState } from "./drills";
 import {
   recordedDarts,
@@ -34,12 +34,6 @@ export function drillDartEvent(value: Dart): DrillEvent {
   };
 }
 
-function toDart(event: DrillEvent): Dart {
-  return event.x === undefined || event.y === undefined
-    ? dart(event.segment, event.multiplier)
-    : dart(event.segment, event.multiplier, { x: event.x, y: event.y });
-}
-
 export function createDrillLog(drill: DrillId): DrillLog {
   createDrill(drill);
   return { drill, events: [] };
@@ -51,7 +45,7 @@ export function replayDrill(log: DrillLog): { state: DrillState; rejected: reado
   log.events.forEach((event, index) => {
     if (state.status === "complete") { rejected.push(index); return; }
     try {
-      state = applyDrillDart(state, toDart(event));
+      state = applyDrillDart(state, dartFromEvent(event));
     } catch {
       rejected.push(index);
     }
@@ -65,26 +59,6 @@ export function appendDrillEvent(log: DrillLog, event: DrillEvent): DrillLog {
 
 export function undoLastDrillEvent(log: DrillLog): DrillLog {
   return log.events.length === 0 ? log : { ...log, events: log.events.slice(0, -1) };
-}
-
-/** Rewinds to just before a completed attempt, for the reason every mode does. */
-export function rewindDrillToAttempt(log: DrillLog, attemptIndex: number): DrillLog {
-  if (!Number.isInteger(attemptIndex) || attemptIndex < 0) throw new RangeError(`No completed attempt at index ${attemptIndex}`);
-  let state = createDrill(log.drill);
-  let completed = 0;
-  let start = 0;
-  for (const [index, event] of log.events.entries()) {
-    let next: DrillState;
-    try { next = applyDrillDart(state, toDart(event)); } catch { continue; }
-    if (next.attempts.length > state.attempts.length) {
-      if (completed === attemptIndex) return { ...log, events: log.events.slice(0, start) };
-      completed += 1;
-      start = index + 1;
-    }
-    state = next;
-    if (state.status === "complete") break;
-  }
-  throw new RangeError(`No completed attempt at index ${attemptIndex}`);
 }
 
 /**

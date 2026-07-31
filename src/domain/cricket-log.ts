@@ -1,4 +1,4 @@
-import { dart, type BoardNumber, type Dart, type Multiplier } from "./darts";
+import { dartFromEvent, type BoardNumber, type Dart, type Multiplier } from "./darts";
 import { applyCricketDart, createCricket, type CricketOptions, type CricketPlayer, type CricketState } from "./cricket";
 import {
   recordedDarts,
@@ -45,12 +45,6 @@ export function cricketDartEvent(value: Dart): CricketEvent {
   };
 }
 
-function toDart(event: CricketEvent): Dart {
-  return event.x === undefined || event.y === undefined
-    ? dart(event.segment, event.multiplier)
-    : dart(event.segment, event.multiplier, { x: event.x, y: event.y });
-}
-
 export function createCricketLog(options: CricketOptions, players: readonly CricketPlayer[]): CricketLog {
   createCricket(options, players);
   return { options, players, events: [] };
@@ -65,7 +59,7 @@ export function replayCricket(log: CricketLog): CricketReplay {
       return;
     }
     try {
-      state = applyCricketDart(state, toDart(event));
+      state = applyCricketDart(state, dartFromEvent(event));
     } catch (problem) {
       rejected.push({ index, reason: problem instanceof Error ? problem.message : "Rejected by the rules" });
     }
@@ -101,7 +95,7 @@ export function cricketMatchRecord(log: CricketLog, seats: readonly SeatIdentity
     if (state.status === "complete") break;
     let next: CricketState;
     try {
-      next = applyCricketDart(state, toDart(event));
+      next = applyCricketDart(state, dartFromEvent(event));
     } catch {
       // A dart the rules refused belongs to no visit, exactly as in replay.
       continue;
@@ -147,7 +141,7 @@ export function rewindCricketToVisit(log: CricketLog, visitIndex: number): Crick
   for (const [index, event] of log.events.entries()) {
     let next: CricketState;
     try {
-      next = applyCricketDart(state, toDart(event));
+      next = applyCricketDart(state, dartFromEvent(event));
     } catch {
       continue;
     }

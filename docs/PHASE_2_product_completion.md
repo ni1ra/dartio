@@ -55,7 +55,9 @@ gap-filling first, simplification and audit last.
 - [x] **Cycle 20 — Observability, analytics, rollback.** Structured events with an
   enforced allow-list, the `get-session` 500 that should have been a 503, and a
   rollback runbook that is a procedure rather than a fact. See `CYCLE_20_observability.md`.
-- [ ] **Cycle 21 — Simplification and the dead-code sweep.**
+- [x] **Cycle 21 — Simplification and the dead-code sweep.** Three duplications
+  removed and two unused functions deleted, with the test count identical before and
+  after. See `CYCLE_21_simplify.md`.
 - [ ] **Cycle 22 — Audit, proof, closure.**
 
 ## Phase-level gates

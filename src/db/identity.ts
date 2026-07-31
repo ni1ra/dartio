@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { createDatabase } from "./client";
+import { isUniqueViolation } from "./errors";
 import {
   IdentityConflictError,
   type InternalUser,
@@ -86,13 +87,4 @@ function toInternalUser(row: IdentityRow): InternalUser {
       preferences: row.preferences,
     },
   };
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  let current: unknown = error;
-  for (let depth = 0; depth < 4 && current && typeof current === "object"; depth += 1) {
-    if ("code" in current && current.code === "23505") return true;
-    current = "cause" in current ? current.cause : undefined;
-  }
-  return false;
 }
