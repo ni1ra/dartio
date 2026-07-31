@@ -52,8 +52,9 @@ gap-filling first, simplification and audit last.
 - [x] **Cycle 19 — Cycle 11's remainder.** Five rows ticked against production
   rather than against the diff, the screenspace complaint measured and fixed, and the
   admin role decided rather than built. See `CYCLE_19_audit_remainder.md`.
-- [ ] **Cycle 20 — Observability, analytics, rollback**, including the
-  `get-session` 500 that should be a 503.
+- [x] **Cycle 20 — Observability, analytics, rollback.** Structured events with an
+  enforced allow-list, the `get-session` 500 that should have been a 503, and a
+  rollback runbook that is a procedure rather than a fact. See `CYCLE_20_observability.md`.
 - [ ] **Cycle 21 — Simplification and the dead-code sweep.**
 - [ ] **Cycle 22 — Audit, proof, closure.**
 

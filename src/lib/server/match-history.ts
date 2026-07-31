@@ -4,6 +4,7 @@ import { createDatabase } from "@/db/client";
 import { darts, matches, players, turns } from "@/db/schema";
 import type { MatchRecord } from "@/domain/match-record";
 import type { StatMatch, StatTurn } from "@/domain/match-stats";
+import { recordFailure } from "./observability";
 
 /**
  * Writes a finished match down, and reads back what a player has played.
@@ -130,6 +131,7 @@ export async function recordMatch(
     // three statements already guarantee.
     await db.batch(statements as unknown as [(typeof statements)[number]]);
   } catch (cause) {
+    recordFailure("match.record_failed", cause, { userId, mode: record.mode, count: record.turns.length });
     throw new MatchHistoryError({ cause });
   }
   return matchId;
