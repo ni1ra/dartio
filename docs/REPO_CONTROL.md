@@ -49,6 +49,8 @@
 - Every mode reduces to one `MatchRecord` (`src/domain/match-record.ts`) before it is stored, and each mode owns the adapter that produces it. The server never learns any mode's rules, so a seventh mode needs no server change. It validates shape and ownership only: every dart is checked against the same board the `darts` constraints enforce, and the account a match is filed under comes from the session, never from the request body.
 - **`.env.local`'s `DATABASE_URL` addresses the `vercel-preview` branch, not `main`.** Its host is `ep-shy-brook-afwoyw0n`; production is `ep-raspy-lake-afeigwvp`. A row count or a schema check run with the repo's own env file describes preview and says nothing about production. Per-branch connection URIs come from the Neon control plane at `/projects/{project_id}/connection_uri?branch_id=…`.
 - Playable modes as of 2026-07-31: X01, Cricket (standard / cut-throat / tactics), Around the Clock, Shanghai, Count-Up, Bob's 27, and the three drills — Checkout Lab, Doubles Matrix, and Scoring Sprint. All nine catalogue rows are playable; nothing on `/practice` is labelled coming next any more, and the branch that rendered an inert card was removed with the last row that needed it.
+- Dartio reports on itself through `src/lib/server/observability.ts`: one line of JSON per event on stdout, which Vercel captures, with no third-party agent, key, or request made on a player's behalf. **The field list is an allow-list, not a spread** — the types forbid an email or a token and the allow-list is what actually enforces it, which a test asserts by reaching past the types.
+- `/api/auth/[...path]` now degrades honestly: an unreachable Neon Auth, or a 500 from it, answers **503 `auth_service_unavailable`** rather than 500, because a 500 says Dartio is broken and a 503 says an authority is temporarily unavailable — and only the second is true during a Neon outage. Refusals the auth service means, such as a wrong password or an untrusted origin, pass through unchanged.
 - The match fits the screen it reserves as of 2026-07-31, measured rather than assumed: it ran to 1229 px in a 1000 px viewport with the command dock at y=1036, and now measures 1000 px with the dock ending at the bottom edge. Three causes: `#main-content` and `.match-page` reserved only the nav's 76 px while the stage starts 38 px lower (both now subtract `--stage-inset`, in `dvh`); `.match-page` had a `min-height` and no height, so `flex: 1` on the grid had nothing to distribute; and Navi's shell reserves room for a bottom navigation that only exists below 1100 px. **The board was never the constraint** — the middle column was, and it now scrolls inside the grid. `tests/browser/layout.spec.ts` asserts both measurements, with a 1 px tolerance for sub-pixel rounding.
 - **The admin role is decided and deliberately not built.** Neon Auth already runs Better Auth's admin plugin, so `users` needs no `role` column and a second copy inside Dartio would leave two answers to who is an administrator. "Signed in as admin but the card reads FREE" was correct: role and entitlement are separate on purpose, and letting a role grant paid entitlements would hand out paid access with no billing record.
 - Voice is continuous as of 2026-07-31. `src/lib/voice/segmenter.ts` decides where a clip begins and ends from loudness alone, so a clip is a sentence rather than a fixed 4.5 seconds; it ends the clip where the talking stopped rather than where the silence was noticed, keeps a short pause from splitting one utterance, and discards anything under 180 ms — mostly darts hitting the board — then listens again without a word. The monitor runs on animation frames so it stops when the tab is hidden.
@@ -59,7 +61,6 @@
 - A drill is an attempt ledger rather than a game: a fixed list of targets, up to three darts each, taken or not. `DRILLS` holds one rules entry per drill the way `ROUND_MODES` does, so a fourth drill is a table entry. An attempt ends the moment it is decided — a double landed on the first dart, or a checkout overshot — rather than at three darts.
 - Every mode owns its rules and its log and imports nothing from another mode. What they share is the regulation board (`src/components/dartboard.tsx`), the per-dart pad, the keyboard scheme, visit rewind, and local resume. Adding a mode must not require editing an existing one.
 - `pnpm test:browser` runs against production by setting `DARTIO_BASE_URL`. On 2026-07-28 it passed 115 with 2 skipped against `https://dartioopus46.vercel.app`. The suite grew from 102 in the same session: a green 102/102 had been reported against a deployment whose top bar offered a phone no way to sign in, because the suite asserted that `/auth/sign-in` answers 200 and never that a visitor could reach it. Nav reachability and accent-foreground contrast are now asserted rather than assumed.
-- Known unfixed defect: `/api/auth/get-session` answers 500 when Neon Auth's upstream is unreachable, where Dartio's own routes answer a deliberate 503. A real Neon outage would report a server fault instead of degrading to local free play.
 - **Production authentication works as of 2026-07-28.** The production branch's Neon Auth trusted-domain list was empty — `{"domains":[]}` on `br-sweet-wildflower-afy2ygj6`, while preview carried its Cycle 2 alias. `https://dartioopus46.vercel.app` and `https://dartio.vercel.app` were added through the Neon control plane and `pnpm verify:auth` now passes; a real account signed up and signed back in against production, 200 both.
 - The Neon control plane is reachable without the console. `neonctl` OAuth credentials with a refresh token live at `~/.config/neonctl/credentials.json`; org `org-wild-credit-66143021`, project `nameless-tooth-63658537`. Trusted domains are per branch at `/projects/{project_id}/branches/{branch_id}/auth/domains` (GET, POST, DELETE). A deployment on a new URL needs its origin added there or nobody can sign in to it, and no repository check will tell you — `pnpm verify:auth <url>` is the one that will.
 - **Preview and production run separate Neon Auth projects.** `DARTIO_QA_EMAIL`/`DARTIO_QA_PASSWORD` are a production identity and are refused with `INVALID_EMAIL_OR_PASSWORD` against a preview deployment. Anything probing behind the login wall on preview has to sign up its own throwaway identity first.
@@ -94,6 +95,29 @@
 5. Production deployment and post-deploy verification only after preview proof.
 
 ## Rollback
+
+A written path, because "Vercel retains prior deployments" is a fact and not a
+procedure. In order:
+
+1. **Confirm it is the deployment.** `pnpm verify:auth <url>`, then
+   `pnpm verify:history <url>`. If both pass, the deployment is serving and
+   authenticated — the fault is narrower than the release and rolling back may not
+   help.
+2. **Promote the last good deployment.** `vercel rollback` from the project, or
+   promote the prior Ready production deployment from the dashboard. Code rolls back
+   in one step because every migration this phase shipped is additive.
+3. **Leave the database alone unless the migration is the fault.** Migration `0006`
+   only adds columns, so older code ignores them; there is no version of the app
+   that breaks because they exist. The escape path, if one is ever needed, is
+   dropping the three columns, and the pre-change snapshot is the Neon branch
+   `pre-0006-2026-07-30` (`br-dark-cloud-afis6s5i`).
+4. **Re-verify after the rollback**, with the same two commands plus
+   `DARTIO_BASE_URL=<url> pnpm test:browser`. A rollback that is not verified is a
+   second deployment nobody checked.
+
+What cannot be rolled back by promoting a deployment: Neon Auth trusted domains,
+Stripe configuration, and anything applied through the Neon control plane. Those are
+changed deliberately and one at a time, and each is recorded above.
 
 - Vercel retains prior ready production deployments.
 - Recoverable pre-greenfield production target: `dpl_2CiBPFdxJzJe6vYwu8vk4QEzLm4x`. It serves the legacy build and is rollback-only, never greenfield v1 proof.

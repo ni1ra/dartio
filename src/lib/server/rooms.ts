@@ -4,6 +4,7 @@ import { createDatabase } from "@/db/client";
 import { darts, matches, players, roomMembers, rooms, turns } from "@/db/schema";
 import type { RecordedTurn } from "@/domain/match-record";
 import type { Database } from "./match-history";
+import { record, recordFailure } from "./observability";
 
 export type { Database };
 
@@ -120,6 +121,7 @@ export async function createRoom(
         db.insert(matches).values({ id: matchId, roomId, mode: input.mode, status: "pending", options: input.options }),
         db.insert(players).values({ id: playerId, matchId, userId, seat: 0, displayName: input.displayName, isBot: false }),
       ] as never);
+      record("room.opened", { userId, mode: input.mode });
       return { code, seat: 0 };
     } catch (cause) {
       // 23505 is a duplicate code and only a duplicate code: every other id here
@@ -207,6 +209,9 @@ export async function appendRoomTurn(
     throw new RoomServiceError({ cause });
   }
   if (!claimed) {
+    // Worth counting rather than only refusing: a room producing these steadily
+    // means two clients disagree about whose turn it is, not that people are fast.
+    record("room.version_conflict", { userId, count: input.expectedVersion }, "warn");
     throw new RoomError(409, "version_conflict", "Somebody else threw first — catch up and try again");
   }
 
@@ -241,6 +246,7 @@ export async function appendRoomTurn(
     ];
     await db.batch(statements as never);
   } catch (cause) {
+    recordFailure("room.turn_failed", cause, { userId, count: turnNumber });
     throw new RoomServiceError({ cause });
   }
   return { version: claimed.version };
