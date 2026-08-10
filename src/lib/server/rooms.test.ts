@@ -5,9 +5,11 @@ import {
   createRoom,
   generateRoomCode,
   joinRoom,
+  MAX_SPECTATORS,
   readRoom,
   RoomError,
   RoomServiceError,
+  spectateRoom,
   type Database,
 } from "./rooms";
 
@@ -17,6 +19,7 @@ const SEAT_ZERO = { seat: 0, userId: "user-1", displayName: "Player 1", playerId
 const SEAT_ONE = { seat: 1, userId: "user-2", displayName: "Player 2", playerId: "player-2", role: "player" };
 
 function room(overrides: Record<string, unknown> = {}) {
+  const seats = (overrides.seats as typeof SEAT_ZERO[] | undefined) ?? [SEAT_ZERO, SEAT_ONE];
   return {
     roomId: "room-1",
     matchId: "match-1",
@@ -25,7 +28,10 @@ function room(overrides: Record<string, unknown> = {}) {
     options: { startingScore: 501 },
     status: "active",
     version: 3,
-    seats: [SEAT_ZERO, SEAT_ONE],
+    seats,
+    // Membership mirrors the seats unless a test says otherwise — the way the real
+    // query behaves, where every seated player has a membership row.
+    members: seats.map((seat) => ({ userId: seat.userId, role: seat.role })),
     ...overrides,
   };
 }
@@ -35,12 +41,29 @@ function room(overrides: Record<string, unknown> = {}) {
  * Every claim these tests make — who may write, what order, what happens when two
  * writers collide — is decided before anything reaches Postgres.
  */
-function fakeDatabase(options: { queue?: unknown[][]; failBatch?: readonly (Error | null)[] } = {}) {
+function fakeDatabase(options: { queue?: unknown[][]; failBatch?: readonly (Error | null)[]; failInsert?: readonly Error[] } = {}) {
   const queue = [...(options.queue ?? [])];
   const failures = [...(options.failBatch ?? [])];
+  const insertFailures = [...(options.failInsert ?? [])];
   const batches: Statement[][] = [];
+  const writes: Statement[] = [];
   const database = {
-    insert: (table: unknown) => ({ values: (rows: unknown) => ({ kind: "insert", table, rows: Array.isArray(rows) ? rows : [rows] }) }),
+    // An insert is a statement when it goes into a batch and a write when awaited
+    // on its own, so it is a thenable that records itself only at await time — a
+    // batched statement is never awaited individually and must not self-record.
+    insert: (table: unknown) => ({
+      values: (rows: unknown) => {
+        const statement: Statement = { kind: "insert", table, rows: Array.isArray(rows) ? rows : [rows] };
+        return Object.assign({
+          then: (resolve: (value: unknown) => void, reject: (cause: unknown) => void) => {
+            const failure = insertFailures.shift();
+            if (failure) { reject(failure); return; }
+            writes.push(statement);
+            resolve(undefined);
+          },
+        }, statement);
+      },
+    }),
     // `where` is awaited directly when an update stands alone, and used as a value
     // when it goes into a batch, so it has to be both.
     update: (table: unknown) => ({
@@ -55,7 +78,7 @@ function fakeDatabase(options: { queue?: unknown[][]; failBatch?: readonly (Erro
     },
     execute: async () => ({ rows: queue.shift() ?? [] }),
   };
-  return { database: database as unknown as Database, batches };
+  return { database: database as unknown as Database, batches, writes };
 }
 
 function uniqueViolation(): Error {
@@ -119,6 +142,21 @@ describe("taking a seat", () => {
     const { database } = fakeDatabase({ queue: [[]] });
     await expect(joinRoom("user-3", "NOPE99", "Player 3", database)).rejects.toMatchObject({ status: 404, code: "room_not_found" });
   });
+
+  it("promotes a watcher taking a seat instead of inserting a second membership row", async () => {
+    const watching = room({ members: [
+      { userId: "user-1", role: "owner" },
+      { userId: "user-2", role: "player" },
+      { userId: "user-3", role: "spectator" },
+    ] });
+    const { database, batches } = fakeDatabase({ queue: [[watching]] });
+    await expect(joinRoom("user-3", "OCHE42", "Player 3", database)).resolves.toEqual({ code: "OCHE42", seat: 2 });
+
+    // A second insert would trip the membership primary key; the promotion updates.
+    expect(batches[0]).toHaveLength(3);
+    expect(batches[0]![0]).toMatchObject({ kind: "update" });
+    expect(batches[0]![0]!.rows[0]).toMatchObject({ role: "player" });
+  });
 });
 
 describe("filing a visit into a room", () => {
@@ -148,6 +186,15 @@ describe("filing a visit into a room", () => {
   it("refuses somebody who is not in the room", async () => {
     const { database } = fakeDatabase({ queue: [[room()]] });
     await expect(appendRoomTurn("stranger", "OCHE42", visit, database)).rejects.toMatchObject({ status: 403, code: "not_a_member" });
+  });
+
+  it("refuses a spectator as read-only, not as a stranger", async () => {
+    // The chair confers no arm — and no version arithmetic runs before the refusal,
+    // which the empty statement queue proves: a version check would ask the database.
+    const gallery = room({ members: [...room().members as [], { userId: "watcher", role: "spectator" }] });
+    const { database, batches } = fakeDatabase({ queue: [[gallery]] });
+    await expect(appendRoomTurn("watcher", "OCHE42", visit, database)).rejects.toMatchObject({ status: 403, code: "spectator_read_only" });
+    expect(batches).toHaveLength(0);
   });
 
   it("refuses a member throwing from somebody else's seat", async () => {
@@ -181,12 +228,27 @@ describe("reading a room", () => {
     expect(state.turns[0]?.aggregateScore).toBeUndefined();
   });
 
-  it("gives a spectator with no seat a null seat rather than a refusal", async () => {
+  it("gives an entitled stranger a null seat and no standing rather than a refusal", async () => {
     const { database } = fakeDatabase({ queue: [[room()], []] });
-    const state = await readRoom("watcher", "OCHE42", 0, database);
+    const state = await readRoom("stranger", "OCHE42", 0, database);
 
     expect(state.yourSeat).toBeNull();
+    expect(state.yourRole).toBeNull();
     expect(state.seats.every((seat) => !seat.isYou)).toBe(true);
+  });
+
+  it("counts the gallery and names the reader's standing in it", async () => {
+    const gallery = room({ members: [
+      ...room().members as [],
+      { userId: "watcher", role: "spectator" },
+      { userId: "watcher-2", role: "spectator" },
+    ] });
+    const { database } = fakeDatabase({ queue: [[gallery], []] });
+    const state = await readRoom("watcher", "OCHE42", 0, database);
+
+    expect(state).toMatchObject({ yourSeat: null, yourRole: "spectator", watching: 2 });
+    // The seats stay the players': a gallery is counted, never seated.
+    expect(state.seats).toHaveLength(2);
   });
 
   it("reports a database failure as unavailable rather than as a missing room", async () => {
@@ -227,8 +289,59 @@ describe("closing a room's match", () => {
     await expect(completeRoomMatch("stranger", "OCHE42", 1, database)).rejects.toMatchObject({ status: 403, code: "not_a_member" });
   });
 
+  it("refuses a spectator's report — watching a finish is not reporting one", async () => {
+    const gallery = room({ members: [...room().members as [], { userId: "watcher", role: "spectator" }] });
+    const { database } = fakeDatabase({ queue: [[gallery]] });
+    await expect(completeRoomMatch("watcher", "OCHE42", 1, database)).rejects.toMatchObject({ status: 403, code: "spectator_read_only" });
+  });
+
   it("accepts a match that ended with no winner", async () => {
     const { database } = fakeDatabase({ queue: [[room()]] });
     await expect(completeRoomMatch("user-1", "OCHE42", null, database)).resolves.toEqual({ alreadyComplete: false });
+  });
+});
+
+describe("pulling up a chair", () => {
+  it("writes one spectator membership row and nothing else", async () => {
+    const { database, writes, batches } = fakeDatabase({ queue: [[room()]] });
+    await expect(spectateRoom("watcher", "oche42", database)).resolves.toEqual({ code: "OCHE42", role: "spectator" });
+
+    expect(writes).toHaveLength(1);
+    expect(writes[0]!.rows[0]).toMatchObject({ userId: "watcher", role: "spectator" });
+    // No players row: the read-only promise is structural, not policed.
+    expect(batches).toHaveLength(0);
+  });
+
+  it("tells a seated player asking to watch what they already are, without writing", async () => {
+    const { database, writes } = fakeDatabase({ queue: [[room()]] });
+    await expect(spectateRoom("user-1", "OCHE42", database)).resolves.toEqual({ code: "OCHE42", role: "owner" });
+    expect(writes).toHaveLength(0);
+  });
+
+  it("answers a watcher asking twice with the same chair, without writing twice", async () => {
+    const gallery = room({ members: [...room().members as [], { userId: "watcher", role: "spectator" }] });
+    const { database, writes } = fakeDatabase({ queue: [[gallery]] });
+    await expect(spectateRoom("watcher", "OCHE42", database)).resolves.toEqual({ code: "OCHE42", role: "spectator" });
+    expect(writes).toHaveLength(0);
+  });
+
+  it("treats two racing taps as one chair when the membership key refuses the second", async () => {
+    const conflict = Object.assign(new Error("duplicate key"), { code: "23505" });
+    const { database } = fakeDatabase({ queue: [[room()]], failInsert: [conflict] });
+    await expect(spectateRoom("watcher", "OCHE42", database)).resolves.toEqual({ code: "OCHE42", role: "spectator" });
+  });
+
+  it("refuses a room whose match is already over", async () => {
+    const { database } = fakeDatabase({ queue: [[room({ status: "complete" })]] });
+    await expect(spectateRoom("watcher", "OCHE42", database)).rejects.toMatchObject({ status: 409, code: "room_closed" });
+  });
+
+  it("refuses the seventeenth chair", async () => {
+    const packed = room({ members: [
+      ...room().members as [],
+      ...Array.from({ length: MAX_SPECTATORS }, (_, index) => ({ userId: `watcher-${index}`, role: "spectator" })),
+    ] });
+    const { database } = fakeDatabase({ queue: [[packed]] });
+    await expect(spectateRoom("late-arrival", "OCHE42", database)).rejects.toMatchObject({ status: 409, code: "gallery_full" });
   });
 });

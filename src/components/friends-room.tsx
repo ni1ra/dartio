@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Surface, TextField } from "navi-ui";
 import { hasAccessEntitlement } from "@/lib/product/access-contract";
-import { createRoom, joinRoom, readRoom, type RoomFailure, type RoomStateView } from "@/lib/product/rooms-client";
+import { createRoom, joinRoom, readRoom, spectateRoom, type RoomFailure, type RoomStateView } from "@/lib/product/rooms-client";
 import { useAccess } from "./access-provider";
 
 /**
@@ -28,17 +28,19 @@ const FAILURE_COPY: Record<RoomFailure, string> = {
   authentication_required: "Sign in to open or join a room.",
   room_not_found: "That room isn’t live. Check the code — it expires after 12 hours.",
   room_full: "That room is full.",
+  gallery_full: "That room’s gallery is full.",
   room_closed: "That room’s match has already finished.",
   invalid_room_request: "That code doesn’t look right.",
   version_conflict: "Somebody threw first. Catching up.",
   wrong_seat: "That seat isn’t yours.",
+  spectator_read_only: "You’re watching this one — take a seat to throw.",
   rooms_unavailable: "Rooms are unreachable right now. Nothing was lost.",
 };
 
 export function FriendsRoom() {
   const access = useAccess();
   const [code, setCode] = useState("");
-  const [busy, setBusy] = useState<"idle" | "hosting" | "joining">("idle");
+  const [busy, setBusy] = useState<"idle" | "hosting" | "joining" | "watching">("idle");
   const [failure, setFailure] = useState<RoomFailure | null>(null);
   const [room, setRoom] = useState<RoomStateView | null>(null);
   const [lost, setLost] = useState(false);
@@ -92,6 +94,16 @@ export function FriendsRoom() {
     await refresh(result.value.code, controller.signal);
   }
 
+  /** Same code, no seat: the room is entered as a watcher and the lobby shows it. */
+  async function watch() {
+    setBusy("watching"); setFailure(null);
+    const result = await spectateRoom(code);
+    setBusy("idle");
+    if (!result.ok) { setFailure(result.failure); return; }
+    const controller = new AbortController();
+    await refresh(result.value.code, controller.signal);
+  }
+
   return <div className="page-frame friends-page">
     <header className="page-heading">
       <p className="eyebrow">Play together</p>
@@ -117,6 +129,7 @@ export function FriendsRoom() {
           <form onSubmit={(event) => void join(event)}>
             <TextField label="Room code" value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} placeholder="OCHE42" maxLength={6} />
             <Button type="submit" variant="secondary" disabled={code.length !== 6 || busy !== "idle" || !entitled}>{busy === "joining" ? "Finding room…" : "Join room"}</Button>
+            <Button type="button" variant="ghost" onClick={() => void watch()} disabled={code.length !== 6 || busy !== "idle" || !entitled}>{busy === "watching" ? "Pulling up a chair…" : "Watch instead"}</Button>
           </form>
           {failure && <p className="form-error" role="alert">{FAILURE_COPY[failure]}{failure === "upgrade_required" && <> <Link href="/pricing">See Pro</Link>.</>}</p>}
         </Surface>
@@ -126,7 +139,8 @@ export function FriendsRoom() {
       <span>Live · one shared record, in one order</span>
       <span>Live · a seat is yours and nobody can throw from it</span>
       <span>Live · rejoin from any screen and the match rebuilds itself</span>
-      <span>Planned · spectators and host handover</span>
+      <span>Live · spectators watch every visit as it lands</span>
+      <span>Planned · host handover</span>
     </div>
   </div>;
 }
@@ -140,7 +154,9 @@ function RoomLobby({ room, lost, onLeave }: { room: RoomStateView; lost: boolean
       </div>
       <Button variant="secondary" onClick={onLeave}>Leave lobby</Button>
     </div>
-    <p>Send that code to whoever is playing. Everyone who joins appears here.</p>
+    <p>{room.yourRole === "spectator"
+      ? "You’re watching. The seats are the players’ — every visit they throw lands here as well."
+      : "Send that code to whoever is playing. Everyone who joins appears here."}</p>
     <ol className="room-seats">
       {room.seats.map((seat) => <li key={seat.seat}>
         <span className="room-seat-index">{String(seat.seat + 1).padStart(2, "0")}</span>
@@ -148,8 +164,9 @@ function RoomLobby({ room, lost, onLeave }: { room: RoomStateView; lost: boolean
         <small>{seat.role}</small>
       </li>)}
     </ol>
+    {room.watching > 0 && <p className="room-lobby-note">{room.watching === 1 ? "One chair pulled up to watch." : `${room.watching} chairs pulled up to watch.`}</p>}
     {room.seats.length > 1
-      ? <Link className="button-link button-link-lg" href={`/play/match?room=${room.code}`}>Go to the oche</Link>
+      ? <Link className="button-link button-link-lg" href={`/play/match?room=${room.code}`}>{room.yourRole === "spectator" ? "Watch the match" : "Go to the oche"}</Link>
       : <p className="room-lobby-note">Waiting for somebody to join. Send them the code — the match starts as soon as a second player sits down.</p>}
     {lost
       ? <p className="form-error" role="alert">Lost contact with the room. Your seat is still held — reopen this page to pick it back up.</p>

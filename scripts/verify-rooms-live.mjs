@@ -81,6 +81,7 @@ async function api(path, cookie, init = {}) {
 
 const host = await identity("host");
 const guest = await identity("guest");
+const watcher = await identity("watcher");
 
 const created = await api("", host.cookie, { method: "POST", body: JSON.stringify({ mode: "x01", options: { startingScore: 501 } }) });
 if (created.status !== 201) await fail(`opening a room returned ${created.status}`, JSON.stringify(created.body));
@@ -95,6 +96,28 @@ const seen = await api(`/${code}?since=0`, guest.cookie);
 if (seen.status !== 200) await fail(`reading the room returned ${seen.status}`, JSON.stringify(seen.body));
 if (seen.body.seats.length !== 2) await fail("the room does not show both players", JSON.stringify(seen.body.seats));
 console.log(`OK   both seats visible, room at version ${seen.body.version}, guest sees yourSeat=${seen.body.yourSeat}`);
+
+// A third account pulls up a chair. No seat is taken and the players see the count.
+const chair = await api(`/${code}`, watcher.cookie, { method: "POST", body: JSON.stringify({ spectate: true }) });
+if (chair.status !== 200 || chair.body.role !== "spectator") {
+  await fail(`spectating returned ${chair.status}`, JSON.stringify(chair.body));
+}
+console.log(`OK   watcher pulled up a chair as ${chair.body.role}`);
+
+const chairAgain = await api(`/${code}`, watcher.cookie, { method: "POST", body: JSON.stringify({ spectate: true }) });
+if (chairAgain.status !== 200 || chairAgain.body.role !== "spectator") {
+  await fail(`spectating twice returned ${chairAgain.status}, expected the same chair`, JSON.stringify(chairAgain.body));
+}
+console.log("OK   asking to watch twice is the same chair, not an error");
+
+const watcherView = await api(`/${code}?since=0`, watcher.cookie);
+if (watcherView.body.yourSeat !== null || watcherView.body.yourRole !== "spectator") {
+  await fail("the watcher does not read as a seatless spectator", JSON.stringify({ yourSeat: watcherView.body.yourSeat, yourRole: watcherView.body.yourRole }));
+}
+if (watcherView.body.watching !== 1 || watcherView.body.seats.length !== 2) {
+  await fail("the room does not count exactly one watcher over two seats", JSON.stringify({ watching: watcherView.body.watching, seats: watcherView.body.seats.length }));
+}
+console.log("OK   the watcher reads the room seatless, and the room counts one watching");
 
 const visit = (expectedVersion, seat) => ({
   method: "POST",
@@ -125,6 +148,14 @@ if (wrongSeat.status !== 403 || wrongSeat.body.error !== "wrong_seat") {
 }
 console.log("OK   throwing from somebody else's seat is refused (403 wrong_seat)");
 
+// The chair confers no arm. A stale version AND a stolen seat AND no membership
+// seat: the spectator refusal must win, proving it precedes the version arithmetic.
+const watcherThrow = await api(`/${code}/turns`, watcher.cookie, visit(0, 0));
+if (watcherThrow.status !== 403 || watcherThrow.body.error !== "spectator_read_only") {
+  await fail(`a spectator's visit returned ${watcherThrow.status}, expected 403 spectator_read_only`, JSON.stringify(watcherThrow.body));
+}
+console.log("OK   a spectator's visit is refused as read-only, before any version check (403 spectator_read_only)");
+
 const second = await api(`/${code}/turns`, guest.cookie, visit(1, 1));
 if (second.status !== 201) await fail(`the guest's own visit returned ${second.status}`, JSON.stringify(second.body));
 console.log(`OK   guest filed their own visit after catching up, room at version ${second.body.version}`);
@@ -151,6 +182,12 @@ const finishing = await api(`/${code}/turns`, host.cookie, {
 if (finishing.status !== 201) await fail(`the finishing visit returned ${finishing.status}`, JSON.stringify(finishing.body));
 console.log(`OK   host filed a finishing visit, room at version ${finishing.body.version}`);
 
+const watcherClose = await api(`/${code}/complete`, watcher.cookie, { method: "POST", body: JSON.stringify({ winnerSeat: 0 }) });
+if (watcherClose.status !== 403 || watcherClose.body.error !== "spectator_read_only") {
+  await fail(`a spectator closing the match returned ${watcherClose.status}, expected 403 spectator_read_only`, JSON.stringify(watcherClose.body));
+}
+console.log("OK   a spectator cannot report the finish (403 spectator_read_only)");
+
 const closed = await api(`/${code}/complete`, host.cookie, { method: "POST", body: JSON.stringify({ winnerSeat: 0 }) });
 if (closed.status !== 200 || closed.body.alreadyComplete !== false) {
   await fail(`closing the match returned ${closed.status}`, JSON.stringify(closed.body));
@@ -168,6 +205,13 @@ const after = await api(`/${code}?since=0`, guest.cookie);
 if (after.body.status !== "complete") await fail(`the room reads ${after.body.status}, expected complete`);
 if (after.body.turns.length !== 3) await fail(`the room holds ${after.body.turns.length} visits, expected 3`);
 console.log(`OK   the room reads complete and holds all ${after.body.turns.length} visits`);
+
+// The gallery outlives the finish: a watcher already in the room still sees the result.
+const watcherAfter = await api(`/${code}?since=0`, watcher.cookie);
+if (watcherAfter.body.status !== "complete" || watcherAfter.body.turns.length !== 3) {
+  await fail("the watcher cannot see the finished match", JSON.stringify({ status: watcherAfter.body.status, turns: watcherAfter.body.turns.length }));
+}
+console.log("OK   the watcher sees the finished match and every visit in it");
 
 // A closed room takes no more darts.
 const late = await api(`/${code}/turns`, guest.cookie, visit(3, 1));
