@@ -34,15 +34,19 @@ async function room(path, init = {}, cookie) {
   });
 }
 
-// Nothing about a room is visible without a session.
+// Nothing about a room is visible without a session — watching and reporting a
+// finish included. `/complete` was absent from this sweep until Cycle 23; a gate
+// that skips a route is a gate that cannot notice it opening.
 for (const [label, response] of [
   ["opening a room", await room("", { method: "POST", body: JSON.stringify({ mode: "x01" }) })],
   ["reading a room", await room("/OCHE42")],
+  ["watching a room", await room("/OCHE42", { method: "POST", body: JSON.stringify({ spectate: true }) })],
   ["filing a visit", await room("/OCHE42/turns", { method: "POST", body: JSON.stringify({ expectedVersion: 0, seat: 0, turn: {} }) })],
+  ["reporting a finish", await room("/OCHE42/complete", { method: "POST", body: JSON.stringify({ winnerSeat: 0 }) })],
 ]) {
   if (response.status !== 401) fail(`${label} without a session answered ${response.status}, expected 401`);
 }
-console.log("OK   rooms refuse every request with no session (401)");
+console.log("OK   rooms refuse every request with no session, watching and finishing included (401)");
 
 if (!email || !password) {
   console.log("SKIP no QA identity configured, so the paid boundary was not checked");

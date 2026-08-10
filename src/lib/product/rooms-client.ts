@@ -8,12 +8,19 @@ import { z } from "zod";
  * never live, and a plan without online play are four different things to say.
  */
 
+/*
+ * Read schemas are deliberately not `.strict()`. The server may grow additive
+ * fields, and a deployed bundle strict-parsing a response it mostly understands
+ * would refuse the whole room over a key it could have ignored — a client mid-match
+ * during a deploy would read "rooms unavailable" until a reload. Unknown keys are
+ * stripped; what is validated is what is used.
+ */
 const seatSchema = z.object({
   seat: z.number().int(),
   displayName: z.string(),
   isYou: z.boolean(),
   role: z.enum(["owner", "player", "spectator"]),
-}).strict();
+});
 
 const stateSchema = z.object({
   code: z.string(),
@@ -22,9 +29,12 @@ const stateSchema = z.object({
   status: z.enum(["pending", "active", "complete", "abandoned"]),
   version: z.number().int(),
   yourSeat: z.number().int().nullable(),
+  // Defaulted rather than required: a server one deploy behind simply has no gallery.
+  yourRole: z.enum(["owner", "player", "spectator"]).nullable().default(null),
+  watching: z.number().int().min(0).default(0),
   seats: z.array(seatSchema),
   turns: z.array(z.object({}).passthrough()),
-}).strict();
+});
 
 const seatResultSchema = z.object({ code: z.string(), seat: z.number().int() }).strict();
 
@@ -36,18 +46,20 @@ export type RoomFailure =
   | "authentication_required"
   | "room_not_found"
   | "room_full"
+  | "gallery_full"
   | "room_closed"
   | "invalid_room_request"
   | "version_conflict"
   | "wrong_seat"
+  | "spectator_read_only"
   | "rooms_unavailable";
 
 export type RoomResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly failure: RoomFailure };
 
 const FAILURES: readonly RoomFailure[] = [
   "upgrade_required", "authentication_required", "room_not_found",
-  "room_full", "room_closed", "invalid_room_request", "version_conflict",
-  "wrong_seat", "rooms_unavailable",
+  "room_full", "gallery_full", "room_closed", "invalid_room_request",
+  "version_conflict", "wrong_seat", "spectator_read_only", "rooms_unavailable",
 ];
 
 async function readFailure(response: Response): Promise<RoomFailure> {
@@ -76,6 +88,19 @@ export async function joinRoom(
   options: RoomClientOptions = {},
 ): Promise<RoomResult<z.infer<typeof seatResultSchema>>> {
   return send(seatResultSchema, `/api/rooms/${encodeURIComponent(code)}`, {}, options);
+}
+
+const spectateResultSchema = z.object({ code: z.string(), role: z.enum(["owner", "player", "spectator"]) });
+
+/**
+ * Pulls up a chair. The answer names what the caller actually is, because a seated
+ * player asking to watch keeps their seat — the room does not demote anybody.
+ */
+export async function spectateRoom(
+  code: string,
+  options: RoomClientOptions = {},
+): Promise<RoomResult<z.infer<typeof spectateResultSchema>>> {
+  return send(spectateResultSchema, `/api/rooms/${encodeURIComponent(code)}`, { spectate: true }, options);
 }
 
 export async function readRoom(

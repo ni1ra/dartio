@@ -96,6 +96,8 @@ export function RoomMatch({ code }: RoomMatchProps) {
   }, [game, pending]);
 
   const yourSeat = room?.yourSeat ?? null;
+  // A spectator is in the room with no seat; every input surface keys off this.
+  const spectating = room?.yourRole === "spectator";
   const yourTurn = game !== null && yourSeat !== null && game.status === "playing" && game.currentPlayer === yourSeat;
   const finished = game?.status === "complete";
 
@@ -163,10 +165,10 @@ export function RoomMatch({ code }: RoomMatchProps) {
   return <div className="page-frame room-match">
     <header className="match-header">
       <div>
-        <span className={finished ? "match-complete" : "match-live"}>{!finished && <i />} {finished ? "MATCH COMPLETE" : `LEG ${game.legNumber} · ROOM ${room.code}`}</span>
-        <b>{game.options.startingScore} · first to {game.options.legsToWin}</b>
+        <span className={finished ? "match-complete" : "match-live"}>{!finished && <i />} {finished ? "MATCH COMPLETE" : spectating ? `WATCHING · ROOM ${room.code}` : `LEG ${game.legNumber} · ROOM ${room.code}`}</span>
+        <b>{game.options.startingScore} · first to {game.options.legsToWin}{room.watching > 0 && <> · {room.watching} watching</>}</b>
       </div>
-      <div className="match-tools"><span>{stale ? "Reconnecting…" : yourTurn ? "Your throw" : "Waiting for your opponent"}</span></div>
+      <div className="match-tools"><span>{stale ? "Reconnecting…" : spectating ? onThrow(room, projected) : yourTurn ? "Your throw" : "Waiting for your opponent"}</span></div>
     </header>
 
     <section className="score-race" aria-label="Scoreboard">
@@ -177,14 +179,22 @@ export function RoomMatch({ code }: RoomMatchProps) {
       </div>)}
     </section>
 
+    {/* The board stays for a watcher — it is the display — but the pad is purely
+        an input surface and would be dead weight under fingers that cannot throw. */}
     <Dartboard darts={pending} disabled={!yourTurn} onDart={(value) => void throwDart(value)} />
-    <DartInputPad disabled={!yourTurn} onDart={(value) => void throwDart(value)} />
+    {!spectating && <DartInputPad disabled={!yourTurn} onDart={(value) => void throwDart(value)} />}
 
     <CommandDock className="match-dock">
-      <span aria-live="polite">{finished ? "Match complete." : message}</span>
+      <span aria-live="polite">{finished ? "Match complete." : spectating ? "You’re watching — visits land as they’re thrown." : message}</span>
       <div>{finished && <Link className="button-link" href="/friends">Back to rooms</Link>}</div>
     </CommandDock>
   </div>;
+}
+
+/** What a watcher's header says: whose throw the match is waiting on. */
+function onThrow(room: RoomStateView, projected: { currentPlayer: number }): string {
+  const seat = room.seats[projected.currentPlayer];
+  return seat ? `${seat.displayName} to throw` : "Watching";
 }
 
 /** Room settings arrive as free-form JSON; anything unrecognised falls back to a standard 501. */

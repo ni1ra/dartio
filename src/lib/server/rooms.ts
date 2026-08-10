@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { createDatabase } from "@/db/client";
 import { dartRows } from "@/db/rows";
 import { darts, matches, players, roomMembers, rooms, turns } from "@/db/schema";
@@ -32,6 +32,12 @@ export type { Database };
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 6;
 const MAX_SEATS = 8;
+/**
+ * Spectators are members without seats, so the seat cap does not bound them; this
+ * does. The number is generous on purpose — a gallery is company, not a resource —
+ * but it exists so one room cannot accrete unbounded membership rows.
+ */
+const MAX_SPECTATORS = 16;
 /** A room is a sitting, not an account. Abandoned ones stop being joinable. */
 const ROOM_TTL_HOURS = 12;
 
@@ -50,6 +56,14 @@ export interface RoomState {
   /** Increments once per accepted write. A client sends back the last one it saw. */
   readonly version: number;
   readonly yourSeat: number | null;
+  /**
+   * The caller's standing in the room: a seat's role, `spectator` for a member
+   * without a seat, `null` for an entitled stranger reading by code. `yourSeat`
+   * answers "where do I throw from"; this answers "what am I here as".
+   */
+  readonly yourRole: RoomSeat["role"] | null;
+  /** How many are watching. Spectators are counted, not named — a gallery, not a roster. */
+  readonly watching: number;
   readonly seats: readonly RoomSeat[];
   readonly turns: readonly RoomTurn[];
 }
@@ -94,6 +108,12 @@ export interface CreateRoomInput {
 export interface RoomSeatResult {
   readonly code: string;
   readonly seat: number;
+}
+
+export interface RoomSpectateResult {
+  readonly code: string;
+  /** What the caller actually is — a player asking to watch keeps their seat. */
+  readonly role: RoomSeat["role"];
 }
 
 /**
@@ -150,9 +170,16 @@ export async function joinRoom(
   }
 
   const seat = nextFreeSeat(room.seats.map((entry) => entry.seat));
+  const member = room.members.find((entry) => entry.userId === userId);
   try {
     await db.batch([
-      db.insert(roomMembers).values({ roomId: room.roomId, userId, role: "player" }),
+      // A spectator taking a seat is promoted, not re-inserted — inserting would
+      // trip the membership primary key and read as somebody else's seat race.
+      // The role guard keeps the promotion from ever rewriting an owner.
+      member
+        ? db.update(roomMembers).set({ role: "player" })
+            .where(and(eq(roomMembers.roomId, room.roomId), eq(roomMembers.userId, userId), eq(roomMembers.role, "spectator")))
+        : db.insert(roomMembers).values({ roomId: room.roomId, userId, role: "player" }),
       db.insert(players).values({ id: randomUUID(), matchId: room.matchId, userId, seat, displayName, isBot: false }),
       // A room with a second player is a match in progress, not one waiting to start.
       db.update(matches).set({ status: "active" }).where(eq(matches.id, room.matchId)),
@@ -162,6 +189,44 @@ export async function joinRoom(
     throw new RoomServiceError({ cause });
   }
   return { code: room.code, seat };
+}
+
+/**
+ * Joins a room as a watcher: a membership row and nothing else.
+ *
+ * No seat means no `players` row, which is what makes the read-only promise
+ * structural rather than policed — a spectator cannot file a visit for the same
+ * reason a stranger cannot, and never appears in anyone's match history or the
+ * statistics computed from it. Spectators are counted, not named: the players'
+ * names are on the seats, and a gallery is company rather than a roster.
+ */
+export async function spectateRoom(
+  userId: string,
+  code: string,
+  db: Database = createDatabase(),
+): Promise<RoomSpectateResult> {
+  const room = await findRoom(normalizeRoomCode(code), db);
+  // A seat outranks the gallery: a player asking to watch keeps what they hold.
+  const seated = room.seats.find((seat) => seat.userId === userId);
+  if (seated) return { code: room.code, role: seated.role };
+  const member = room.members.find((entry) => entry.userId === userId);
+  if (member) return { code: room.code, role: member.role };
+  if (room.status === "complete" || room.status === "abandoned") {
+    throw new RoomError(409, "room_closed", "This room's match has already finished");
+  }
+  if (room.members.filter((entry) => entry.role === "spectator").length >= MAX_SPECTATORS) {
+    throw new RoomError(409, "gallery_full", "This room's gallery is full");
+  }
+
+  try {
+    await db.insert(roomMembers).values({ roomId: room.roomId, userId, role: "spectator" });
+  } catch (cause) {
+    // Two taps racing each other both wanted the same thing, and one of them got it.
+    if (isUniqueViolation(cause)) return { code: room.code, role: "spectator" };
+    throw new RoomServiceError({ cause });
+  }
+  record("room.spectated", { userId });
+  return { code: room.code, role: "spectator" };
 }
 
 export interface AppendTurnInput {
@@ -187,7 +252,7 @@ export async function appendRoomTurn(
 ): Promise<{ readonly version: number }> {
   const room = await findRoom(normalizeRoomCode(code), db);
   const seated = room.seats.find((seat) => seat.userId === userId);
-  if (!seated) throw new RoomError(403, "not_a_member", "You are not in this room");
+  if (!seated) throw refusalForUnseated(room, userId);
   if (seated.seat !== input.seat) throw new RoomError(403, "wrong_seat", "You can only throw from your own seat");
   if (room.status === "complete" || room.status === "abandoned") {
     throw new RoomError(409, "room_closed", "This room's match has already finished");
@@ -266,7 +331,7 @@ export async function completeRoomMatch(
 ): Promise<{ readonly alreadyComplete: boolean }> {
   const room = await findRoom(normalizeRoomCode(code), db);
   const seated = room.seats.find((seat) => seat.userId === userId);
-  if (!seated) throw new RoomError(403, "not_a_member", "You are not in this room");
+  if (!seated) throw refusalForUnseated(room, userId);
   if (room.status === "complete") return { alreadyComplete: true };
 
   const winner = winnerSeat === null ? null : room.seats.find((seat) => seat.seat === winnerSeat);
@@ -321,13 +386,18 @@ export async function readRoom(
     throw new RoomServiceError({ cause });
   }
 
+  const yourSeat = room.seats.find((seat) => seat.userId === userId);
   return {
     code: room.code,
     mode: room.mode,
     options: room.options,
     status: room.status,
     version: room.version,
-    yourSeat: room.seats.find((seat) => seat.userId === userId)?.seat ?? null,
+    yourSeat: yourSeat?.seat ?? null,
+    // A seat's role wins over the membership row: promotion updates both, but the
+    // seat is the thing the rest of the room can see.
+    yourRole: yourSeat?.role ?? room.members.find((entry) => entry.userId === userId)?.role ?? null,
+    watching: room.members.filter((entry) => entry.role === "spectator").length,
     seats: room.seats.map((seat) => ({
       seat: seat.seat,
       displayName: seat.displayName,
@@ -358,10 +428,16 @@ interface FoundRoom {
   readonly status: RoomState["status"];
   readonly version: number;
   readonly seats: readonly { seat: number; userId: string | null; displayName: string; playerId: string; role: RoomSeat["role"] }[];
+  /**
+   * Every membership row, seated or not. `seats` reaches membership through
+   * `players`, so a spectator — a member with no seat — is invisible there;
+   * this is where the room knows who is watching and who may not throw.
+   */
+  readonly members: readonly { userId: string; role: RoomSeat["role"] }[];
 }
 
 async function findRoom(code: string, db: Database): Promise<FoundRoom> {
-  let rows: (Omit<FoundRoom, "seats"> & { seats: FoundRoom["seats"] })[];
+  let rows: (Omit<FoundRoom, "seats" | "members"> & { seats: FoundRoom["seats"]; members: FoundRoom["members"] })[];
   try {
     const result = await db.execute<(typeof rows)[number]>(sql`
       select
@@ -381,7 +457,18 @@ async function findRoom(code: string, db: Database): Promise<FoundRoom> {
             'role', coalesce(${roomMembers.role}, 'player')
           ) order by ${players.seat}) filter (where ${players.id} is not null),
           '[]'::json
-        ) as "seats"
+        ) as "seats",
+        (
+          -- A scalar subquery rather than a second join: two aggregates over two
+          -- joins would multiply rows. Inside this scope "room_members" is the
+          -- subquery's own instance, not the joined one above.
+          select coalesce(
+            json_agg(json_build_object('userId', ${roomMembers.userId}, 'role', ${roomMembers.role})),
+            '[]'::json
+          )
+          from ${roomMembers}
+          where ${roomMembers.roomId} = ${rooms.id}
+        ) as "members"
       from ${rooms}
       join ${matches} on ${matches.roomId} = ${rooms.id}
       left join ${players} on ${players.matchId} = ${matches.id}
@@ -408,5 +495,17 @@ function nextFreeSeat(taken: readonly number[]): number {
   throw new RoomError(409, "room_full", "This room has no free seat");
 }
 
+/**
+ * The honest refusal for a caller with no seat. A spectator is a member — telling
+ * them they are "not in this room" would be false; what is true is that watching
+ * carries no right to write.
+ */
+function refusalForUnseated(room: FoundRoom, userId: string): RoomError {
+  const member = room.members.find((entry) => entry.userId === userId);
+  if (member?.role === "spectator") {
+    return new RoomError(403, "spectator_read_only", "Spectators watch — take a seat to throw");
+  }
+  return new RoomError(403, "not_a_member", "You are not in this room");
+}
 
-export { MAX_SEATS, ROOM_TTL_HOURS };
+export { MAX_SEATS, MAX_SPECTATORS, ROOM_TTL_HOURS };

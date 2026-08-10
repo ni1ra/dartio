@@ -13,11 +13,14 @@ test("the join form no longer fakes a lookup", async ({ page }) => {
   await page.goto("/friends", { waitUntil: "networkidle" });
 
   const join = page.getByRole("button", { name: /join room/i });
+  const watch = page.getByRole("button", { name: /watch instead/i });
   await expect(join).toBeDisabled();
+  await expect(watch).toBeDisabled();
 
   await page.getByLabel(/room code/i).fill("OCHE42");
   // A full code is still not enough without an account, and nothing pretends to search.
   await expect(join).toBeDisabled();
+  await expect(watch).toBeDisabled();
   await expect(page.getByText(/that room isn’t live/i)).toHaveCount(0);
 });
 
@@ -34,6 +37,9 @@ test("the page claims only what is built", async ({ page }) => {
 
   const foundation = page.locator(".room-foundation");
   await expect(foundation).toContainText(/one shared record/i);
-  // Reconnect and spectators are not built, and must still be marked as planned.
-  await expect(foundation).toContainText(/planned/i);
+  // Spectators shipped in Cycle 23 and the page now says so as a fact.
+  await expect(foundation).toContainText(/live · spectators/i);
+  // Host handover has not, and must still be marked as planned — and only it.
+  await expect(foundation).toContainText(/planned · host handover/i);
+  await expect(foundation.getByText(/planned/i)).toHaveCount(1);
 });

@@ -7,6 +7,7 @@ import { RoomError, RoomServiceError, type RoomState } from "@/lib/server/rooms"
 import { handleCreateRoomRequest } from "./route";
 import { handleJoinRoomRequest, handleReadRoomRequest } from "./[code]/route";
 import { handleRoomTurnRequest } from "./[code]/turns/route";
+import { handleCompleteRoomRequest } from "./[code]/complete/route";
 
 const signedIn = async () => ({ userId: "user-1", displayName: "Lain" });
 
@@ -98,6 +99,54 @@ describe("POST /api/rooms/{code}", () => {
     expect(join).toHaveBeenCalledWith("user-1", "oche42", "Lain");
   });
 
+  it("seats a player when the request carries no body at all, the way old clients did", async () => {
+    const join = vi.fn(async () => ({ code: "OCHE42", seat: 1 }));
+    const response = await handleJoinRoomRequest(
+      new Request("https://dartio.test/api/rooms/OCHE42", { method: "POST" }),
+      "OCHE42",
+      { authorize: signedIn, join },
+    );
+    expect(response.status).toBe(200);
+    expect(join).toHaveBeenCalled();
+  });
+
+  it("admits a watcher when the body asks to spectate, and never consults join", async () => {
+    const join = vi.fn();
+    const spectate = vi.fn(async () => ({ code: "OCHE42", role: "spectator" as const }));
+    const response = await handleJoinRoomRequest(post({ spectate: true }), "oche42", { authorize: signedIn, join, spectate });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ code: "OCHE42", role: "spectator" });
+    expect(spectate).toHaveBeenCalledWith("user-1", "oche42");
+    expect(join).not.toHaveBeenCalled();
+  });
+
+  it("tells a seated player asking to watch what they already are", async () => {
+    const spectate = vi.fn(async () => ({ code: "OCHE42", role: "owner" as const }));
+    const response = await handleJoinRoomRequest(post({ spectate: true }), "OCHE42", { authorize: signedIn, spectate });
+    await expect(response.json()).resolves.toEqual({ code: "OCHE42", role: "owner" });
+  });
+
+  it("refuses a body that is neither a join nor a spectate request", async () => {
+    const join = vi.fn();
+    const spectate = vi.fn();
+    const response = await handleJoinRoomRequest(post({ spectate: "yes" }), "OCHE42", { authorize: signedIn, join, spectate });
+
+    expect(response.status).toBe(400);
+    expect(join).not.toHaveBeenCalled();
+    expect(spectate).not.toHaveBeenCalled();
+  });
+
+  it("turns away an unauthenticated watcher before reading what they asked for", async () => {
+    const spectate = vi.fn();
+    const response = await handleJoinRoomRequest(post({ spectate: true }), "OCHE42", {
+      authorize: async () => { throw new AuthError(); },
+      spectate,
+    });
+    expect(response.status).toBe(401);
+    expect(spectate).not.toHaveBeenCalled();
+  });
+
   it.each([
     [new RoomError(404, "room_not_found", "That room isn't live"), 404, "room_not_found"],
     [new RoomError(409, "room_full", "This room has no free seat"), 409, "room_full"],
@@ -111,11 +160,21 @@ describe("POST /api/rooms/{code}", () => {
     expect(response.status).toBe(status);
     await expect(response.json()).resolves.toMatchObject({ error: code });
   });
+
+  it("passes a full gallery through as its own refusal, not a full room", async () => {
+    const response = await handleJoinRoomRequest(post({ spectate: true }), "OCHE42", {
+      authorize: signedIn,
+      spectate: async () => { throw new RoomError(409, "gallery_full", "This room's gallery is full"); },
+    });
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({ error: "gallery_full" });
+  });
 });
 
 describe("GET /api/rooms/{code}", () => {
   const state: RoomState = {
     code: "OCHE42", mode: "x01", options: {}, status: "active", version: 4, yourSeat: 1,
+    yourRole: "player", watching: 1,
     seats: [{ seat: 0, displayName: "Lain", isYou: false, role: "owner" }, { seat: 1, displayName: "Player 2", isYou: true, role: "player" }],
     turns: [],
   };
@@ -165,6 +224,16 @@ describe("POST /api/rooms/{code}/turns", () => {
     expect(response.status).toBe(403);
   });
 
+  it("refuses a spectator's throw as read-only, not as a stranger's", async () => {
+    // The distinction is the honesty: a watcher IS in the room. What they lack is a seat.
+    const response = await handleRoomTurnRequest(post(VALID_VISIT, "https://dartio.test/api/rooms/OCHE42/turns"), "OCHE42", {
+      authorize: signedIn,
+      append: async () => { throw new RoomError(403, "spectator_read_only", "Spectators watch — take a seat to throw"); },
+    });
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ error: "spectator_read_only" });
+  });
+
   it("turns away an unauthenticated write before reading what it was carrying", async () => {
     const append = vi.fn();
     const response = await handleRoomTurnRequest(post({ garbage: true }, "https://dartio.test/api/rooms/OCHE42/turns"), "OCHE42", {
@@ -187,5 +256,54 @@ describe("POST /api/rooms/{code}/turns", () => {
 
     expect(response.status).toBe(400);
     expect(append).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/rooms/{code}/complete", () => {
+  it("closes the match and says it was the first report", async () => {
+    const complete = vi.fn(async () => ({ alreadyComplete: false }));
+    const response = await handleCompleteRoomRequest(post({ winnerSeat: 0 }, "https://dartio.test/api/rooms/OCHE42/complete"), "OCHE42", { authorize: signedIn, complete });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ alreadyComplete: false });
+    expect(complete).toHaveBeenCalledWith("user-1", "OCHE42", 0);
+  });
+
+  it("treats the second report of the same finish as agreement", async () => {
+    const complete = vi.fn(async () => ({ alreadyComplete: true }));
+    const response = await handleCompleteRoomRequest(post({ winnerSeat: 0 }, "https://dartio.test/api/rooms/OCHE42/complete"), "OCHE42", { authorize: signedIn, complete });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ alreadyComplete: true });
+  });
+
+  it("turns away an unauthenticated report before reading it", async () => {
+    const complete = vi.fn();
+    const response = await handleCompleteRoomRequest(post({ winnerSeat: 0 }, "https://dartio.test/api/rooms/OCHE42/complete"), "OCHE42", {
+      authorize: async () => { throw new AuthError(); },
+      complete,
+    });
+    expect(response.status).toBe(401);
+    expect(complete).not.toHaveBeenCalled();
+  });
+
+  it("refuses a spectator's report — watching a finish is not reporting one", async () => {
+    const response = await handleCompleteRoomRequest(post({ winnerSeat: 0 }, "https://dartio.test/api/rooms/OCHE42/complete"), "OCHE42", {
+      authorize: signedIn,
+      complete: async () => { throw new RoomError(403, "spectator_read_only", "Spectators watch — take a seat to throw"); },
+    });
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ error: "spectator_read_only" });
+  });
+
+  it.each([
+    ["a seat off the board", { winnerSeat: 99 }],
+    ["a missing winner field", {}],
+    ["a stowaway field", { winnerSeat: 0, confetti: true }],
+  ])("refuses %s", async (_label, body) => {
+    const complete = vi.fn();
+    const response = await handleCompleteRoomRequest(post(body, "https://dartio.test/api/rooms/OCHE42/complete"), "OCHE42", { authorize: signedIn, complete });
+    expect(response.status).toBe(400);
+    expect(complete).not.toHaveBeenCalled();
   });
 });
