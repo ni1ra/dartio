@@ -70,8 +70,12 @@ and the browser suite asserts that count.
   access-snapshot test asserting `coming_soon` updated to assert the truth.
 - [x] Local gates: typecheck 0, lint 0, test 591/591, build 0, browser 155
   passed / 4 skipped by design — all unpiped this session.
-- [ ] Preview proof: `verify:rooms:live` with the handover and close passes
-  against this PR's preview deployment.
+- [x] Preview proof: `verify:rooms:live` against this PR's preview deployment —
+  ALL ROOM CHECKS PASSED, 26 OK lines. Room S9J6EU: the room could not be taken
+  by player or spectator (403 not_the_host), the host handed it to seat 1 and
+  both memberships swapped atomically with the row's owner. Room FK8P2C: only
+  its host could close it, closing twice was agreement, and it took no more
+  visits. Trusted-domain grant added (201) and removed (200). 2026-08-11.
 - [ ] Production verified after merge: verify gates plus the rooms browser spec
   against the live deployment.
 
