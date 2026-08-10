@@ -1,93 +1,137 @@
 # Cycle 24 — Room Handoff and Lifecycle
 
-Status: active. Opened 2026-08-11 on branch `cycle-24-handoff`.
+Status: active. Opened 2026-08-11. The first candidate merged as PR #27
+(`924d22b`); the corrective slice is on `cycle-24-lifecycle-fix`. PR #27's
+production receipts are retained below, but they do not close the corrected
+implementation.
 
-Second cycle of `PHASE_3_promise_completion.md`. Completes the `/friends` promise
-— the room can change hands — and gives rooms the lifecycle they were missing:
-an end that isn't a finish, and a death that actually deletes the row.
+Second cycle of `PHASE_3_promise_completion.md`. Completes the `/friends`
+promise — the room can change hands — and gives every room mutation one terminal
+lifecycle: after close or completion, no stale join, watcher, visit, handover, or
+finish can reopen or rewrite it.
 
-## What ownership means now
+## What ownership and terminal state mean
 
 Before this cycle "owner" was a label: written at create, read nowhere,
-authorizing nothing. Now it is the authority behind the only two verbs that
-belong to one person:
+authorizing nothing. It is now canonical authority in `rooms.owner_user_id`,
+mirrored by exactly one owner membership for display.
 
-- **Handover** (`POST /api/rooms/[code]/handover`). Host-only. One batch demotes
-  the old host's membership, promotes the new one, and moves
-  `rooms.owner_user_id` with them, so the row and the memberships can never name
-  two hosts. Only a seated human can receive the room; handing it to yourself is
-  agreement, not an error. The room cannot be taken — a player or spectator
-  asking is refused `not_the_host`.
-- **Close** (`POST /api/rooms/[code]/close`). Host-only. Marks the match
-  `abandoned` — the first writer that status has ever had — names no winner, and
-  leaves `completed_at` null because the match did not complete. Distinct from
-  `/complete` on purpose: completion is seat-authorized agreement about a finish
-  both players replayed; closing is host authority over a match that never
-  finished. Closing twice is agreement. A finished match cannot be un-finished
-  into an abandonment.
+- **Handover** (`POST /api/rooms/[code]/handover`) is host-only. One
+  data-modifying statement locks the room and match, rechecks canonical authority
+  and the open status, moves `rooms.owner_user_id`, demotes the old membership,
+  and promotes the new one. Competing gifts from a stale host therefore serialize
+  to one owner rather than creating two.
+- **Close** (`POST /api/rooms/[code]/close`) is host-only and marks the match
+  `abandoned`, without a winner or `completed_at`. Close and completion contend
+  on the same match row; one terminal transition wins and the other observes
+  `room_closed`. Closing an abandoned room twice is agreement. A completed match
+  cannot be un-finished into abandonment.
+- **Every other mutation participates.** Join and spectator admission take the
+  same room/match locks before changing membership or status. A visit claims the
+  version and inserts its turn and darts in one Postgres statement, so neither a
+  close race nor a failed insert can leave `state_version` without the matching
+  turn. Completion changes only an open match. Terminal state is monotonic.
 
-## Host departure, decided
+## Host departure and expiry, decided
 
-A room outlives presence by design: closing a tab abandons nothing, the TTL
-bounds every room's life, and reconnect is the feature. So departure needs no
-event — a leaving host hands over first, or the room simply runs out its clock.
-Written down here so the absence of a "leave" endpoint reads as a decision
-rather than a gap.
+A room outlives presence by design: closing a tab abandons nothing, reconnect is
+the feature, and the twelve-hour TTL makes an expired room indistinguishable from
+a code that never existed. A leaving host hands over first, or the room runs out
+its clock. There is deliberately no unreliable tab-close event.
 
-## The sweep
+The first candidate added a lazy physical purge to `createRoom`. That purge is
+removed: it deleted real room and membership rows as a side effect of opening a
+room, without a snapshot or restore path, while this campaign explicitly forbids
+destructive database operations. Expired rows remain unreachable. Physical
+archive/purge is parked until separately authorized with a recoverable design;
+Cycle 24 does not claim it shipped.
 
-Expired rooms answered as if they never existed but their rows lived forever,
-permanently burning codes out of the unique index. `createRoom` now deletes up
-to 100 rooms expired more than 24 hours ago before opening a new one: no
-scheduler, bounded work, an inherent exit condition. Deletion cascades
-memberships; matches survive with `room_id` set null, so history is untouched.
-A failed sweep is logged and never blocks the room being opened.
+This was a confirmed hard-stop breach, not merely dormant code. A read-only
+Preview audit after removal found zero anomalies among surviving rooms, but found
+2 pending/active matches and 3 multi-user matches whose `room_id` is now null.
+The latter shape cannot be produced by local match filing, so at least three old
+Preview room rows were physically purged and their memberships cascaded while
+the candidate was exercised. No repair or further deletion was attempted. The
+same count-only Production audit found zero orphan signatures and zero
+surviving-room anomalies. Available evidence therefore confines confirmed purge
+impact to Preview, though absence of a pre-purge snapshot means current counts
+cannot prove every historical side effect that left no signature.
+
+## History remains about filed matches
+
+Room rows exist from creation, including active and host-abandoned matches whose
+`completed_at` is null. Both history and statistics now require a non-null
+`completed_at`, so those lifecycle rows never appear at the top as 1970 entries
+or change a player's numbers. Locally filed abandoned matches still carry a
+completion timestamp and retain their existing history semantics.
 
 ## The flag, retired
 
-`PRODUCT_AVAILABILITY.onlineMultiplayer` is `implemented`. It was held at
-`coming_soon` from Cycle 15 deliberately — the map has no word for half a
-feature. Create, join, play, reconnect, spectate, handover, and close are all
-live, so the word is now simply true. `/friends` carries zero "Planned" chips
-and the browser suite asserts that count.
+`PRODUCT_AVAILABILITY.onlineMultiplayer` is `implemented`. Create, join, play,
+reconnect, spectate, handover, and close are all live, so `/friends` carries zero
+"Planned" chips and the browser suite asserts that count.
 
 ## Queue
 
-- [x] `handOverRoom` and `closeRoom` in `src/lib/server/rooms.ts`, with the
-  refusal, idempotency, and atomicity cases in `rooms.test.ts`. Evidence:
-  591/591 unit tests this session (was 571; +20).
-- [x] Lazy expiry sweep in `createRoom`, bounded and failure-tolerant, with
-  tests proving create survives a failed sweep.
-- [x] Two new routes with the DI pattern and full route-test blocks, authorize
-  before body-read preserved.
-- [x] Client verbs `handOverRoom`/`closeRoom`, failure codes `not_the_host` and
-  `unknown_seat` wired through to `/friends` copy.
-- [x] Lobby host controls: Make host per seat, Close room; closed-room states on
-  the lobby and the match surface, inputs withdrawn when the room is closed.
-- [x] `verify:rooms:live` is a pnpm script; the no-session sweep in
-  `verify:rooms` covers handover and close.
-- [x] Flag retired; the stale comment in `friends-room.tsx` rewritten; the one
-  access-snapshot test asserting `coming_soon` updated to assert the truth.
-- [x] Local gates: typecheck 0, lint 0, test 591/591, build 0, browser 155
-  passed / 4 skipped by design — all unpiped this session.
-- [x] Preview proof: `verify:rooms:live` against this PR's preview deployment —
-  ALL ROOM CHECKS PASSED, 26 OK lines. Room S9J6EU: the room could not be taken
-  by player or spectator (403 not_the_host), the host handed it to seat 1 and
-  both memberships swapped atomically with the row's owner. Room FK8P2C: only
-  its host could close it, closing twice was agreement, and it took no more
-  visits. Trusted-domain grant added (201) and removed (200). 2026-08-11.
-- [ ] Production verified after merge: verify gates plus the rooms browser spec
-  against the live deployment.
+- [x] Host-only handover and close routes, client verbs, refusal codes, and lobby
+  controls from the first candidate.
+- [x] Canonical, serialized handover; terminal close/complete arbitration; atomic
+  visit append; and locked join/spectator admission. Focused evidence this session:
+  `rooms.test.ts` and `match-history.test.ts`, 61/61; `pnpm typecheck`, exit 0.
+- [x] Closed state withdraws match inputs and no longer reports a finish; host
+  controls disable while a mutation is in flight; the fourth seat-list action has
+  deliberate desktop and narrow layout rules. Canonical close also wins the UI
+  when the stored visits already replay to a finish: no active seat, completion
+  label, or scoring pad survives.
+- [x] History and statistics exclude rows with null `completed_at`, with rendered
+  SQL assertions in `match-history.test.ts`.
+- [x] Read-only integrity probe reports owner, version/turn, terminal-field, and
+  historical orphan-signature counts without row ids or account data. Preview:
+  live anomalies all 0; historical signatures open=2, multi-user=3.
+- [x] `verify:rooms:live` expanded to exercise the lifecycle SQL once deployed:
+  competing handovers, canonical owner agreement, close versus completion,
+  post-close refusal, and history/statistics exclusion.
+- [x] Full local gates on the corrective branch: typecheck 0, lint 0, test
+  600/600, build 0, browser 161 passed / 4 skipped by design; all unpiped.
+- [ ] Fresh Preview deployment and `verify:rooms:live` against the corrective
+  revision. PR #27's Preview proof cannot cover changed SQL.
+- [ ] Corrective PR CI green, merged, then all three production verify gates and
+  touched browser surfaces green against `https://dartioopus46.vercel.app`.
+- [ ] Physical expiry archive/purge — parked because the active goal forbids
+  destructive database operations; no automatic `DELETE` remains.
 
-## Found for later, not fixed here
+## Superseded-candidate receipts retained for audit
 
-Neither `queryMatches` nor `readStatMatches` filters on `matches.status`, and
-`order by completed_at desc` is NULLS FIRST in Postgres — an active or abandoned
-room match surfaces in history and sorts to the top. Queued into Cycle 28, which
-owns that data layer, alongside the missing `completed_at` index.
+- 2026-08-11 · PR #27 candidate: typecheck 0, lint 0, test 591/591 across 44
+  files, build 0, browser 155 passed / 4 skipped by design.
+- 2026-08-11 · PR #27 Preview: `verify:rooms:live` reported all checks passed
+  with 26 OK lines after the trusted-domain grant was added and removed.
+- 2026-08-11 · PR #27 merged as `924d22b`; production auth, history, rooms, and
+  rooms-browser probes exited 0. These receipts prove that deployed candidate,
+  not the later lifecycle correction.
+- 2026-08-11 · Post-merge main CI run `31439841596` failed while fetching the
+  external Manrope font and resolving Turbopack's internal Google-font module.
+  PR #27's build had passed minutes earlier. The same failure reproduced while
+  starting the corrective browser proof, so this was a release blocker rather
+  than a harmless transient.
 
-## Receipts
+## Corrective receipts
 
-- 2026-08-11 · `pnpm typecheck` 0, `pnpm lint` 0, `pnpm test` 591/591 across 44
-  files, `pnpm build` 0, `pnpm test:browser` 155 passed / 4 skipped by design —
-  all unpiped, exit codes read, this session.
+- 2026-08-11 · `node --check scripts/verify-rooms-live.mjs`, exit 0;
+  `node --check scripts/verify-room-integrity.mjs`, exit 0;
+  `pnpm typecheck`, exit 0; focused Vitest run, 61/61 across two files, exit 0.
+- 2026-08-11 · Read-only Preview integrity audit: owner=0, version=0,
+  abandoned_fields=0, complete_fields=0, open_fields=0; historical orphan
+  signatures open=2, multi_user=3; exit 0. Counts only; no ids or secrets printed.
+- 2026-08-11 · Read-only Production integrity audit through a refreshed Neon
+  control-plane URI: owner=0, version=0, all terminal-field counts=0; historical
+  orphan signatures open=0, multi_user=0; exit 0. URI, ids, and secrets were not
+  printed.
+- 2026-08-11 · Google-backed `next/font` was replaced by pinned Fontsource 5.3.0
+  packages for the same Manrope, Syne, and DM Mono families. The final standalone
+  `pnpm build` compiled in 8.9 seconds, exit 0, without a Google request.
+- 2026-08-11 · Final corrective local gates: `pnpm typecheck` 0, `pnpm lint` 0,
+  `pnpm test` 600/600 across 44 files, `pnpm build` 0; all unpiped. The authenticated
+  room matrix passed 15/15 in 141.7 seconds at all three viewports, including a
+  close-after-finishing-visit state. The full browser matrix passed 161 with 4
+  design skips across 165 cases in 199 seconds, exit 0.

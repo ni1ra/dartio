@@ -148,14 +148,21 @@ export function FriendsRoom() {
 
 function RoomLobby({ room, lost, onLeave, onChanged }: { room: RoomStateView; lost: boolean; onLeave: () => void; onChanged: () => void }) {
   const [failure, setFailure] = useState<RoomFailure | null>(null);
+  const [acting, setActing] = useState(false);
   const hosting = room.yourRole === "owner";
 
   /** Host verbs. The buttons only render for the host, so a refusal here is news. */
   async function act(action: () => ReturnType<typeof closeRoom> | ReturnType<typeof handOverRoom>) {
+    if (acting) return;
+    setActing(true);
     setFailure(null);
-    const result = await action();
-    if (!result.ok) { setFailure(result.failure); return; }
-    onChanged();
+    try {
+      const result = await action();
+      if (!result.ok) { setFailure(result.failure); return; }
+      onChanged();
+    } finally {
+      setActing(false);
+    }
   }
 
   return <Surface className="room-lobby">
@@ -166,7 +173,7 @@ function RoomLobby({ room, lost, onLeave, onChanged }: { room: RoomStateView; lo
       </div>
       <div className="room-lobby-actions">
         {hosting && room.status !== "complete" && room.status !== "abandoned" &&
-          <Button variant="ghost" onClick={() => void act(() => closeRoom(room.code))}>Close room</Button>}
+          <Button variant="ghost" disabled={acting} onClick={() => void act(() => closeRoom(room.code))}>Close room</Button>}
         <Button variant="secondary" onClick={onLeave}>Leave lobby</Button>
       </div>
     </div>
@@ -179,7 +186,7 @@ function RoomLobby({ room, lost, onLeave, onChanged }: { room: RoomStateView; lo
         <b>{seat.displayName}{seat.isYou && <em> · you</em>}</b>
         <small>{seat.role}</small>
         {hosting && !seat.isYou && room.status !== "complete" && room.status !== "abandoned" &&
-          <Button variant="ghost" size="sm" onClick={() => void act(() => handOverRoom(room.code, seat.seat))}>Make host</Button>}
+          <Button variant="ghost" size="sm" disabled={acting} onClick={() => void act(() => handOverRoom(room.code, seat.seat))}>Make host</Button>}
       </li>)}
     </ol>
     {failure && <p className="form-error" role="alert">{FAILURE_COPY[failure]}</p>}
