@@ -74,9 +74,12 @@ design:
   stays as the display, no completion reporting from a chair.
 - [x] Local browser suite green at all three viewports. Evidence: 155 passed,
   4 skipped by design, exit 0, unpiped, this session.
-- [ ] Preview proof: extended `verify-rooms-live.mjs` — third identity pulls up a
-  chair, is counted, is refused writes exactly as `spectator_read_only`, sees the
-  finished match. Flips on the script's output against a preview deployment.
+- [x] Preview proof: extended `verify-rooms-live.mjs` — third identity pulled up
+  a chair in room H4PN58, was counted (`watching: 1`, `yourSeat: null`,
+  `yourRole: spectator`), was refused a visit and the finish as
+  `spectator_read_only` with the visit refusal proven to precede version
+  arithmetic, and saw the finished match with all three visits. Evidence below,
+  2026-08-11.
 - [ ] Production verified after merge: `verify:auth`, `verify:history`,
   `verify:rooms` (now covering watch and complete in the no-session sweep), and
   the browser suite against the live deployment.
@@ -90,3 +93,8 @@ Recorded as they land; nothing above flips without one.
   cycle), all run unpiped in this session.
 - 2026-08-11 · `pnpm build` exit 0. `pnpm test:browser` 155 passed, 4 skipped by
   design, exit 0, at 390×844 / 834×1112 / 1440×1000 against the local build.
+- 2026-08-11 · `verify-rooms-live.mjs` against the PR's preview deployment:
+  ALL ROOM CHECKS PASSED — 22 OK lines including the five spectator checks, three
+  throwaway identities granted and removed, room H4PN58. The preview origin was
+  added to the preview branch's Neon Auth trusted domains for the run (HTTP 201)
+  and removed after it (HTTP 200), the Cycle 11 dance.
