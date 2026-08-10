@@ -52,6 +52,8 @@ export type RoomFailure =
   | "version_conflict"
   | "wrong_seat"
   | "spectator_read_only"
+  | "not_the_host"
+  | "unknown_seat"
   | "rooms_unavailable";
 
 export type RoomResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly failure: RoomFailure };
@@ -59,7 +61,8 @@ export type RoomResult<T> = { readonly ok: true; readonly value: T } | { readonl
 const FAILURES: readonly RoomFailure[] = [
   "upgrade_required", "authentication_required", "room_not_found",
   "room_full", "gallery_full", "room_closed", "invalid_room_request",
-  "version_conflict", "wrong_seat", "spectator_read_only", "rooms_unavailable",
+  "version_conflict", "wrong_seat", "spectator_read_only", "not_the_host",
+  "unknown_seat", "rooms_unavailable",
 ];
 
 async function readFailure(response: Response): Promise<RoomFailure> {
@@ -181,4 +184,24 @@ export async function completeRoomMatch(
   options: RoomClientOptions = {},
 ): Promise<RoomResult<z.infer<typeof completeSchema>>> {
   return send(completeSchema, `/api/rooms/${encodeURIComponent(code)}/complete`, { winnerSeat }, options);
+}
+
+const handOverSchema = z.object({ code: z.string(), hostSeat: z.number().int() });
+const closeSchema = z.object({ alreadyClosed: z.boolean() });
+
+/** Hands the room to another seated player. The host's verb alone. */
+export async function handOverRoom(
+  code: string,
+  toSeat: number,
+  options: RoomClientOptions = {},
+): Promise<RoomResult<z.infer<typeof handOverSchema>>> {
+  return send(handOverSchema, `/api/rooms/${encodeURIComponent(code)}/handover`, { toSeat }, options);
+}
+
+/** Closes the room without a finish. Also the host's alone. */
+export async function closeRoom(
+  code: string,
+  options: RoomClientOptions = {},
+): Promise<RoomResult<z.infer<typeof closeSchema>>> {
+  return send(closeSchema, `/api/rooms/${encodeURIComponent(code)}/close`, {}, options);
 }

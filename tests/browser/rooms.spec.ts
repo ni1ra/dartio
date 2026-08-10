@@ -37,9 +37,9 @@ test("the page claims only what is built", async ({ page }) => {
 
   const foundation = page.locator(".room-foundation");
   await expect(foundation).toContainText(/one shared record/i);
-  // Spectators shipped in Cycle 23 and the page now says so as a fact.
+  // Spectators shipped in Cycle 23, handover and close in Cycle 24. The rooms
+  // promise is complete: every chip is a fact and nothing is "planned" any more.
   await expect(foundation).toContainText(/live · spectators/i);
-  // Host handover has not, and must still be marked as planned — and only it.
-  await expect(foundation).toContainText(/planned · host handover/i);
-  await expect(foundation.getByText(/planned/i)).toHaveCount(1);
+  await expect(foundation).toContainText(/live · the host can hand the room over/i);
+  await expect(foundation.getByText(/planned/i)).toHaveCount(0);
 });

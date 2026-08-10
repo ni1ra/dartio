@@ -19,7 +19,8 @@
     "test:browser:install": "playwright install chromium",
     "verify:auth": "node scripts/verify-production-auth.mjs",
     "verify:history": "node --env-file=.env.local scripts/verify-history.mjs",
-    "verify:rooms": "node --env-file=.env.local scripts/verify-rooms.mjs"
+    "verify:rooms": "node --env-file=.env.local scripts/verify-rooms.mjs",
+    "verify:rooms:live": "node scripts/verify-rooms-live.mjs"
   },
   "dependencies": {
     "@better-auth/api-key": "1.6.13",

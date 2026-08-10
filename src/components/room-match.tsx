@@ -98,7 +98,10 @@ export function RoomMatch({ code }: RoomMatchProps) {
   const yourSeat = room?.yourSeat ?? null;
   // A spectator is in the room with no seat; every input surface keys off this.
   const spectating = room?.yourRole === "spectator";
-  const yourTurn = game !== null && yourSeat !== null && game.status === "playing" && game.currentPlayer === yourSeat;
+  // A closed room takes no more darts even though the replayed game still says
+  // "playing" — the server would refuse the visit; the inputs must not offer it.
+  const closed = room?.status === "abandoned";
+  const yourTurn = game !== null && yourSeat !== null && !closed && game.status === "playing" && game.currentPlayer === yourSeat;
   const finished = game?.status === "complete";
 
   // Whoever is in the room reports the finish; the server treats the second report
@@ -165,10 +168,10 @@ export function RoomMatch({ code }: RoomMatchProps) {
   return <div className="page-frame room-match">
     <header className="match-header">
       <div>
-        <span className={finished ? "match-complete" : "match-live"}>{!finished && <i />} {finished ? "MATCH COMPLETE" : spectating ? `WATCHING · ROOM ${room.code}` : `LEG ${game.legNumber} · ROOM ${room.code}`}</span>
+        <span className={finished || closed ? "match-complete" : "match-live"}>{!finished && !closed && <i />} {finished ? "MATCH COMPLETE" : closed ? `ROOM CLOSED · ${room.code}` : spectating ? `WATCHING · ROOM ${room.code}` : `LEG ${game.legNumber} · ROOM ${room.code}`}</span>
         <b>{game.options.startingScore} · first to {game.options.legsToWin}{room.watching > 0 && <> · {room.watching} watching</>}</b>
       </div>
-      <div className="match-tools"><span>{stale ? "Reconnecting…" : spectating ? onThrow(room, projected) : yourTurn ? "Your throw" : "Waiting for your opponent"}</span></div>
+      <div className="match-tools"><span>{stale ? "Reconnecting…" : closed ? "The host closed this room" : spectating ? onThrow(room, projected) : yourTurn ? "Your throw" : "Waiting for your opponent"}</span></div>
     </header>
 
     <section className="score-race" aria-label="Scoreboard">
@@ -185,8 +188,8 @@ export function RoomMatch({ code }: RoomMatchProps) {
     {!spectating && <DartInputPad disabled={!yourTurn} onDart={(value) => void throwDart(value)} />}
 
     <CommandDock className="match-dock">
-      <span aria-live="polite">{finished ? "Match complete." : spectating ? "You’re watching — visits land as they’re thrown." : message}</span>
-      <div>{finished && <Link className="button-link" href="/friends">Back to rooms</Link>}</div>
+      <span aria-live="polite">{finished ? "Match complete." : closed ? "The host closed this room. Nothing more will be thrown." : spectating ? "You’re watching — visits land as they’re thrown." : message}</span>
+      <div>{(finished || closed) && <Link className="button-link" href="/friends">Back to rooms</Link>}</div>
     </CommandDock>
   </div>;
 }

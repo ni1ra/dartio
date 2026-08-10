@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Surface, TextField } from "navi-ui";
 import { hasAccessEntitlement } from "@/lib/product/access-contract";
-import { createRoom, joinRoom, readRoom, spectateRoom, type RoomFailure, type RoomStateView } from "@/lib/product/rooms-client";
+import { closeRoom, createRoom, handOverRoom, joinRoom, readRoom, spectateRoom, type RoomFailure, type RoomStateView } from "@/lib/product/rooms-client";
 import { useAccess } from "./access-provider";
 
 /**
@@ -34,6 +34,8 @@ const FAILURE_COPY: Record<RoomFailure, string> = {
   version_conflict: "Somebody threw first. Catching up.",
   wrong_seat: "That seat isn’t yours.",
   spectator_read_only: "You’re watching this one — take a seat to throw.",
+  not_the_host: "Only the host can do that.",
+  unknown_seat: "That seat has nobody to host from.",
   rooms_unavailable: "Rooms are unreachable right now. Nothing was lost.",
 };
 
@@ -47,10 +49,9 @@ export function FriendsRoom() {
   const failures = useRef(0);
 
   /*
-   * Gated on the entitlement alone, not on PRODUCT_AVAILABILITY. That map still
-   * reads `onlineMultiplayer: "coming_soon"` and stays that way until a room can be
-   * played in — opening and joining one works today, and the map has no word for
-   * half a feature. The copy below carries that distinction instead.
+   * Gated on the entitlement alone. PRODUCT_AVAILABILITY reads `implemented` as of
+   * Cycle 24, but availability describes the product, not this player — the only
+   * question this page asks is whether their plan carries online play.
    */
   const entitled = access.status === "ready" && hasAccessEntitlement(access.snapshot, "online_multiplayer");
   const joined = room?.code ?? null;
@@ -111,7 +112,7 @@ export function FriendsRoom() {
       <p>Open a room, send one short code, and everybody sits at the same table. The room keeps one shared record of the match, in one order, so two phones can never disagree about what was thrown.</p>
     </header>
 
-    {room ? <RoomLobby room={room} lost={lost} onLeave={() => { setRoom(null); setLost(false); failures.current = 0; }} />
+    {room ? <RoomLobby room={room} lost={lost} onLeave={() => { setRoom(null); setLost(false); failures.current = 0; }} onChanged={() => { const controller = new AbortController(); void refresh(room.code, controller.signal); }} />
       : <div className="friends-actions">
         <Surface className="create-room">
           <span className="giant-number">01</span>
@@ -140,19 +141,34 @@ export function FriendsRoom() {
       <span>Live · a seat is yours and nobody can throw from it</span>
       <span>Live · rejoin from any screen and the match rebuilds itself</span>
       <span>Live · spectators watch every visit as it lands</span>
-      <span>Planned · host handover</span>
+      <span>Live · the host can hand the room over or close it</span>
     </div>
   </div>;
 }
 
-function RoomLobby({ room, lost, onLeave }: { room: RoomStateView; lost: boolean; onLeave: () => void }) {
+function RoomLobby({ room, lost, onLeave, onChanged }: { room: RoomStateView; lost: boolean; onLeave: () => void; onChanged: () => void }) {
+  const [failure, setFailure] = useState<RoomFailure | null>(null);
+  const hosting = room.yourRole === "owner";
+
+  /** Host verbs. The buttons only render for the host, so a refusal here is news. */
+  async function act(action: () => ReturnType<typeof closeRoom> | ReturnType<typeof handOverRoom>) {
+    setFailure(null);
+    const result = await action();
+    if (!result.ok) { setFailure(result.failure); return; }
+    onChanged();
+  }
+
   return <Surface className="room-lobby">
     <div className="room-lobby-head">
       <div>
         <span className="account-state-code">ROOM CODE</span>
         <strong className="room-code">{room.code}</strong>
       </div>
-      <Button variant="secondary" onClick={onLeave}>Leave lobby</Button>
+      <div className="room-lobby-actions">
+        {hosting && room.status !== "complete" && room.status !== "abandoned" &&
+          <Button variant="ghost" onClick={() => void act(() => closeRoom(room.code))}>Close room</Button>}
+        <Button variant="secondary" onClick={onLeave}>Leave lobby</Button>
+      </div>
     </div>
     <p>{room.yourRole === "spectator"
       ? "You’re watching. The seats are the players’ — every visit they throw lands here as well."
@@ -162,8 +178,12 @@ function RoomLobby({ room, lost, onLeave }: { room: RoomStateView; lost: boolean
         <span className="room-seat-index">{String(seat.seat + 1).padStart(2, "0")}</span>
         <b>{seat.displayName}{seat.isYou && <em> · you</em>}</b>
         <small>{seat.role}</small>
+        {hosting && !seat.isYou && room.status !== "complete" && room.status !== "abandoned" &&
+          <Button variant="ghost" size="sm" onClick={() => void act(() => handOverRoom(room.code, seat.seat))}>Make host</Button>}
       </li>)}
     </ol>
+    {failure && <p className="form-error" role="alert">{FAILURE_COPY[failure]}</p>}
+    {room.status === "abandoned" && <p className="room-lobby-note">The host closed this room. Nothing more will be thrown in it.</p>}
     {room.watching > 0 && <p className="room-lobby-note">{room.watching === 1 ? "One chair pulled up to watch." : `${room.watching} chairs pulled up to watch.`}</p>}
     {room.seats.length > 1
       ? <Link className="button-link button-link-lg" href={`/play/match?room=${room.code}`}>{room.yourRole === "spectator" ? "Watch the match" : "Go to the oche"}</Link>

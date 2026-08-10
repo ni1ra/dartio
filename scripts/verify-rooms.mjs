@@ -43,6 +43,8 @@ for (const [label, response] of [
   ["watching a room", await room("/OCHE42", { method: "POST", body: JSON.stringify({ spectate: true }) })],
   ["filing a visit", await room("/OCHE42/turns", { method: "POST", body: JSON.stringify({ expectedVersion: 0, seat: 0, turn: {} }) })],
   ["reporting a finish", await room("/OCHE42/complete", { method: "POST", body: JSON.stringify({ winnerSeat: 0 }) })],
+  ["handing the room over", await room("/OCHE42/handover", { method: "POST", body: JSON.stringify({ toSeat: 1 }) })],
+  ["closing the room", await room("/OCHE42/close", { method: "POST", body: JSON.stringify({}) })],
 ]) {
   if (response.status !== 401) fail(`${label} without a session answered ${response.status}, expected 401`);
 }
