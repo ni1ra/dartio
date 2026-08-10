@@ -27,12 +27,15 @@ The full plan and its execution contract were approved on 2026-08-11.
 
 ## Queue
 
-- [ ] **Cycle 23 — Room spectators.** A third account joins a live room by code as
+- [x] **Cycle 23 — Room spectators.** A third account joins a live room by code as
   a read-only seat: a membership row with no `players` row, so the read-only
   promise is structural — no seat, no write, no appearance in anyone's history.
   Watching costs `online_multiplayer`, the same as sitting. Spectators are
   counted, not named. `/friends` gains "Watch instead" and its promise chip
-  splits: spectators Live, handover still Planned.
+  splits: spectators Live, handover still Planned. Closed on production
+  evidence 2026-08-11 — PR #26, live three-identity proof on preview, all
+  verify gates and the rooms browser spec green against production after
+  merge. See `CYCLE_23_spectators.md`.
 - [ ] **Cycle 24 — Room handoff and lifecycle.** Deliberate handover, host-departure
   semantics, an expiry sweep for rooms that today outlive their own deadline as
   rows, `verify-rooms-live` as a pnpm script, and the deliberately held
