@@ -156,6 +156,29 @@ if (watcherThrow.status !== 403 || watcherThrow.body.error !== "spectator_read_o
 }
 console.log("OK   a spectator's visit is refused as read-only, before any version check (403 spectator_read_only)");
 
+// The room changes hands mid-match. Only the host can hand it over, and the
+// transfer moves the label and the row's owner together.
+const guestGrab = await api(`/${code}/handover`, guest.cookie, { method: "POST", body: JSON.stringify({ toSeat: 1 }) });
+if (guestGrab.status !== 403 || guestGrab.body.error !== "not_the_host") {
+  await fail(`a player taking the room returned ${guestGrab.status}, expected 403 not_the_host`, JSON.stringify(guestGrab.body));
+}
+const watcherGrab = await api(`/${code}/handover`, watcher.cookie, { method: "POST", body: JSON.stringify({ toSeat: 1 }) });
+if (watcherGrab.status !== 403 || watcherGrab.body.error !== "not_the_host") {
+  await fail(`a spectator taking the room returned ${watcherGrab.status}, expected 403 not_the_host`, JSON.stringify(watcherGrab.body));
+}
+console.log("OK   the room cannot be taken, only given (403 not_the_host for player and spectator)");
+
+const handed = await api(`/${code}/handover`, host.cookie, { method: "POST", body: JSON.stringify({ toSeat: 1 }) });
+if (handed.status !== 200 || handed.body.hostSeat !== 1) {
+  await fail(`handing the room over returned ${handed.status}`, JSON.stringify(handed.body));
+}
+const rolesAfter = await api(`/${code}?since=0`, guest.cookie);
+const seatRoles = rolesAfter.body.seats.map((seat) => seat.role).join(",");
+if (rolesAfter.body.yourRole !== "owner" || seatRoles !== "player,owner") {
+  await fail("the handover did not swap the roles", JSON.stringify({ yourRole: rolesAfter.body.yourRole, seatRoles }));
+}
+console.log("OK   host handed the room to seat 1, and both memberships swapped atomically");
+
 const second = await api(`/${code}/turns`, guest.cookie, visit(1, 1));
 if (second.status !== 201) await fail(`the guest's own visit returned ${second.status}`, JSON.stringify(second.body));
 console.log(`OK   guest filed their own visit after catching up, room at version ${second.body.version}`);
@@ -219,6 +242,33 @@ if (late.status !== 409 || late.body.error !== "room_closed") {
   await fail(`a visit filed after the finish returned ${late.status}, expected 409 room_closed`, JSON.stringify(late.body));
 }
 console.log("OK   a finished room takes no more visits (409 room_closed)");
+
+// A second room proves the host's other verb: closing without a finish.
+const second_room = await api("", guest.cookie, { method: "POST", body: JSON.stringify({ mode: "x01", options: { startingScore: 301 } }) });
+if (second_room.status !== 201) await fail(`opening the second room returned ${second_room.status}`, JSON.stringify(second_room.body));
+const code2 = second_room.body.code;
+
+const strangerClose = await api(`/${code2}/close`, host.cookie, { method: "POST", body: "{}" });
+if (strangerClose.status !== 403 || strangerClose.body.error !== "not_the_host") {
+  await fail(`a non-host closing the room returned ${strangerClose.status}, expected 403 not_the_host`, JSON.stringify(strangerClose.body));
+}
+const closedRoom = await api(`/${code2}/close`, guest.cookie, { method: "POST", body: "{}" });
+if (closedRoom.status !== 200 || closedRoom.body.alreadyClosed !== false) {
+  await fail(`the host closing the room returned ${closedRoom.status}`, JSON.stringify(closedRoom.body));
+}
+const closedAgain = await api(`/${code2}/close`, guest.cookie, { method: "POST", body: "{}" });
+if (closedAgain.status !== 200 || closedAgain.body.alreadyClosed !== true) {
+  await fail(`closing twice returned ${closedAgain.status}, expected agreement`, JSON.stringify(closedAgain.body));
+}
+const closedVisit = await api(`/${code2}/turns`, guest.cookie, visit(0, 0));
+if (closedVisit.status !== 409 || closedVisit.body.error !== "room_closed") {
+  await fail(`a visit into a closed room returned ${closedVisit.status}, expected 409 room_closed`, JSON.stringify(closedVisit.body));
+}
+const closedState = await api(`/${code2}?since=0`, guest.cookie);
+if (closedState.body.status !== "abandoned") {
+  await fail(`the closed room reads ${closedState.body.status}, expected abandoned`);
+}
+console.log(`OK   room ${code2}: only its host could close it, closing twice is agreement, and it takes no more visits`);
 
 await cleanup();
 console.log("\nALL ROOM CHECKS PASSED");

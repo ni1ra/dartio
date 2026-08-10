@@ -8,6 +8,8 @@ import { handleCreateRoomRequest } from "./route";
 import { handleJoinRoomRequest, handleReadRoomRequest } from "./[code]/route";
 import { handleRoomTurnRequest } from "./[code]/turns/route";
 import { handleCompleteRoomRequest } from "./[code]/complete/route";
+import { handleHandOverRoomRequest } from "./[code]/handover/route";
+import { handleCloseRoomRequest } from "./[code]/close/route";
 
 const signedIn = async () => ({ userId: "user-1", displayName: "Lain" });
 
@@ -305,5 +307,76 @@ describe("POST /api/rooms/{code}/complete", () => {
     const response = await handleCompleteRoomRequest(post(body, "https://dartio.test/api/rooms/OCHE42/complete"), "OCHE42", { authorize: signedIn, complete });
     expect(response.status).toBe(400);
     expect(complete).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/rooms/{code}/handover", () => {
+  it("hands the room over and answers with the new host's seat", async () => {
+    const handOver = vi.fn(async () => ({ code: "OCHE42", hostSeat: 1 }));
+    const response = await handleHandOverRoomRequest(post({ toSeat: 1 }, "https://dartio.test/api/rooms/OCHE42/handover"), "OCHE42", { authorize: signedIn, handOver });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ code: "OCHE42", hostSeat: 1 });
+    expect(handOver).toHaveBeenCalledWith("user-1", "OCHE42", 1);
+  });
+
+  it("passes the host-only refusal through", async () => {
+    const response = await handleHandOverRoomRequest(post({ toSeat: 0 }, "https://dartio.test/api/rooms/OCHE42/handover"), "OCHE42", {
+      authorize: signedIn,
+      handOver: async () => { throw new RoomError(403, "not_the_host", "Only the host hands the room over"); },
+    });
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ error: "not_the_host" });
+  });
+
+  it("turns away an unauthenticated caller before reading the body", async () => {
+    const handOver = vi.fn();
+    const response = await handleHandOverRoomRequest(post({ garbage: true }, "https://dartio.test/api/rooms/OCHE42/handover"), "OCHE42", {
+      authorize: async () => { throw new AuthError(); },
+      handOver,
+    });
+    expect(response.status).toBe(401);
+    expect(handOver).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a seat off the board", { toSeat: 99 }],
+    ["a missing seat", {}],
+    ["a stowaway field", { toSeat: 1, alsoTheKeys: true }],
+  ])("refuses %s", async (_label, body) => {
+    const handOver = vi.fn();
+    const response = await handleHandOverRoomRequest(post(body, "https://dartio.test/api/rooms/OCHE42/handover"), "OCHE42", { authorize: signedIn, handOver });
+    expect(response.status).toBe(400);
+    expect(handOver).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/rooms/{code}/close", () => {
+  it("closes the room and says whether it was already closed", async () => {
+    const close = vi.fn(async () => ({ alreadyClosed: false }));
+    const response = await handleCloseRoomRequest(post({}, "https://dartio.test/api/rooms/OCHE42/close"), "OCHE42", { authorize: signedIn, close });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ alreadyClosed: false });
+    expect(close).toHaveBeenCalledWith("user-1", "OCHE42");
+  });
+
+  it("passes the host-only refusal through", async () => {
+    const response = await handleCloseRoomRequest(post({}, "https://dartio.test/api/rooms/OCHE42/close"), "OCHE42", {
+      authorize: signedIn,
+      close: async () => { throw new RoomError(403, "not_the_host", "Only the host closes the room"); },
+    });
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ error: "not_the_host" });
+  });
+
+  it("turns away an unauthenticated caller", async () => {
+    const close = vi.fn();
+    const response = await handleCloseRoomRequest(post({}, "https://dartio.test/api/rooms/OCHE42/close"), "OCHE42", {
+      authorize: async () => { throw new AuthError(); },
+      close,
+    });
+    expect(response.status).toBe(401);
+    expect(close).not.toHaveBeenCalled();
   });
 });

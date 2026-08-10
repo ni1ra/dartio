@@ -1,6 +1,7 @@
 # Cycle 23 — Room Spectators
 
-Status: active. Opened 2026-08-11 on branch `cycle-23-spectators`.
+Status: closed 2026-08-11 on production evidence. Opened 2026-08-11 on branch
+`cycle-23-spectators`; merged as PR #26, `b51a879`.
 
 The first cycle of `PHASE_3_promise_completion.md`. `/friends` has carried
 "Planned · spectators and host handover" since Cycle 15 split both out of room
@@ -80,9 +81,12 @@ design:
   `spectator_read_only` with the visit refusal proven to precede version
   arithmetic, and saw the finished match with all three visits. Evidence below,
   2026-08-11.
-- [ ] Production verified after merge: `verify:auth`, `verify:history`,
-  `verify:rooms` (now covering watch and complete in the no-session sweep), and
-  the browser suite against the live deployment.
+- [x] Production verified after merge: `verify:auth` OK, `verify:history` OK
+  (match filed and read back, deep stats withheld from Free), `verify:rooms` OK
+  with the no-session sweep now covering watch and complete, and the rooms
+  browser spec 9/9 at all three viewports — all against
+  `https://dartioopus46.vercel.app` after merge `b51a879`, exit codes 0,
+  2026-08-11.
 
 ## Receipts
 

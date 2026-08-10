@@ -134,6 +134,25 @@ export async function createRoom(
   const playerId = randomUUID();
   const expiresAt = new Date(Date.now() + ROOM_TTL_HOURS * 3_600_000);
 
+  // The lazy sweep: expired rooms already answer as if they never existed, but the
+  // rows outlive the deadline and permanently burn codes out of the unique index.
+  // Sweeping on create needs no scheduler and is bounded (100 rows) so one create
+  // never inherits unbounded cleanup. The 24h grace past expiry keeps a freshly
+  // expired room inspectable; deletion cascades memberships while matches survive
+  // with `room_id` set null, so nobody's history is touched. A failed sweep must
+  // never block the room being opened — it is logged and abandoned.
+  try {
+    await db.execute(sql`
+      delete from ${rooms} where ${rooms.id} in (
+        select ${rooms.id} from ${rooms}
+        where ${rooms.expiresAt} is not null and ${rooms.expiresAt} < now() - interval '24 hours'
+        limit 100
+      )
+    `);
+  } catch (cause) {
+    recordFailure("room.sweep_failed", cause, { userId });
+  }
+
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const code = generateRoomCode(random);
     try {
@@ -227,6 +246,80 @@ export async function spectateRoom(
   }
   record("room.spectated", { userId });
   return { code: room.code, role: "spectator" };
+}
+
+/**
+ * Hands the room to another seated player.
+ *
+ * Ownership is transferred, never shared and never vacated: the batch demotes the
+ * old host and promotes the new one in the same transaction, and `rooms.owner_user_id`
+ * moves with it so the row and the membership can never name two different hosts.
+ * Only a seated human can receive the room — a spectator holds no seat, and a bot
+ * seat has nobody behind it to decide anything.
+ */
+export async function handOverRoom(
+  userId: string,
+  code: string,
+  toSeat: number,
+  db: Database = createDatabase(),
+): Promise<{ readonly code: string; readonly hostSeat: number }> {
+  const room = await findRoom(normalizeRoomCode(code), db);
+  const caller = room.members.find((entry) => entry.userId === userId);
+  if (caller?.role !== "owner") throw new RoomError(403, "not_the_host", "Only the host hands the room over");
+  if (room.status === "complete" || room.status === "abandoned") {
+    throw new RoomError(409, "room_closed", "This room's match has already finished");
+  }
+
+  const target = room.seats.find((seat) => seat.seat === toSeat);
+  if (!target || target.userId === null) throw new RoomError(422, "unknown_seat", "That seat has nobody to host from");
+  // Handing the room to yourself is agreement with the current state, not an error.
+  if (target.userId === userId) return { code: room.code, hostSeat: toSeat };
+
+  try {
+    await db.batch([
+      db.update(roomMembers).set({ role: "player" })
+        .where(and(eq(roomMembers.roomId, room.roomId), eq(roomMembers.userId, userId), eq(roomMembers.role, "owner"))),
+      db.update(roomMembers).set({ role: "owner" })
+        .where(and(eq(roomMembers.roomId, room.roomId), eq(roomMembers.userId, target.userId))),
+      db.update(rooms).set({ ownerUserId: target.userId }).where(eq(rooms.id, room.roomId)),
+    ] as never);
+  } catch (cause) {
+    throw new RoomServiceError({ cause });
+  }
+  record("room.handed_over", { userId });
+  return { code: room.code, hostSeat: toSeat };
+}
+
+/**
+ * The host closes the room: the match is marked abandoned, no winner is named,
+ * and no more visits are taken.
+ *
+ * This is the first writer the `abandoned` status has ever had, and the first
+ * thing ownership mechanically authorizes — before this cycle "owner" was a label.
+ * `completed_at` stays null on purpose: the match did not complete, and pretending
+ * it did would file a fiction into every query that reads completion.
+ */
+export async function closeRoom(
+  userId: string,
+  code: string,
+  db: Database = createDatabase(),
+): Promise<{ readonly alreadyClosed: boolean }> {
+  const room = await findRoom(normalizeRoomCode(code), db);
+  const caller = room.members.find((entry) => entry.userId === userId);
+  if (caller?.role !== "owner") throw new RoomError(403, "not_the_host", "Only the host closes the room");
+  if (room.status === "abandoned") return { alreadyClosed: true };
+  if (room.status === "complete") {
+    // A finished match cannot be un-finished into an abandonment.
+    throw new RoomError(409, "room_closed", "This room's match has already finished");
+  }
+
+  try {
+    await db.update(matches).set({ status: "abandoned" }).where(eq(matches.id, room.matchId));
+  } catch (cause) {
+    throw new RoomServiceError({ cause });
+  }
+  record("room.closed_by_host", { userId });
+  return { alreadyClosed: false };
 }
 
 export interface AppendTurnInput {

@@ -7,7 +7,10 @@ export const PRODUCT_AVAILABILITY = {
   voiceInput: "implemented",
   history: "implemented",
   deepStats: "implemented",
-  onlineMultiplayer: "coming_soon",
+  // Flipped in Cycle 24: create, join, play, reconnect, spectate, handover, and
+  // close are all live and production-verified. Held deliberately from Cycle 15
+  // until the whole /friends promise was true rather than half of it.
+  onlineMultiplayer: "implemented",
   customPractice: "coming_soon",
   clubManagement: "coming_soon",
 } as const;
