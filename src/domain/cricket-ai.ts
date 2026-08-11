@@ -1,4 +1,5 @@
-import type { Aim, AiTactics } from "./ai";
+import type { AiTactics } from "./ai";
+import type { Aim } from "./ai-throw";
 import { CRICKET_NUMBERS, hasClosed, type CricketNumber, type CricketState } from "./cricket";
 
 /**

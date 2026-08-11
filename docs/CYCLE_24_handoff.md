@@ -1,9 +1,9 @@
 # Cycle 24 — Room Handoff and Lifecycle
 
-Status: active. Opened 2026-08-11. The first candidate merged as PR #27
-(`924d22b`); the corrective slice is on `cycle-24-lifecycle-fix`. PR #27's
-production receipts are retained below, but they do not close the corrected
-implementation.
+Status: closed on production evidence 2026-08-11. The first candidate merged as
+PR #27 (`924d22b`); corrective PR #28 merged as `705b98d`. PR #27's production
+receipts are retained below because they explain the correction, but Cycle 24 is
+closed only by the later implementation and receipts.
 
 Second cycle of `PHASE_3_promise_completion.md`. Completes the `/friends`
 promise — the room can change hands — and gives every room mutation one terminal
@@ -101,7 +101,7 @@ reconnect, spectate, handover, and close are all live, so `/friends` carries zer
   `verify:rooms:live` entrypoint. PR #27's Preview proof and the pre-rotation
   corrective run cannot cover this final revision.
 - [x] Corrective PR #28 CI green on the credential-safe code revision.
-- [ ] Corrective PR merged, then all three production verify gates and
+- [x] Corrective PR merged, then all three production verify gates and
   touched browser surfaces green against `https://dartioopus46.vercel.app`.
 - [ ] Physical expiry archive/purge — parked because the active goal forbids
   destructive database operations; no automatic `DELETE` remains.
@@ -171,3 +171,12 @@ reconnect, spectate, handover, and close are all live, so `/friends` carries zer
   terminal-field anomaly counts=0; the known historical signatures remained
   open=2, multi_user=3. The Preview rooms browser matrix passed 15/15 across all
   three viewports. The Auth origin was then deleted (200) and confirmed absent.
+- 2026-08-11 · Corrective PR #28 merged as `705b98d`. Vercel reported success
+  for that merge, the canonical Production `/` and `/friends` routes served 200,
+  the landing identified Dartio, Friends carried Online Rooms, and neither page
+  carried a Planned marker. Main CI run `31466566461` completed successfully.
+  Production `verify:auth`, `verify:history`, and `verify:rooms` each exited 0;
+  the history probe filed and read back a lossless match, its statistics agreed,
+  and anonymous history/statistics requests were refused. The rooms probe proved
+  anonymous refusal and Free-plan refusal before creation. The touched rooms
+  browser matrix passed 15/15 in 9.9 seconds across 390, 834, and 1440 pixels.

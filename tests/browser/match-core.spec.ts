@@ -17,7 +17,7 @@ test.beforeEach(async ({ page }) => {
   // Cleared once, on the way in — not through addInitScript, which would run
   // again on the reload these tests depend on and wipe the log under them.
   await page.goto(MATCH, { waitUntil: "domcontentloaded" });
-  await page.evaluate(() => window.localStorage.removeItem("dartio:x01-log:v1"));
+  await page.evaluate(() => window.localStorage.removeItem("dartio:x01-log:v2:local"));
   await page.reload({ waitUntil: "networkidle" });
   await page.getByRole("tab", { name: "Each dart" }).click();
 });

@@ -1,46 +1,100 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+export interface AiVisitController {
+  /** Re-runs the current authoritative visit after the caller clears its error. */
+  readonly retry: () => void;
+  /** Invalidates a timer or request before correction, undo, or navigation. */
+  readonly cancel: () => void;
+}
 
 /**
- * Runs an opponent's visit after a pause, once, and never twice.
+ * Schedules one cancellable opponent visit for one authoritative log revision.
  *
- * This exists because X01 got it wrong first. Its AI committed from inside a
- * `setTimeout` created a visit earlier, so it folded over a stale log, read the
- * stale result to decide whose turn it was, concluded it was still its own, and
- * re-queued itself forever — scoring against whichever player the stale turn order
- * happened to name. The fix was to read the log from a ref at the moment of
- * committing rather than from a closure.
- *
- * `play` is therefore called with no arguments on purpose: it must go and look at
- * what has actually happened, not at what had happened when the timer was set. The
- * generation counter cancels a queued visit that a correction or an unmount has
- * made obsolete.
+ * `generate` receives no captured match state: callers replay their current log
+ * when the timer actually fires. A generation token and AbortController guard
+ * both the delayed start and every asynchronous completion, so a correction or
+ * unmount cannot append a stale visit after it has already left the screen.
  */
-export function useAiVisit(options: {
-  /** True only when it is the opponent's turn in a game still being played. */
+export function useAiVisit<Value>(options: {
   readonly ready: boolean;
-  readonly play: () => void;
+  readonly revision: string | number;
+  readonly generate: (signal: AbortSignal) => Promise<Value> | Value;
+  readonly commit: (value: Value) => void;
+  readonly fail: (problem: unknown) => void;
   readonly delayMs?: number;
-}): void {
-  const { ready, delayMs = 450 } = options;
-  const play = useRef(options.play);
-  // Written in an effect rather than during render: React may render without
-  // committing, and a ref updated on a discarded render is a lie about the latest
-  // callback.
-  useEffect(() => { play.current = options.play; });
+}): AiVisitController {
+  const { ready, revision, delayMs = 450 } = options;
+  const generate = useRef(options.generate);
+  const commit = useRef(options.commit);
+  const fail = useRef(options.fail);
   const generation = useRef(0);
+  const timer = useRef<number | null>(null);
+  const controller = useRef<AbortController | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
+
+  // Refs move only after React commits the render. A discarded render must never
+  // become the source of a visit that later writes to the authoritative log.
+  useEffect(() => {
+    generate.current = options.generate;
+    commit.current = options.commit;
+    fail.current = options.fail;
+  });
+
+  const cancel = useCallback(() => {
+    generation.current += 1;
+    if (timer.current !== null) {
+      window.clearTimeout(timer.current);
+      timer.current = null;
+    }
+    controller.current?.abort();
+    controller.current = null;
+  }, []);
+
+  const retry = useCallback(() => {
+    setRetryNonce((value) => value + 1);
+  }, []);
 
   useEffect(() => {
-    generation.current += 1;
+    cancel();
     if (!ready) return;
-    const mine = generation.current;
-    const timer = window.setTimeout(() => {
-      if (mine !== generation.current) return;
-      play.current();
-    }, delayMs);
-    return () => window.clearTimeout(timer);
-  }, [ready, delayMs]);
 
-  useEffect(() => () => { generation.current += 1; }, []);
+    const mine = generation.current;
+    const request = new AbortController();
+    controller.current = request;
+    timer.current = window.setTimeout(() => {
+      timer.current = null;
+      let pending: Promise<Value>;
+      try {
+        pending = Promise.resolve(generate.current(request.signal));
+      } catch (problem) {
+        pending = Promise.reject(problem);
+      }
+      void pending.then(
+        (value) => {
+          if (
+            request.signal.aborted
+            || mine !== generation.current
+            || controller.current !== request
+          ) return;
+          controller.current = null;
+          commit.current(value);
+        },
+        (problem: unknown) => {
+          if (
+            request.signal.aborted
+            || mine !== generation.current
+            || controller.current !== request
+          ) return;
+          controller.current = null;
+          fail.current(problem);
+        },
+      );
+    }, delayMs);
+
+    return cancel;
+  }, [ready, revision, retryNonce, delayMs, cancel]);
+
+  return { retry, cancel };
 }

@@ -11,7 +11,7 @@ const MATCH = "/play/match?start=501&level=8&best=5&out=double&opponent=local";
 
 test.beforeEach(async ({ page }) => {
   await page.goto(MATCH, { waitUntil: "domcontentloaded" });
-  await page.evaluate(() => window.localStorage.removeItem("dartio:x01-log:v1"));
+  await page.evaluate(() => window.localStorage.removeItem("dartio:x01-log:v2:local"));
   await page.reload({ waitUntil: "networkidle" });
 });
 

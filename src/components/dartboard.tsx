@@ -1,7 +1,7 @@
 "use client";
 
 import { BOARD_CLOCKWISE, BOARD_RADII, dart, notation, representativePoint, scoreBoardPoint, type Dart } from "@/domain";
-import { projectDartMarker } from "@/lib/product/ai-turn-client";
+import { projectDartMarker } from "@/lib/product/dart-marker";
 
 /**
  * The regulation board, shared by every mode.
