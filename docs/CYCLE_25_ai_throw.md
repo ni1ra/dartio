@@ -1,6 +1,7 @@
 # Cycle 25 — Premium AI, Rules-Blind
 
-Status: active on branch `cycle-25-ai-throw`.
+Status: PR #29 is merged as `a4c959a`; Production closure and the requested
+Sandbox-promotion proof continue on `cycle-25-sandbox-promotions`.
 
 Third cycle of `PHASE_3_promise_completion.md`. Levels 9–20 become playable in
 X01, Cricket, Around the Clock, Shanghai, Count-Up, and Bob's 27 without moving
@@ -88,8 +89,39 @@ X01 does.
 - [x] Full local typecheck, lint, unit, build, and browser gates.
 - [x] Exact Preview deployment: authentication, premium live verifier, touched
   browser matrix, CI, and origin cleanup.
+- [x] Lock the existing Stripe promotion-code boundary explicitly: normal Pro
+  Checkout remains card-backed, customer-entered codes stay enabled, and Dartio
+  does not inject an undisclosed discount.
+- [ ] Provision and redeem a one-use, Pro-product-only 100% code in Stripe
+  Sandbox; prove the next full-price invoice is discounted to zero, the signed
+  webhook grants the real entitlement, and Portal cancellation prevents a
+  later charge.
 - [ ] Merge only a green exact revision; repeat auth, history, rooms, premium AI,
   touched browser, and main-CI proof on Production.
+
+## Sandbox promotion addendum
+
+The first Production premium gate correctly found the existing QA identity on
+Free. Lain asked for a real coupon path so paid boundaries can be exercised at
+zero cost. Dartio already delegates coupons to Stripe Hosted Checkout through
+`allow_promotion_codes`; creating a second coupon store or admin surface would
+leave two billing authorities. The missing implementation is therefore the
+Sandbox promotion object and its redemption evidence, not another database
+table.
+
+Normal 14-day Pro Checkout deliberately keeps
+`payment_method_collection: "always"`. Changing every Session to
+`"if_required"` would make every trial cardless because its amount due today is
+already zero, and Stripe would cancel those subscriptions at trial end when no
+payment method exists. The QA promotion is instead 100% off forever, restricted
+to the Pro product, usable once, and short-lived. One-cent or one-krone testing
+is not used: the catalogue is EUR and a cent is below Stripe's minimum EUR
+charge. The causal proof is the upcoming invoice — non-zero Pro subtotal,
+discount equal to that subtotal, and zero amount due — rather than the trial's
+already-zero first invoice. These constraints follow Stripe's current
+[Checkout payment-method contract](https://docs.stripe.com/api/checkout/sessions/create),
+[coupon and promotion-code model](https://docs.stripe.com/billing/subscriptions/coupons),
+and [currency minimums](https://docs.stripe.com/currencies).
 
 ## Resume boundary
 
