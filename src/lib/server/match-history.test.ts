@@ -3,7 +3,8 @@ import type { SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { darts, matches, players, turns } from "@/db/schema";
 import type { MatchRecord } from "@/domain/match-record";
-import { listMatches, MatchHistoryError, readStatMatches, recordMatch, type Database } from "./match-history";
+import { buildMatchReplayTimeline } from "@/domain/match-replay";
+import { listMatches, MatchHistoryError, readMatchReplay, readStatMatches, recordMatch, type Database } from "./match-history";
 
 interface Statement {
   readonly kind: "insert" | "update";
@@ -173,5 +174,106 @@ describe("reading a player's history", () => {
   it("reports a database failure as unavailable", async () => {
     const { database } = fakeDatabase({ failOn: "execute" });
     await expect(listMatches("user-1", 20, database)).rejects.toBeInstanceOf(MatchHistoryError);
+  });
+});
+
+describe("reading one match for replay", () => {
+  const replayRow = {
+    id: "match-1",
+    mode: "future-mode",
+    options: { rounds: 4 },
+    completedAt: "2026-08-12T10:00:00.000Z",
+    winnerSeat: 0,
+    ownerSeat: 0,
+    players: [
+      { seat: 0, displayName: "Player 1", isBot: false, botLevel: null },
+      { seat: 1, displayName: "Bot", isBot: true, botLevel: 12 },
+    ],
+    turns: [{
+      seat: 0,
+      turnNumber: 1,
+      legNumber: 1,
+      scoreBefore: 40,
+      scoreAfter: 0,
+      bust: false,
+      dartsThrown: 1,
+      aggregateScore: null,
+      darts: [{ ordinal: 1, segment: 20, multiplier: 2, x: 250_000, y: -500_000 }],
+    }],
+  };
+
+  it("rebuilds the generic record and converts stored microunits", async () => {
+    const { database, queries } = fakeDatabase({ rows: [replayRow] });
+
+    await expect(readMatchReplay("user-1", "match-1", database)).resolves.toEqual({
+      id: "match-1",
+      completedAt: "2026-08-12T10:00:00.000Z",
+      ownerSeat: 0,
+      record: {
+        mode: "future-mode",
+        options: { rounds: 4 },
+        players: [
+          { seat: 0, displayName: "Player 1", isBot: false },
+          { seat: 1, displayName: "Bot", isBot: true, botLevel: 12 },
+        ],
+        turns: [{
+          seat: 0,
+          turnNumber: 1,
+          legNumber: 1,
+          scoreBefore: 40,
+          scoreAfter: 0,
+          bust: false,
+          dartsThrown: 1,
+          darts: [{ ordinal: 1, segment: 20, multiplier: 2, x: 0.25, y: -0.5 }],
+        }],
+        winnerSeat: 0,
+      },
+    });
+
+    const query = rendered(queries[0]!);
+    expect(query).toContain('"matches"."completed_at" is not null');
+    expect(query).toContain("reader.user_id = $1");
+    expect(query).toContain("order by visit.turn_number");
+    expect(query).toContain("order by thrown.ordinal");
+  });
+
+  it("returns no clue for a missing or unowned match", async () => {
+    const { database } = fakeDatabase();
+    await expect(readMatchReplay("user-1", "match-404", database)).resolves.toBeNull();
+  });
+
+  it("preserves an aggregate visit as marker-free unknown dart frames", async () => {
+    const aggregateRow = {
+      ...replayRow,
+      winnerSeat: null,
+      turns: [{
+        ...replayRow.turns[0]!,
+        scoreBefore: 501,
+        scoreAfter: 441,
+        dartsThrown: 3,
+        aggregateScore: 60,
+        darts: [],
+      }],
+    };
+    const { database } = fakeDatabase({ rows: [aggregateRow] });
+    const detail = await readMatchReplay("user-1", "match-1", database);
+
+    expect(detail?.record.turns[0]).toMatchObject({
+      dartsThrown: 3,
+      aggregateScore: 60,
+      darts: [],
+    });
+    const frames = buildMatchReplayTimeline(detail!.record);
+    expect(frames).toHaveLength(3);
+    expect(frames.every((frame) => frame.landing.kind === "unknown")).toBe(true);
+    expect(frames.every((frame) => !("x" in frame.landing) && !("segment" in frame.landing))).toBe(true);
+  });
+
+  it("rejects an internally inconsistent stored record", async () => {
+    const { database } = fakeDatabase({ rows: [{ ...replayRow, turns: [] }] });
+    await expect(readMatchReplay("user-1", "match-1", database)).rejects.toBeInstanceOf(MatchHistoryError);
+
+    const absentOwner = fakeDatabase({ rows: [{ ...replayRow, ownerSeat: 7 }] });
+    await expect(readMatchReplay("user-1", "match-1", absentOwner.database)).rejects.toBeInstanceOf(MatchHistoryError);
   });
 });

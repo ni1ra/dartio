@@ -252,6 +252,14 @@ describe("POST /api/rooms/{code}/turns", () => {
     ["a dart that never landed on a board", { ...VALID_VISIT, turn: { ...VALID_VISIT.turn, darts: [{ ordinal: 1, segment: 21, multiplier: 1 }] } }],
     ["a treble bull", { ...VALID_VISIT, turn: { ...VALID_VISIT.turn, darts: [{ ordinal: 1, segment: 25, multiplier: 3 }] } }],
     ["darts that disagree with the count", { ...VALID_VISIT, turn: { ...VALID_VISIT.turn, dartsThrown: 2 } }],
+    ["a gapped exact-dart chronology", { ...VALID_VISIT, turn: { ...VALID_VISIT.turn, dartsThrown: 2, darts: [
+      { ordinal: 2, segment: 20, multiplier: 1 },
+      { ordinal: 3, segment: 20, multiplier: 1 },
+    ] } }],
+    ["a duplicate exact-dart chronology", { ...VALID_VISIT, turn: { ...VALID_VISIT.turn, dartsThrown: 2, darts: [
+      { ordinal: 1, segment: 20, multiplier: 1 },
+      { ordinal: 1, segment: 20, multiplier: 1 },
+    ] } }],
   ])("refuses %s", async (_label, body) => {
     const append = vi.fn();
     const response = await handleRoomTurnRequest(post(body, "https://dartio.test/api/rooms/OCHE42/turns"), "OCHE42", { authorize: signedIn, append });

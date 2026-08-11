@@ -147,6 +147,14 @@ describe("what the boundary refuses", () => {
     expect(parseMatchRecord({ ...valid, turns: [{ ...turn, dartsThrown: 3 }] })).toBeNull();
   });
 
+  it("refuses a gapped or duplicate exact-dart chronology", () => {
+    const turn = valid.turns[0]!;
+    const second = { ...turn.darts[0]!, ordinal: 2 as const };
+    const third = { ...turn.darts[0]!, ordinal: 3 as const };
+    expect(parseMatchRecord({ ...valid, turns: [{ ...turn, dartsThrown: 2, darts: [second, third] }] })).toBeNull();
+    expect(parseMatchRecord({ ...valid, turns: [{ ...turn, dartsThrown: 2, darts: [second, second] }] })).toBeNull();
+  });
+
   it("refuses unknown fields rather than storing them", () => {
     expect(parseMatchRecord({ ...valid, sneaky: true })).toBeNull();
   });

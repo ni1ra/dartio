@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { defaultAuthorize, roomErrorResponse } from "../../route";
 import { appendRoomTurn, type AppendTurnInput } from "@/lib/server/rooms";
-import { MAX_PLAYERS, MAX_TURNS } from "@/domain/match-record";
+import { hasCompleteDartChronology, MAX_PLAYERS, MAX_TURNS } from "@/domain/match-record";
 
 const NO_STORE = { "Cache-Control": "private, no-store" };
 
@@ -41,8 +41,8 @@ const bodySchema = z.object({
     aggregateScore: z.number().int().min(0).max(180).optional(),
     darts: z.array(dartSchema).max(3),
   }).strict().refine(
-    (t) => t.darts.length === 0 || t.darts.length === t.dartsThrown,
-    "A visit recorded dart by dart must record every dart it threw",
+    hasCompleteDartChronology,
+    "A visit recorded dart by dart must record darts 1 through dartsThrown exactly once",
   ),
 }).strict();
 

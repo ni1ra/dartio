@@ -78,6 +78,18 @@ const dartSchema = z.object({
   "Impossible bed and multiplier",
 );
 
+/** Exact visits must account for physical darts 1..N once each; aggregates have no dart rows. */
+export function hasCompleteDartChronology(value: {
+  readonly dartsThrown: 1 | 2 | 3;
+  readonly darts: readonly { readonly ordinal: 1 | 2 | 3 }[];
+}): boolean {
+  if (value.darts.length === 0) return true;
+  if (value.darts.length !== value.dartsThrown) return false;
+  return [...value.darts]
+    .sort((left, right) => left.ordinal - right.ordinal)
+    .every((thrown, index) => thrown.ordinal === index + 1);
+}
+
 const turnSchema = z.object({
   seat: z.number().int().min(0).max(MAX_PLAYERS - 1),
   turnNumber: z.number().int().min(1).max(MAX_TURNS),
@@ -89,8 +101,8 @@ const turnSchema = z.object({
   aggregateScore: z.number().int().min(0).max(180).optional(),
   darts: z.array(dartSchema).max(3),
 }).strict().refine(
-  (t) => t.darts.length === 0 || t.darts.length === t.dartsThrown,
-  "A visit recorded dart by dart must record every dart it threw",
+  hasCompleteDartChronology,
+  "A visit recorded dart by dart must record darts 1 through dartsThrown exactly once",
 );
 
 const playerSchema = z.object({

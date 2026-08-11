@@ -45,14 +45,20 @@ The full plan and its execution contract were approved on 2026-08-11.
   PR #27's first candidate reached production; corrective PR #28 then repeated
   Preview, CI, merge, and Production proof and closed the lifecycle on
   `705b98d` on 2026-08-11. See `CYCLE_24_handoff.md`.
-- [ ] **Cycle 25 — Levels 9–20 for every mode, server rules-blind.** What is paid is
+- [x] **Cycle 25 — Levels 9–20 for every mode, server rules-blind.** What is paid is
   execution quality, not aim policy. A mode-agnostic throw authority samples the
   landing for {target, level} behind the `advanced_ai` gate; the client keeps the
   rules, the server keeps the skill, and the server still never learns a mode.
-- [ ] **Cycle 26 — Voice confidence end to end.** The hold-queue is built and
+  Shipped in PR #29; exact Preview paid proof passed. Production's standing QA
+  account is Free, so that separate paid-live receipt remains parked rather than
+  being forged. See `CYCLE_25_ai_throw.md`.
+- [x] **Cycle 26 — Voice confidence end to end.** The hold-queue is built and
   starves; `POST /api/voice/transcribe` returns no confidence. Research the
   current OpenAI transcription API first, wire a real signal through, and put the
-  594-line `voice-control.tsx` under test on the way.
+  voice component under test on the way. Shipped in PR #31 with exact Production
+  CI, deployment, auth/history/rooms, targeted voice, and full browser proof.
+  Paid-provider proof remains parked on the same honest Free-QA boundary. See
+  `CYCLE_26_voice_confidence.md`.
 - [ ] **Cycle 27 — Match replay.** The manifesto promises a board that records,
   explains, and replays every dart; migration 0006 made stored visits lossless and
   nothing plays them back. Any stored match, dart by dart, on the regulation

@@ -82,7 +82,7 @@ export function PricingExperience() {
             <li>Unlimited local X01 scoring</li>
             <li>AI opponents through level 8</li>
             <li>Basic checkout guidance</li>
-            <li className="feature-soon">Saved match history <span>COMING SOON</span></li>
+            <li>Saved match history and dart-by-dart replay <span>AVAILABLE</span></li>
           </ul>
           <Link className="button-link button-link-secondary" href="/play">Start a free match</Link>
         </Surface>
