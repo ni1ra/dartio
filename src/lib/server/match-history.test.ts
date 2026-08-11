@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import type { SQL } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { darts, matches, players, turns } from "@/db/schema";
 import type { MatchRecord } from "@/domain/match-record";
-import { listMatches, MatchHistoryError, recordMatch, type Database } from "./match-history";
+import { listMatches, MatchHistoryError, readStatMatches, recordMatch, type Database } from "./match-history";
 
 interface Statement {
   readonly kind: "insert" | "update";
@@ -17,6 +19,7 @@ interface Statement {
  */
 function fakeDatabase(options: { failOn?: "batch" | "execute"; rows?: readonly unknown[] } = {}) {
   const batches: Statement[][] = [];
+  const queries: SQL[] = [];
   const database = {
     insert: (table: unknown) => ({ values: (rows: unknown) => ({ kind: "insert", table, rows: Array.isArray(rows) ? rows : [rows] }) }),
     update: (table: unknown) => ({ set: (rows: unknown) => ({ where: () => ({ kind: "update", table, rows: [rows] }) }) }),
@@ -24,12 +27,17 @@ function fakeDatabase(options: { failOn?: "batch" | "execute"; rows?: readonly u
       if (options.failOn === "batch") throw new Error("connection reset");
       batches.push(statements);
     },
-    execute: async () => {
+    execute: async (query: SQL) => {
       if (options.failOn === "execute") throw new Error("connection reset");
+      queries.push(query);
       return { rows: options.rows ?? [] };
     },
   };
-  return { database: database as unknown as Database, batches };
+  return { database: database as unknown as Database, batches, queries };
+}
+
+function rendered(query: SQL): string {
+  return new PgDialect().sqlToQuery(query).sql;
 }
 
 const RECORD: MatchRecord = {
@@ -147,12 +155,19 @@ describe("reading a player's history", () => {
   };
 
   it("marks which seat was the reader's own", async () => {
-    const { database } = fakeDatabase({ rows: [row] });
+    const { database, queries } = fakeDatabase({ rows: [row] });
     const [entry] = await listMatches("user-1", 20, database);
 
     expect(entry).toMatchObject({ id: "match-1", mode: "cricket", winnerSeat: 1, turnCount: 12, dartCount: 36 });
     expect(entry?.players.map((player) => player.isYou)).toEqual([true, false]);
     expect(entry?.completedAt).toBe("2026-07-30T21:00:00.000Z");
+    expect(rendered(queries[0]!)).toContain('"matches"."completed_at" is not null');
+  });
+
+  it("keeps unfinished room rows out of statistics too", async () => {
+    const { database, queries } = fakeDatabase();
+    await expect(readStatMatches("user-1", null, database)).resolves.toEqual([]);
+    expect(rendered(queries[0]!)).toContain('"matches"."completed_at" is not null');
   });
 
   it("reports a database failure as unavailable", async () => {

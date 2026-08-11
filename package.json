@@ -20,10 +20,14 @@
     "verify:auth": "node scripts/verify-production-auth.mjs",
     "verify:history": "node --env-file=.env.local scripts/verify-history.mjs",
     "verify:rooms": "node --env-file=.env.local scripts/verify-rooms.mjs",
-    "verify:rooms:live": "node scripts/verify-rooms-live.mjs"
+    "verify:rooms:live": "node scripts/verify-rooms-live.mjs",
+    "verify:rooms:integrity": "node scripts/verify-room-integrity.mjs"
   },
   "dependencies": {
     "@better-auth/api-key": "1.6.13",
+    "@fontsource-variable/manrope": "5.3.0",
+    "@fontsource-variable/syne": "5.3.0",
+    "@fontsource/dm-mono": "5.3.0",
     "@neondatabase/auth": "0.4.2-beta",
     "@neondatabase/serverless": "1.1.0",
     "drizzle-orm": "0.45.2",

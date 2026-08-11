@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import type { SQL } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 import {
   appendRoomTurn,
   closeRoom,
@@ -25,6 +27,7 @@ function room(overrides: Record<string, unknown> = {}) {
   return {
     roomId: "room-1",
     matchId: "match-1",
+    ownerUserId: "user-1",
     code: "OCHE42",
     mode: "x01",
     options: { startingScore: 501 },
@@ -51,6 +54,7 @@ function fakeDatabase(options: { queue?: unknown[][]; failBatch?: readonly (Erro
   const batches: Statement[][] = [];
   const writes: Statement[] = [];
   const executes = { count: 0 };
+  const queries: SQL[] = [];
   const database = {
     // An insert is a statement when it goes into a batch and a write when awaited
     // on its own, so it is a thenable that records itself only at await time — a
@@ -75,19 +79,32 @@ function fakeDatabase(options: { queue?: unknown[][]; failBatch?: readonly (Erro
         where: () => Object.assign(Promise.resolve(), { kind: "update", table, rows: [rows] }),
       }),
     }),
-    batch: async (statements: Statement[]) => {
+    batch: async (statements: unknown[]) => {
       const failure = failures.shift();
       if (failure) throw failure;
-      batches.push(statements);
+      // Raw `db.execute` values are native promises in this fake. Production's
+      // Neon driver keeps them lazy and executes them sequentially in one batch;
+      // resolving both here preserves the returned result shape these tests use.
+      if (statements.every((statement) => statement instanceof Promise)) {
+        const results = await Promise.all(statements);
+        batches.push([]);
+        return results;
+      }
+      batches.push(statements as Statement[]);
     },
-    execute: async () => {
+    execute: async (query: SQL) => {
       executes.count += 1;
+      queries.push(query);
       const failure = executeFailures.shift();
       if (failure) throw failure;
       return { rows: queue.shift() ?? [] };
     },
   };
-  return { database: database as unknown as Database, batches, writes, executes };
+  return { database: database as unknown as Database, batches, writes, executes, queries };
+}
+
+function rendered(query: SQL): string {
+  return new PgDialect().sqlToQuery(query).sql;
 }
 
 function uniqueViolation(): Error {
@@ -112,16 +129,8 @@ describe("opening a room", () => {
     expect(result.code).toMatch(/^[A-Z2-9]{6}$/);
     expect(batches).toHaveLength(1);
     expect(batches[0]).toHaveLength(4);
-    // The lazy sweep of long-expired rooms rides on create, exactly once.
-    expect(executes.count).toBe(1);
-  });
-
-  it("still opens the room when the sweep itself fails", async () => {
-    // Cleanup is a courtesy; a room being openable is the product.
-    const { database, batches } = fakeDatabase({ failExecute: [new Error("sweep timeout")] });
-    const result = await createRoom("user-1", { mode: "x01", options: {}, displayName: "Lain" }, database);
-    expect(result.seat).toBe(0);
-    expect(batches).toHaveLength(1);
+    // Creating a room does not perform destructive cleanup as a side effect.
+    expect(executes.count).toBe(0);
   });
 
   it("tries another code when one is already taken", async () => {
@@ -147,9 +156,10 @@ describe("taking a seat", () => {
   });
 
   it("takes the lowest free seat, so a rejoin does not widen the table", async () => {
-    const { database, batches } = fakeDatabase({ queue: [[room({ seats: [SEAT_ZERO, { ...SEAT_ONE, seat: 3 }] })]] });
+    const { database, batches, executes } = fakeDatabase({ queue: [[room({ seats: [SEAT_ZERO, { ...SEAT_ONE, seat: 3 }] })], [{ seat: 1 }]] });
     await expect(joinRoom("user-3", "OCHE42", "Player 3", database)).resolves.toEqual({ code: "OCHE42", seat: 1 });
-    expect(batches[0]).toHaveLength(3);
+    expect(executes.count).toBe(2);
+    expect(batches).toHaveLength(0);
   });
 
   it("refuses a room whose match is already over", async () => {
@@ -168,13 +178,18 @@ describe("taking a seat", () => {
       { userId: "user-2", role: "player" },
       { userId: "user-3", role: "spectator" },
     ] });
-    const { database, batches } = fakeDatabase({ queue: [[watching]] });
+    const { database, batches, executes } = fakeDatabase({ queue: [[watching], [{ seat: 2 }]] });
     await expect(joinRoom("user-3", "OCHE42", "Player 3", database)).resolves.toEqual({ code: "OCHE42", seat: 2 });
 
-    // A second insert would trip the membership primary key; the promotion updates.
-    expect(batches[0]).toHaveLength(3);
-    expect(batches[0]![0]).toMatchObject({ kind: "update" });
-    expect(batches[0]![0]!.rows[0]).toMatchObject({ role: "player" });
+    // Read plus one locked statement: membership promotion, seat, and activation
+    // cannot split or revive a concurrently closed match.
+    expect(executes.count).toBe(2);
+    expect(batches).toHaveLength(0);
+  });
+
+  it("does not seat a player when close wins the room lock", async () => {
+    const { database } = fakeDatabase({ queue: [[room()], [], [room({ status: "abandoned" })]] });
+    await expect(joinRoom("user-3", "OCHE42", "Player 3", database)).rejects.toMatchObject({ status: 409, code: "room_closed" });
   });
 });
 
@@ -186,18 +201,17 @@ describe("filing a visit into a room", () => {
   };
 
   it("accepts a write that extends the version it claims to, and numbers the turn itself", async () => {
-    const { database, batches } = fakeDatabase({ queue: [[room()], [{ version: 4 }]] });
+    const { database, batches, executes } = fakeDatabase({ queue: [[room()], [{ version: 4 }]] });
     await expect(appendRoomTurn("user-2", "OCHE42", visit, database)).resolves.toEqual({ version: 4 });
 
-    const turnRow = batches[0]![0]!.rows[0]!;
-    // The number came from the accepted version, never from the request.
-    expect(turnRow).toMatchObject({ turnNumber: 4, playerId: "player-2", legNumber: 1, dartsThrown: 3 });
-    expect(batches[0]).toHaveLength(2);
+    // Read plus one data-modifying CTE: version, visit, and darts cannot split.
+    expect(executes.count).toBe(2);
+    expect(batches).toHaveLength(0);
   });
 
   it("refuses a write whose version somebody else already used", async () => {
     // The conditional update matches no row, which is what a conflict looks like.
-    const { database, batches } = fakeDatabase({ queue: [[room()], []] });
+    const { database, batches } = fakeDatabase({ queue: [[room()], [], [room()]] });
     await expect(appendRoomTurn("user-2", "OCHE42", visit, database)).rejects.toMatchObject({ status: 409, code: "version_conflict" });
     expect(batches).toHaveLength(0);
   });
@@ -222,11 +236,27 @@ describe("filing a visit into a room", () => {
   });
 
   it("does not send a darts statement for a visit typed as a total", async () => {
-    const { database, batches } = fakeDatabase({ queue: [[room()], [{ version: 4 }]] });
+    const { database, batches, executes } = fakeDatabase({ queue: [[room()], [{ version: 4 }]] });
     await appendRoomTurn("user-2", "OCHE42", { ...visit, turn: { ...visit.turn, darts: [], aggregateScore: 60 } }, database);
 
-    expect(batches[0]).toHaveLength(1);
-    expect(batches[0]![0]!.rows[0]).toMatchObject({ aggregateScore: 60 });
+    expect(executes.count).toBe(2);
+    expect(batches).toHaveLength(0);
+  });
+
+  it("reports a close that wins the version race as a closed room", async () => {
+    const closed = room({ status: "abandoned" });
+    const { database } = fakeDatabase({ queue: [[room()], [], [closed]] });
+    await expect(appendRoomTurn("user-2", "OCHE42", visit, database)).rejects.toMatchObject({ status: 409, code: "room_closed" });
+  });
+
+  it("does not attempt a second write when the atomic visit statement fails", async () => {
+    const { database, batches, executes } = fakeDatabase({
+      queue: [[room()]],
+      failExecute: [null, new Error("dart constraint")],
+    });
+    await expect(appendRoomTurn("user-2", "OCHE42", visit, database)).rejects.toBeInstanceOf(RoomServiceError);
+    expect(executes.count).toBe(2);
+    expect(batches).toHaveLength(0);
   });
 });
 
@@ -286,7 +316,7 @@ describe("the error contract", () => {
 
 describe("closing a room's match", () => {
   it("names the winner and marks the match complete", async () => {
-    const { database, batches } = fakeDatabase({ queue: [[room()]] });
+    const { database, batches } = fakeDatabase({ queue: [[room()], [{ status: "complete" }]] });
     await expect(completeRoomMatch("user-1", "OCHE42", 1, database)).resolves.toEqual({ alreadyComplete: false });
     // The update goes out on its own, not through a batch.
     expect(batches).toHaveLength(0);
@@ -315,20 +345,30 @@ describe("closing a room's match", () => {
   });
 
   it("accepts a match that ended with no winner", async () => {
-    const { database } = fakeDatabase({ queue: [[room()]] });
+    const { database } = fakeDatabase({ queue: [[room()], [{ status: "complete" }]] });
     await expect(completeRoomMatch("user-1", "OCHE42", null, database)).resolves.toEqual({ alreadyComplete: false });
+  });
+
+  it("never completes a room the host already abandoned", async () => {
+    const { database } = fakeDatabase({ queue: [[room({ status: "abandoned" })]] });
+    await expect(completeRoomMatch("user-1", "OCHE42", 1, database)).rejects.toMatchObject({ status: 409, code: "room_closed" });
+  });
+
+  it("reports a close that wins during completion as a closed room", async () => {
+    const { database } = fakeDatabase({ queue: [[room()], [], [room({ status: "abandoned" })]] });
+    await expect(completeRoomMatch("user-1", "OCHE42", 1, database)).rejects.toMatchObject({ status: 409, code: "room_closed" });
   });
 });
 
 describe("pulling up a chair", () => {
   it("writes one spectator membership row and nothing else", async () => {
-    const { database, writes, batches } = fakeDatabase({ queue: [[room()]] });
+    const { database, writes, batches, executes } = fakeDatabase({ queue: [[room()], [], [{ role: "spectator" }]] });
     await expect(spectateRoom("watcher", "oche42", database)).resolves.toEqual({ code: "OCHE42", role: "spectator" });
 
-    expect(writes).toHaveLength(1);
-    expect(writes[0]!.rows[0]).toMatchObject({ userId: "watcher", role: "spectator" });
-    // No players row: the read-only promise is structural, not policed.
-    expect(batches).toHaveLength(0);
+    expect(executes.count).toBe(3);
+    // No players write: the read-only promise is structural, not policed.
+    expect(writes).toHaveLength(0);
+    expect(batches).toHaveLength(1);
   });
 
   it("tells a seated player asking to watch what they already are, without writing", async () => {
@@ -345,9 +385,14 @@ describe("pulling up a chair", () => {
   });
 
   it("treats two racing taps as one chair when the membership key refuses the second", async () => {
-    const conflict = Object.assign(new Error("duplicate key"), { code: "23505" });
-    const { database } = fakeDatabase({ queue: [[room()]], failInsert: [conflict] });
+    const gallery = room({ members: [...room().members as [], { userId: "watcher", role: "spectator" }] });
+    const { database } = fakeDatabase({ queue: [[room()], [], [], [gallery]] });
     await expect(spectateRoom("watcher", "OCHE42", database)).resolves.toEqual({ code: "OCHE42", role: "spectator" });
+  });
+
+  it("does not add a new watcher when close wins the room lock", async () => {
+    const { database } = fakeDatabase({ queue: [[room()], [], [], [room({ status: "abandoned" })]] });
+    await expect(spectateRoom("watcher", "OCHE42", database)).rejects.toMatchObject({ status: 409, code: "room_closed" });
   });
 
   it("refuses a room whose match is already over", async () => {
@@ -367,14 +412,11 @@ describe("pulling up a chair", () => {
 
 describe("handing the room over", () => {
   it("demotes the old host, promotes the new one, and moves the row's owner, atomically", async () => {
-    const { database, batches } = fakeDatabase({ queue: [[room()]] });
+    const { database, batches, executes } = fakeDatabase({ queue: [[room()], [{ hostSeat: 1 }]] });
     await expect(handOverRoom("user-1", "oche42", 1, database)).resolves.toEqual({ code: "OCHE42", hostSeat: 1 });
 
-    expect(batches).toHaveLength(1);
-    expect(batches[0]).toHaveLength(3);
-    expect(batches[0]![0]!.rows[0]).toMatchObject({ role: "player" });
-    expect(batches[0]![1]!.rows[0]).toMatchObject({ role: "owner" });
-    expect(batches[0]![2]!.rows[0]).toMatchObject({ ownerUserId: "user-2" });
+    expect(executes.count).toBe(2);
+    expect(batches).toHaveLength(0);
   });
 
   it("refuses everyone but the host, a seated player included", async () => {
@@ -403,11 +445,34 @@ describe("handing the room over", () => {
     const { database } = fakeDatabase({ queue: [[room({ status: "complete" })]] });
     await expect(handOverRoom("user-1", "OCHE42", 1, database)).rejects.toMatchObject({ status: 409, code: "room_closed" });
   });
+
+  it("refuses a stale host after a competing handover wins", async () => {
+    const changed = room({
+      ownerUserId: "user-2",
+      seats: [{ ...SEAT_ZERO, role: "player" }, { ...SEAT_ONE, role: "owner" }],
+      members: [{ userId: "user-1", role: "player" }, { userId: "user-2", role: "owner" }],
+    });
+    const { database } = fakeDatabase({ queue: [[room()], [], [changed]] });
+    await expect(handOverRoom("user-1", "OCHE42", 1, database)).rejects.toMatchObject({ status: 403, code: "not_the_host" });
+  });
+
+  it("reconciles every old owner label while moving canonical authority", async () => {
+    const corrupt = room({
+      seats: [SEAT_ZERO, { ...SEAT_ONE, role: "owner" }],
+      members: [{ userId: "user-1", role: "owner" }, { userId: "user-2", role: "owner" }],
+    });
+    const { database, queries } = fakeDatabase({ queue: [[corrupt], [{ hostSeat: 1 }]] });
+    await expect(handOverRoom("user-1", "OCHE42", 1, database)).resolves.toEqual({ code: "OCHE42", hostSeat: 1 });
+
+    const mutation = rendered(queries[1]!);
+    expect(mutation).toContain("set role = case");
+    expect(mutation).toContain('"room_members"."role" = \'owner\' or');
+  });
 });
 
 describe("the host closing the room", () => {
   it("marks the match abandoned and names nobody", async () => {
-    const { database } = fakeDatabase({ queue: [[room()]] });
+    const { database } = fakeDatabase({ queue: [[room()], [{ status: "abandoned" }]] });
     await expect(closeRoom("user-1", "OCHE42", database)).resolves.toEqual({ alreadyClosed: false });
   });
 
@@ -423,6 +488,11 @@ describe("the host closing the room", () => {
 
   it("refuses to abandon a match that actually finished", async () => {
     const { database } = fakeDatabase({ queue: [[room({ status: "complete" })]] });
+    await expect(closeRoom("user-1", "OCHE42", database)).rejects.toMatchObject({ status: 409, code: "room_closed" });
+  });
+
+  it("reports completion when it wins the terminal race", async () => {
+    const { database } = fakeDatabase({ queue: [[room()], [], [room({ status: "complete" })]] });
     await expect(closeRoom("user-1", "OCHE42", database)).rejects.toMatchObject({ status: 409, code: "room_closed" });
   });
 });

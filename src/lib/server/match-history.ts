@@ -181,6 +181,7 @@ async function queryMatches(userId: string, limit: number, db: Database): Promis
     from ${matches}
     join mine on mine.match_id = ${matches.id}
     left join ${players} as winner on winner.id = ${matches.winnerPlayerId}
+    where ${matches.completedAt} is not null
     order by ${desc(matches.completedAt)}
     limit ${limit}
   `);
@@ -232,6 +233,7 @@ export async function readStatMatches(
       join ${matches} on ${matches.id} = ${players.matchId}
       left join ${turns} on ${turns.playerId} = ${players.id}
       where ${players.userId} = ${userId}
+        and ${matches.completedAt} is not null
       group by ${matches.id}, ${players.id}
       order by ${desc(matches.completedAt)}
       ${limit === null ? sql`` : sql`limit ${limit}`}

@@ -107,11 +107,11 @@ export function RoomMatch({ code }: RoomMatchProps) {
   // Whoever is in the room reports the finish; the server treats the second report
   // as agreement rather than a conflict.
   useEffect(() => {
-    if (!finished || !room || yourSeat === null || reported.current) return;
+    if (!finished || closed || !room || yourSeat === null || reported.current) return;
     reported.current = true;
     const winnerSeat = game?.winnerId ? Number(game.winnerId.replace("seat-", "")) : null;
     void completeRoomMatch(code, Number.isInteger(winnerSeat) ? winnerSeat : null);
-  }, [finished, room, yourSeat, game, code]);
+  }, [finished, closed, room, yourSeat, game, code]);
 
   async function throwDart(value: Dart) {
     if (!yourTurn || !game) return;
@@ -168,27 +168,28 @@ export function RoomMatch({ code }: RoomMatchProps) {
   return <div className="page-frame room-match">
     <header className="match-header">
       <div>
-        <span className={finished || closed ? "match-complete" : "match-live"}>{!finished && !closed && <i />} {finished ? "MATCH COMPLETE" : closed ? `ROOM CLOSED · ${room.code}` : spectating ? `WATCHING · ROOM ${room.code}` : `LEG ${game.legNumber} · ROOM ${room.code}`}</span>
+        <span className={finished || closed ? "match-complete" : "match-live"}>{!finished && !closed && <i />} {closed ? `ROOM CLOSED · ${room.code}` : finished ? "MATCH COMPLETE" : spectating ? `WATCHING · ROOM ${room.code}` : `LEG ${game.legNumber} · ROOM ${room.code}`}</span>
         <b>{game.options.startingScore} · first to {game.options.legsToWin}{room.watching > 0 && <> · {room.watching} watching</>}</b>
       </div>
       <div className="match-tools"><span>{stale ? "Reconnecting…" : closed ? "The host closed this room" : spectating ? onThrow(room, projected) : yourTurn ? "Your throw" : "Waiting for your opponent"}</span></div>
     </header>
 
     <section className="score-race" aria-label="Scoreboard">
-      {room.seats.map((seat, index) => <div key={seat.seat} className={`score-player ${!finished && projected.currentPlayer === index ? "active" : ""} ${index > 0 ? "opponent" : ""}`}>
+      {room.seats.map((seat, index) => <div key={seat.seat} className={`score-player ${!closed && !finished && projected.currentPlayer === index ? "active" : ""} ${index > 0 ? "opponent" : ""}`}>
         <span>{seat.displayName} <i>{seat.isYou ? "you" : "away"}</i></span>
         <strong>{projected.scores[index] ?? game.options.startingScore}</strong>
         <small>{stats[index]?.dartsThrown ? `${stats[index]!.threeDartAverage.toFixed(2)} 3DA` : "No darts yet"}</small>
       </div>)}
     </section>
 
-    {/* The board stays for a watcher — it is the display — but the pad is purely
-        an input surface and would be dead weight under fingers that cannot throw. */}
+    {/* The board stays as the room's display for watchers and closed matches. The
+        pad is purely an input surface, so it disappears when no future throw can
+        be accepted instead of leaving a permanently disabled control behind. */}
     <Dartboard darts={pending} disabled={!yourTurn} onDart={(value) => void throwDart(value)} />
-    {!spectating && <DartInputPad disabled={!yourTurn} onDart={(value) => void throwDart(value)} />}
+    {!spectating && !closed && <DartInputPad disabled={!yourTurn} onDart={(value) => void throwDart(value)} />}
 
     <CommandDock className="match-dock">
-      <span aria-live="polite">{finished ? "Match complete." : closed ? "The host closed this room. Nothing more will be thrown." : spectating ? "You’re watching — visits land as they’re thrown." : message}</span>
+      <span aria-live="polite">{closed ? "The host closed this room. Nothing more will be thrown." : finished ? "Match complete." : spectating ? "You’re watching — visits land as they’re thrown." : message}</span>
       <div>{(finished || closed) && <Link className="button-link" href="/friends">Back to rooms</Link>}</div>
     </CommandDock>
   </div>;

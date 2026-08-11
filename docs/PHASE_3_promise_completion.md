@@ -37,10 +37,14 @@ The full plan and its execution contract were approved on 2026-08-11.
   verify gates and the rooms browser spec green against production after
   merge. See `CYCLE_23_spectators.md`.
 - [ ] **Cycle 24 — Room handoff and lifecycle.** Deliberate handover, host-departure
-  semantics, an expiry sweep for rooms that today outlive their own deadline as
-  rows, `verify-rooms-live` as a pnpm script, and the deliberately held
+  semantics, one serialized terminal lifecycle across every mutation,
+  `verify-rooms-live` as a pnpm script, and the deliberately held
   `onlineMultiplayer: "coming_soon"` flag retired now that the whole promise is
-  true.
+  true. Physical expiry purge is explicitly parked: the campaign forbids
+  destructive database operations, and expired rooms are already unreachable.
+  PR #27's first candidate reached production, but Cycle 24 remains open until
+  the corrective lifecycle branch repeats Preview, CI, merge, and production
+  proof. See `CYCLE_24_handoff.md`.
 - [ ] **Cycle 25 — Levels 9–20 for every mode, server rules-blind.** What is paid is
   execution quality, not aim policy. A mode-agnostic throw authority samples the
   landing for {target, level} behind the `advanced_ai` gate; the client keeps the
@@ -71,5 +75,6 @@ The full plan and its execution contract were approved on 2026-08-11.
 ## Phase-level gates
 
 Nothing here is closed until the browser suite passes against the live production
-deployment at 390×844, 834×1112, and 1440×1000, and `pnpm verify:auth` passes
-against it — a deployment can answer 200 on every route while nobody can sign in.
+deployment at 390×844, 834×1112, and 1440×1000, and `pnpm verify:auth`,
+`pnpm verify:history`, and `pnpm verify:rooms` all pass against it — a deployment
+can answer 200 on every route while nobody can sign in or persist a match.

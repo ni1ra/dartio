@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { createDatabase } from "@/db/client";
 import { dartRows } from "@/db/rows";
 import { darts, matches, players, roomMembers, rooms, turns } from "@/db/schema";
@@ -134,25 +134,6 @@ export async function createRoom(
   const playerId = randomUUID();
   const expiresAt = new Date(Date.now() + ROOM_TTL_HOURS * 3_600_000);
 
-  // The lazy sweep: expired rooms already answer as if they never existed, but the
-  // rows outlive the deadline and permanently burn codes out of the unique index.
-  // Sweeping on create needs no scheduler and is bounded (100 rows) so one create
-  // never inherits unbounded cleanup. The 24h grace past expiry keeps a freshly
-  // expired room inspectable; deletion cascades memberships while matches survive
-  // with `room_id` set null, so nobody's history is touched. A failed sweep must
-  // never block the room being opened — it is logged and abandoned.
-  try {
-    await db.execute(sql`
-      delete from ${rooms} where ${rooms.id} in (
-        select ${rooms.id} from ${rooms}
-        where ${rooms.expiresAt} is not null and ${rooms.expiresAt} < now() - interval '24 hours'
-        limit 100
-      )
-    `);
-  } catch (cause) {
-    recordFailure("room.sweep_failed", cause, { userId });
-  }
-
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const code = generateRoomCode(random);
     try {
@@ -189,25 +170,60 @@ export async function joinRoom(
   }
 
   const seat = nextFreeSeat(room.seats.map((entry) => entry.seat));
-  const member = room.members.find((entry) => entry.userId === userId);
+  let claimed: { seat: number } | undefined;
   try {
-    await db.batch([
-      // A spectator taking a seat is promoted, not re-inserted — inserting would
-      // trip the membership primary key and read as somebody else's seat race.
-      // The role guard keeps the promotion from ever rewriting an owner.
-      member
-        ? db.update(roomMembers).set({ role: "player" })
-            .where(and(eq(roomMembers.roomId, room.roomId), eq(roomMembers.userId, userId), eq(roomMembers.role, "spectator")))
-        : db.insert(roomMembers).values({ roomId: room.roomId, userId, role: "player" }),
-      db.insert(players).values({ id: randomUUID(), matchId: room.matchId, userId, seat, displayName, isBot: false }),
-      // A room with a second player is a match in progress, not one waiting to start.
-      db.update(matches).set({ status: "active" }).where(eq(matches.id, room.matchId)),
-    ] as never);
+    // Joining takes the same room/match locks as every terminal mutation. Without
+    // that shared lock, a stale join could set an already-abandoned match active
+    // again. The membership, seat, and activation also succeed or roll back as one.
+    const result = await db.execute<{ seat: number }>(sql`
+      with locked as materialized (
+        select ${rooms.id} as room_id, ${matches.id} as match_id
+        from ${rooms}
+        join ${matches} on ${matches.roomId} = ${rooms.id}
+        where ${rooms.id} = ${room.roomId}
+          and (${rooms.expiresAt} is null or ${rooms.expiresAt} > now())
+          and ${matches.status} in ('pending', 'active')
+          and not exists (
+            select 1 from ${players}
+            where ${players.matchId} = ${matches.id} and ${players.seat} = ${seat}
+          )
+        for update of ${rooms}, ${matches}
+      ), membership as (
+        insert into ${roomMembers} (room_id, user_id, role)
+        select locked.room_id, ${userId}, 'player' from locked
+        on conflict (room_id, user_id) do update set role = 'player'
+          where room_members.role = 'spectator'
+        returning room_id
+      ), seated as (
+        insert into ${players} (id, match_id, user_id, seat, display_name, is_bot)
+        select ${randomUUID()}, locked.match_id, ${userId}, ${seat}, ${displayName}, false
+        from locked
+        join membership on membership.room_id = locked.room_id
+        returning match_id
+      ), activated as (
+        update ${matches}
+           set status = 'active'
+         where ${matches.id} in (select match_id from seated)
+        returning ${matches.id}
+      )
+      select ${seat}::integer as "seat" from activated
+    `);
+    claimed = result.rows[0];
   } catch (cause) {
     if (isUniqueViolation(cause)) throw new RoomError(409, "seat_taken", "Somebody took that seat first");
     throw new RoomServiceError({ cause });
   }
-  return { code: room.code, seat };
+  if (!claimed) {
+    const current = await findRoom(room.code, db);
+    const currentSeat = current.seats.find((entry) => entry.userId === userId);
+    if (currentSeat) return { code: current.code, seat: currentSeat.seat };
+    if (current.status === "complete" || current.status === "abandoned") {
+      throw new RoomError(409, "room_closed", "This room's match has already finished");
+    }
+    if (current.seats.length >= MAX_SEATS) throw new RoomError(409, "room_full", "This room has no free seat");
+    throw new RoomError(409, "seat_taken", "Somebody took that seat first");
+  }
+  return { code: room.code, seat: claimed.seat };
 }
 
 /**
@@ -237,23 +253,67 @@ export async function spectateRoom(
     throw new RoomError(409, "gallery_full", "This room's gallery is full");
   }
 
+  let admitted: { role: RoomSeat["role"] } | undefined;
   try {
-    await db.insert(roomMembers).values({ roomId: room.roomId, userId, role: "spectator" });
+    // This deliberately uses two commands in one transaction. The first takes
+    // the shared lifecycle locks; the second gets a fresh READ COMMITTED snapshot
+    // after any waiter ahead of it commits, so two arrivals seeing chair 15 cannot
+    // both insert chair 16. A single CTE would keep its opening snapshot while
+    // waiting and could overshoot the gallery cap even though it held the lock.
+    const [, result] = await db.batch([
+      db.execute(sql`
+        select ${rooms.id}
+        from ${rooms}
+        join ${matches} on ${matches.roomId} = ${rooms.id}
+        where ${rooms.id} = ${room.roomId}
+          and (${rooms.expiresAt} is null or ${rooms.expiresAt} > now())
+          and ${matches.status} in ('pending', 'active')
+        for update of ${rooms}, ${matches}
+      `),
+      db.execute<{ role: RoomSeat["role"] }>(sql`
+        insert into ${roomMembers} (room_id, user_id, role)
+        select ${rooms.id}, ${userId}, 'spectator'
+        from ${rooms}
+        join ${matches} on ${matches.roomId} = ${rooms.id}
+        where ${rooms.id} = ${room.roomId}
+          and (${rooms.expiresAt} is null or ${rooms.expiresAt} > now())
+          and ${matches.status} in ('pending', 'active')
+          and (
+            select count(*) from ${roomMembers}
+            where ${roomMembers.roomId} = ${rooms.id} and ${roomMembers.role} = 'spectator'
+          ) < ${MAX_SPECTATORS}
+        on conflict (room_id, user_id) do nothing
+        returning ${roomMembers.role} as "role"
+      `),
+    ]);
+    admitted = result.rows[0];
   } catch (cause) {
     // Two taps racing each other both wanted the same thing, and one of them got it.
     if (isUniqueViolation(cause)) return { code: room.code, role: "spectator" };
     throw new RoomServiceError({ cause });
   }
+  if (!admitted) {
+    const current = await findRoom(room.code, db);
+    const currentMember = current.members.find((entry) => entry.userId === userId);
+    if (currentMember) return { code: current.code, role: currentMember.role };
+    if (current.status === "complete" || current.status === "abandoned") {
+      throw new RoomError(409, "room_closed", "This room's match has already finished");
+    }
+    if (current.members.filter((entry) => entry.role === "spectator").length >= MAX_SPECTATORS) {
+      throw new RoomError(409, "gallery_full", "This room's gallery is full");
+    }
+    throw new RoomServiceError();
+  }
   record("room.spectated", { userId });
-  return { code: room.code, role: "spectator" };
+  return { code: room.code, role: admitted.role };
 }
 
 /**
  * Hands the room to another seated player.
  *
- * Ownership is transferred, never shared and never vacated: the batch demotes the
- * old host and promotes the new one in the same transaction, and `rooms.owner_user_id`
- * moves with it so the row and the membership can never name two different hosts.
+ * Ownership is transferred, never shared and never vacated: one locked statement
+ * demotes every old host label, promotes the new one, and moves
+ * `rooms.owner_user_id` with it so the row and membership agree.
  * Only a seated human can receive the room — a spectator holds no seat, and a bot
  * seat has nobody behind it to decide anything.
  */
@@ -264,8 +324,7 @@ export async function handOverRoom(
   db: Database = createDatabase(),
 ): Promise<{ readonly code: string; readonly hostSeat: number }> {
   const room = await findRoom(normalizeRoomCode(code), db);
-  const caller = room.members.find((entry) => entry.userId === userId);
-  if (caller?.role !== "owner") throw new RoomError(403, "not_the_host", "Only the host hands the room over");
+  if (room.ownerUserId !== userId) throw new RoomError(403, "not_the_host", "Only the host hands the room over");
   if (room.status === "complete" || room.status === "abandoned") {
     throw new RoomError(409, "room_closed", "This room's match has already finished");
   }
@@ -275,19 +334,62 @@ export async function handOverRoom(
   // Handing the room to yourself is agreement with the current state, not an error.
   if (target.userId === userId) return { code: room.code, hostSeat: toSeat };
 
+  let moved: { hostSeat: number } | undefined;
   try {
-    await db.batch([
-      db.update(roomMembers).set({ role: "player" })
-        .where(and(eq(roomMembers.roomId, room.roomId), eq(roomMembers.userId, userId), eq(roomMembers.role, "owner"))),
-      db.update(roomMembers).set({ role: "owner" })
-        .where(and(eq(roomMembers.roomId, room.roomId), eq(roomMembers.userId, target.userId))),
-      db.update(rooms).set({ ownerUserId: target.userId }).where(eq(rooms.id, room.roomId)),
-    ] as never);
+    // Lock the room and match in one statement before changing either. A competing
+    // handover, close, or finish waits, then rechecks the owner and terminal state.
+    // Reconciliation demotes every non-target owner, not only the caller, so the
+    // first safe handover also repairs any duplicate label left by older code.
+    const result = await db.execute<{ hostSeat: number }>(sql`
+      with locked as materialized (
+        select ${rooms.id} as room_id
+        from ${rooms}
+        join ${matches} on ${matches.roomId} = ${rooms.id}
+        where ${rooms.id} = ${room.roomId}
+          and ${rooms.ownerUserId} = ${userId}
+          and ${matches.status} in ('pending', 'active')
+          and exists (
+            select 1 from ${roomMembers}
+            where ${roomMembers.roomId} = ${rooms.id}
+              and ${roomMembers.userId} = ${target.userId}
+              and ${roomMembers.role} in ('owner', 'player')
+          )
+        for update of ${rooms}, ${matches}
+      ), moved as (
+        update ${rooms}
+           set owner_user_id = ${target.userId}
+         where ${rooms.id} in (select room_id from locked)
+        returning ${rooms.id} as room_id
+      ), reconciled as (
+        update ${roomMembers}
+           set role = case
+             when ${roomMembers.userId} = ${target.userId} then 'owner'::room_member_role
+             else 'player'::room_member_role
+           end
+         where ${roomMembers.roomId} in (select room_id from moved)
+           and (${roomMembers.role} = 'owner' or ${roomMembers.userId} = ${target.userId})
+        returning ${roomMembers.userId} as user_id, ${roomMembers.role} as role
+      )
+      select ${toSeat}::integer as "hostSeat"
+      from reconciled
+      where user_id = ${target.userId} and role = 'owner'
+    `);
+    moved = result.rows[0];
   } catch (cause) {
     throw new RoomServiceError({ cause });
   }
+  if (!moved) {
+    const current = await findRoom(room.code, db);
+    if (current.status === "complete" || current.status === "abandoned") {
+      throw new RoomError(409, "room_closed", "This room's match has already finished");
+    }
+    if (current.ownerUserId !== userId) {
+      throw new RoomError(403, "not_the_host", "Only the current host hands the room over");
+    }
+    throw new RoomServiceError();
+  }
   record("room.handed_over", { userId });
-  return { code: room.code, hostSeat: toSeat };
+  return { code: room.code, hostSeat: moved.hostSeat };
 }
 
 /**
@@ -305,18 +407,42 @@ export async function closeRoom(
   db: Database = createDatabase(),
 ): Promise<{ readonly alreadyClosed: boolean }> {
   const room = await findRoom(normalizeRoomCode(code), db);
-  const caller = room.members.find((entry) => entry.userId === userId);
-  if (caller?.role !== "owner") throw new RoomError(403, "not_the_host", "Only the host closes the room");
+  if (room.ownerUserId !== userId) throw new RoomError(403, "not_the_host", "Only the host closes the room");
   if (room.status === "abandoned") return { alreadyClosed: true };
   if (room.status === "complete") {
     // A finished match cannot be un-finished into an abandonment.
     throw new RoomError(409, "room_closed", "This room's match has already finished");
   }
 
+  let closed: { status: RoomState["status"] } | undefined;
   try {
-    await db.update(matches).set({ status: "abandoned" }).where(eq(matches.id, room.matchId));
+    // The lock makes close, finish, and handover an ordered choice. Whichever
+    // terminal transition wins first is the one every later caller observes.
+    const result = await db.execute<{ status: RoomState["status"] }>(sql`
+      with locked as materialized (
+        select ${matches.id} as match_id
+        from ${rooms}
+        join ${matches} on ${matches.roomId} = ${rooms.id}
+        where ${rooms.id} = ${room.roomId}
+          and ${rooms.ownerUserId} = ${userId}
+          and ${matches.status} in ('pending', 'active')
+        for update of ${rooms}, ${matches}
+      )
+      update ${matches}
+         set status = 'abandoned'
+       where ${matches.id} in (select match_id from locked)
+      returning ${matches.status} as "status"
+    `);
+    closed = result.rows[0];
   } catch (cause) {
     throw new RoomServiceError({ cause });
+  }
+  if (!closed) {
+    const current = await findRoom(room.code, db);
+    if (current.ownerUserId !== userId) throw new RoomError(403, "not_the_host", "Only the current host closes the room");
+    if (current.status === "abandoned") return { alreadyClosed: true };
+    if (current.status === "complete") throw new RoomError(409, "room_closed", "This room's match has already finished");
+    throw new RoomServiceError();
   }
   record("room.closed_by_host", { userId });
   return { alreadyClosed: false };
@@ -351,55 +477,59 @@ export async function appendRoomTurn(
     throw new RoomError(409, "room_closed", "This room's match has already finished");
   }
 
+  const turnId = randomUUID();
+  const storedDarts = dartRows(turnId, input.turn.darts).map(({ ordinal, segment, multiplier, x, y }) => ({ ordinal, segment, multiplier, x, y }));
   let claimed: { version: number } | undefined;
   try {
-    // The SET target is written unqualified on purpose. Drizzle renders a column
-    // reference as "matches"."state_version", which Postgres accepts everywhere in
-    // this statement except as the thing being assigned — there it is a syntax
-    // error, and the whole write came back 503 until the target was spelled out.
+    // Claiming the version, inserting the visit, and inserting its darts are one
+    // Postgres statement. A rejected statement rolls the version claim back too;
+    // after an outcome-unknown transport failure, the caller rereads the room.
+    // Either way, state_version and the complete turn commit together.
     const result = await db.execute<{ version: number }>(sql`
-      update ${matches}
-         set state_version = ${matches.stateVersion} + 1
-       where ${matches.id} = ${room.matchId}
-         and ${matches.stateVersion} = ${input.expectedVersion}
-      returning ${matches.stateVersion} as "version"
+      with claimed as (
+        update ${matches}
+           set state_version = ${matches.stateVersion} + 1
+         where ${matches.id} = ${room.matchId}
+           and ${matches.stateVersion} = ${input.expectedVersion}
+           and ${matches.status} in ('pending', 'active')
+        returning ${matches.stateVersion} as version
+      ), inserted_turn as (
+        insert into ${turns} (
+          id, match_id, player_id, turn_number, leg_number, score_before,
+          score_after, bust, darts_thrown, aggregate_score
+        )
+        select
+          ${turnId}, ${room.matchId}, ${seated.playerId}, claimed.version,
+          ${input.turn.legNumber}, ${input.turn.scoreBefore}, ${input.turn.scoreAfter},
+          ${input.turn.bust}, ${input.turn.dartsThrown}, ${input.turn.aggregateScore ?? null}
+        from claimed
+        returning id
+      ), inserted_darts as (
+        insert into ${darts} (turn_id, ordinal, segment, multiplier, x_microunits, y_microunits)
+        select inserted_turn.id, thrown.ordinal, thrown.segment, thrown.multiplier, thrown.x, thrown.y
+        from inserted_turn
+        cross join jsonb_to_recordset(${JSON.stringify(storedDarts)}::jsonb)
+          as thrown(ordinal integer, segment integer, multiplier integer, x integer, y integer)
+        returning id
+      )
+      select claimed.version as "version" from claimed
     `);
     claimed = result.rows[0];
   } catch (cause) {
+    recordFailure("room.turn_failed", cause, { userId, count: input.expectedVersion + 1 });
     throw new RoomServiceError({ cause });
   }
   if (!claimed) {
+    const current = await findRoom(room.code, db);
+    if (current.status === "complete" || current.status === "abandoned") {
+      throw new RoomError(409, "room_closed", "This room's match has already finished");
+    }
     // Worth counting rather than only refusing: a room producing these steadily
     // means two clients disagree about whose turn it is, not that people are fast.
     record("room.version_conflict", { userId, count: input.expectedVersion }, "warn");
     throw new RoomError(409, "version_conflict", "Somebody else threw first — catch up and try again");
   }
 
-  // The version is now this turn's number: both count accepted writes, and the
-  // update above is the only thing that increments either.
-  const turnNumber = claimed.version;
-  const turnId = randomUUID();
-  try {
-    const statements = [
-      db.insert(turns).values({
-        id: turnId,
-        matchId: room.matchId,
-        playerId: seated.playerId,
-        turnNumber,
-        legNumber: input.turn.legNumber,
-        scoreBefore: input.turn.scoreBefore,
-        scoreAfter: input.turn.scoreAfter,
-        bust: input.turn.bust,
-        dartsThrown: input.turn.dartsThrown,
-        aggregateScore: input.turn.aggregateScore ?? null,
-      }),
-      ...(input.turn.darts.length > 0 ? [db.insert(darts).values([...dartRows(turnId, input.turn.darts)])] : []),
-    ];
-    await db.batch(statements as never);
-  } catch (cause) {
-    recordFailure("room.turn_failed", cause, { userId, count: turnNumber });
-    throw new RoomServiceError({ cause });
-  }
   return { version: claimed.version };
 }
 
@@ -426,18 +556,33 @@ export async function completeRoomMatch(
   const seated = room.seats.find((seat) => seat.userId === userId);
   if (!seated) throw refusalForUnseated(room, userId);
   if (room.status === "complete") return { alreadyComplete: true };
+  if (room.status === "abandoned") throw new RoomError(409, "room_closed", "The host closed this room");
 
   const winner = winnerSeat === null ? null : room.seats.find((seat) => seat.seat === winnerSeat);
   if (winnerSeat !== null && !winner) {
     throw new RoomError(422, "unknown_seat", "That seat is not in this room");
   }
 
+  let completed: { status: RoomState["status"] } | undefined;
   try {
-    await db.update(matches)
-      .set({ status: "complete", winnerPlayerId: winner?.playerId ?? null, completedAt: new Date() })
-      .where(eq(matches.id, room.matchId));
+    const result = await db.execute<{ status: RoomState["status"] }>(sql`
+      update ${matches}
+         set status = 'complete',
+             winner_player_id = ${winner?.playerId ?? null},
+             completed_at = ${new Date()}
+       where ${matches.id} = ${room.matchId}
+         and ${matches.status} in ('pending', 'active')
+      returning ${matches.status} as "status"
+    `);
+    completed = result.rows[0];
   } catch (cause) {
     throw new RoomServiceError({ cause });
+  }
+  if (!completed) {
+    const current = await findRoom(room.code, db);
+    if (current.status === "complete") return { alreadyComplete: true };
+    if (current.status === "abandoned") throw new RoomError(409, "room_closed", "The host closed this room");
+    throw new RoomServiceError();
   }
   return { alreadyComplete: false };
 }
@@ -515,6 +660,8 @@ export async function readRoom(
 interface FoundRoom {
   readonly roomId: string;
   readonly matchId: string;
+  /** Canonical host authority; membership roles mirror this for display. */
+  readonly ownerUserId: string;
   readonly code: string;
   readonly mode: string;
   readonly options: Record<string, unknown>;
@@ -536,6 +683,7 @@ async function findRoom(code: string, db: Database): Promise<FoundRoom> {
       select
         ${rooms.id} as "roomId",
         ${matches.id} as "matchId",
+        ${rooms.ownerUserId} as "ownerUserId",
         ${rooms.code} as "code",
         ${matches.mode} as "mode",
         ${matches.options} as "options",
