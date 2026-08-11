@@ -97,10 +97,11 @@ reconnect, spectate, handover, and close are all live, so `/friends` carries zer
   echoes arguments before script code runs.
 - [x] Full local gates on the corrective branch: typecheck 0, lint 0, test
   616/616, build 0, browser 161 passed / 4 skipped by design; all unpiped.
-- [ ] Fresh Preview deployment and rerun through the remediated credential-safe
+- [x] Fresh Preview deployment and rerun through the remediated credential-safe
   `verify:rooms:live` entrypoint. PR #27's Preview proof and the pre-rotation
   corrective run cannot cover this final revision.
-- [ ] Corrective PR CI green, merged, then all three production verify gates and
+- [x] Corrective PR #28 CI green on the credential-safe code revision.
+- [ ] Corrective PR merged, then all three production verify gates and
   touched browser surfaces green against `https://dartioopus46.vercel.app`.
 - [ ] Physical expiry archive/purge — parked because the active goal forbids
   destructive database operations; no automatic `DELETE` remains.
@@ -157,3 +158,16 @@ reconnect, spectate, handover, and close are all live, so `/friends` carries zer
   targeted. The live verifier no longer accepts the secret-bearing invocation,
   ignores ambient database overrides, and refuses a database outside the named
   Preview branch before constructing its SQL client.
+- 2026-08-11 · Credential-safe code revision `2a5e3dd` passed PR #28 CI run
+  `31447326517`, including the browser proof, in 4m47s. Vercel deployment
+  `dartio-ak6pififa-niras-projects-868b6f5f.vercel.app` reported Ready for the
+  exact commit and served 200 on `/` and `/friends`; the landing identified
+  Dartio, Friends carried Online Rooms, and no Planned marker remained.
+- 2026-08-11 · The exact Preview origin was temporarily added to Preview Neon
+  Auth (201). `pnpm verify:auth <preview>` exited 0. The remediated
+  `pnpm verify:rooms:live <preview>` invocation contained no database argument,
+  passed every lifecycle check, and removed all 4 temporary Pro rows. Its
+  post-write read-only integrity audit reported owner=0, version=0, and all
+  terminal-field anomaly counts=0; the known historical signatures remained
+  open=2, multi_user=3. The Preview rooms browser matrix passed 15/15 across all
+  three viewports. The Auth origin was then deleted (200) and confirmed absent.
