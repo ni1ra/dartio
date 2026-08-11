@@ -1,6 +1,7 @@
 # Cycle 26 — Voice Confidence, End to End
 
-Status: active on branch `codex/cycle-26-voice-confidence`.
+Status: active in PR [#31](https://github.com/ni1ra/dartio/pull/31) from
+`codex/cycle-26-voice-confidence`.
 
 Fourth cycle of `PHASE_3_promise_completion.md`. The continuous voice lifecycle
 already knew how to segment speech and the dialogue layer already had a hold
@@ -84,8 +85,12 @@ rename an X01 proof as cross-mode completion.
   entitlement proof, exact command/confidence validation, and no sensitive
   logging.
 - [x] Full local typecheck, lint, unit, build, and browser gates.
-- [ ] Exact Preview deployment, trusted-origin/auth proof, available Preview
-  voice evidence, touched browser matrix, and CI.
+- [x] Exact Preview deployment, anonymous auth/cache proof, touched browser
+  matrix, and CI.
+- [ ] Paid Preview provider proof is parked: Preview has a separate Neon Auth
+  project, so the existing Production QA identity is refused at sign-in with
+  403. Do not manufacture a subscription row merely to turn this box green;
+  repeat the live gate when a legitimate Preview Pro identity exists.
 - [ ] Merge only a green exact revision; repeat auth, history, rooms, premium AI,
   voice, touched browser, full browser, and main-CI proof on Production.
 
@@ -118,5 +123,26 @@ Local candidate, 2026-08-12:
   245 passed and the four documented viewport-inapplicable layout assertions
   skipped by design; exit 0 in 252.8 seconds.
 
-PR, Preview, merge, and Production receipts remain deliberately unrecorded
-until the stabilized exact revision reaches each gate.
+Merge and Production receipts remain deliberately unrecorded until the
+stabilized exact revision reaches each gate.
+
+Preview candidate, 2026-08-12:
+
+- PR [#31](https://github.com/ni1ra/dartio/pull/31) carried feature commit
+  `a3888cfe0f9134e4dbe2c175a9135fdbda5a4d98`.
+- Vercel deployment `dpl_7Y5hms8d8kRQCKrtCnKWtDbT7ab3` reached READY for
+  that exact Git SHA with no alias error at
+  `https://dartio-bmp37l9pz-niras-projects-868b6f5f.vercel.app`.
+- The Preview page returned 200. A real synthetic-audio request without a
+  session returned exact 401 `authentication_required` with
+  `private, no-store`.
+- `DARTIO_BASE_URL=<exact-preview> pnpm exec playwright test
+  tests/browser/voice.spec.ts` — 18/18 passed across all three viewports in
+  12.7 seconds, exit 0.
+- `pnpm verify:voice:live <exact-preview>` passed the anonymous boundary, then
+  stopped before OpenAI when the Production QA identity was refused by
+  Preview Neon Auth with 403. No paid provider success is claimed.
+- GitHub Actions run
+  [31543086276](https://github.com/ni1ra/dartio/actions/runs/31543086276)
+  completed successfully on the exact feature SHA: typecheck, lint, unit,
+  build, and browser proof all passed. Both required Vercel checks passed.
