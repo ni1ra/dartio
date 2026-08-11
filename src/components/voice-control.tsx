@@ -1,9 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Button, Surface } from "navi-ui";
-import type { VoiceCommand } from "@/lib/voice/commands";
+import { voiceCommandSchema, type VoiceCommand } from "@/lib/voice/commands";
+import {
+  clearDialogue,
+  createDialogue,
+  hearCommand,
+  pending,
+  type DialogueState,
+  type VoiceMode,
+} from "@/lib/voice/dialogue";
 import { createSegmenter, frameLevel, observeLevel } from "@/lib/voice/segmenter";
 import { hasAccessEntitlement, isProductAvailable } from "@/lib/product/access-contract";
 import { RecordDotIcon } from "./icons";
@@ -20,9 +28,30 @@ type VoicePhase =
   | "ambiguous"
   | "denied"
   | "error";
-type VoiceResult = { transcript: string; command: VoiceCommand | null };
+type VoiceResult = {
+  transcript: string;
+  command: VoiceCommand | null;
+  confidence: number;
+  reason:
+    | "unheard"
+    | "out-of-vocabulary"
+    | "nothing-pending"
+    | "uncertain-control";
+};
+type VoiceTranscription = {
+  transcript: string;
+  command: VoiceCommand | null;
+  confidence: number;
+};
+type VoiceRequest = {
+  readonly id: number;
+  readonly revision: number;
+};
 type VoiceControlProps = {
   disabled?: boolean;
+  /** Changes whenever the match advances, invalidating captured audio and held scores. */
+  revision: number;
+  mode?: VoiceMode;
   onDart: (segment: number, multiplier: 1 | 2 | 3) => void;
   onTurnScore: (score: number) => void;
   onUndo: () => void;
@@ -31,6 +60,8 @@ type VoiceControlProps = {
 
 export function VoiceControl({
   disabled = false,
+  revision,
+  mode = "x01",
   onDart,
   onTurnScore,
   onUndo,
@@ -40,7 +71,13 @@ export function VoiceControl({
   const [phase, setPhase] = useState<VoicePhase>("idle"),
     [alwaysOn, setAlwaysOn] = useState(false),
     [result, setResult] = useState<VoiceResult | null>(null),
+    [dialogue, setDialogue] = useState<DialogueState>(createDialogue),
     [error, setError] = useState<string | null>(null);
+  const phaseRef = useRef<VoicePhase>("idle"),
+    dialogueRef = useRef(dialogue),
+    previousRevision = useRef(revision),
+    revisionRef = useRef(revision),
+    voiceEnabledRef = useRef(false);
   const audio = useRef<AudioContext | null>(null),
     monitorFrame = useRef<number | null>(null),
     segmenter = useRef(createSegmenter());
@@ -50,32 +87,187 @@ export function VoiceControl({
     cycleTimer = useRef<number | null>(null),
     permissionTimer = useRef<number | null>(null),
     requestGeneration = useRef(0),
+    transcription = useRef<AbortController | null>(null),
     holdActive = useRef(false),
     discard = useRef(false),
+    restartAfterStop = useRef(false),
+    afterCaptureStop = useRef<(() => void) | null>(null),
     alive = useRef(true),
-    alwaysRef = useRef(false);
+    alwaysRef = useRef(false),
+    disabledRef = useRef(disabled),
+    beginRef = useRef<(mode: "push" | "always") => Promise<void>>(async () => undefined),
+    invalidateCaptureRef = useRef<(restart: boolean) => void>(() => undefined);
+  disabledRef.current = disabled;
+  revisionRef.current = revision;
   useEffect(() => {
     alwaysRef.current = alwaysOn;
   }, [alwaysOn]);
-  useEffect(
-    () => () => {
+  useLayoutEffect(() => {
+    // Strict Mode deliberately runs setup → cleanup → setup in development.
+    // Re-arm the instance so the real setup does not inherit the probe cleanup.
+    alive.current = true;
+    return () => {
       alive.current = false;
+      restartAfterStop.current = false;
+      afterCaptureStop.current = null;
       requestGeneration.current += 1;
+      transcription.current?.abort();
+      transcription.current = null;
       clearPermissionTimer();
       clearCycle();
-      recorder.current?.stop();
+      discard.current = true;
+      if (recorder.current?.state === "recording") recorder.current.stop();
+      stopMonitor();
       stopStream();
-    },
-    [],
-  );
+    };
+  }, []);
+  useLayoutEffect(() => {
+    if (previousRevision.current === revision) return;
+    previousRevision.current = revision;
+    const restart = alwaysRef.current && !disabledRef.current;
+    invalidateCaptureRef.current(restart);
+    const nextDialogue = clearDialogue(dialogueRef.current);
+    dialogueRef.current = nextDialogue;
+    phaseRef.current = restart ? "paused" : "idle";
+    const frame = window.requestAnimationFrame(() => {
+      if (!alive.current || previousRevision.current !== revision) return;
+      setDialogue(nextDialogue);
+      setResult(null);
+      setError(null);
+      setPhase(phaseRef.current);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [revision]);
+  useLayoutEffect(() => {
+    if (!disabled) return;
+    alwaysRef.current = false;
+    invalidateCaptureRef.current(false);
+    const nextDialogue = clearDialogue(dialogueRef.current);
+    dialogueRef.current = nextDialogue;
+    phaseRef.current = "idle";
+    const frame = window.requestAnimationFrame(() => {
+      if (!alive.current || !disabledRef.current) return;
+      setAlwaysOn(false);
+      setDialogue(nextDialogue);
+      setResult(null);
+      setPhase("idle");
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [disabled]);
 
   const voiceEnabled = access.status === "ready" && isProductAvailable(access.snapshot, "voiceInput") && hasAccessEntitlement(access.snapshot, "voice_always_on");
+  voiceEnabledRef.current = voiceEnabled;
+  useLayoutEffect(() => {
+    if (voiceEnabled) return;
+    alwaysRef.current = false;
+    invalidateCaptureRef.current(false);
+    const nextDialogue = clearDialogue(dialogueRef.current);
+    dialogueRef.current = nextDialogue;
+    phaseRef.current = "idle";
+    const frame = window.requestAnimationFrame(() => {
+      if (!alive.current) return;
+      setAlwaysOn(false);
+      setDialogue(nextDialogue);
+      setResult(null);
+      setError(null);
+      setPhase("idle");
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [voiceEnabled]);
+  useEffect(() => {
+    const abandonCapture = () => {
+      alwaysRef.current = false;
+      setAlwaysOn(false);
+      invalidateCaptureRef.current(false);
+      setError(null);
+      changePhase(pending(dialogueRef.current).length > 0 ? "confirm" : "idle");
+    };
+    const abandonHiddenCapture = () => {
+      if (document.hidden) abandonCapture();
+    };
+    window.addEventListener("blur", abandonCapture);
+    document.addEventListener("visibilitychange", abandonHiddenCapture);
+    return () => {
+      window.removeEventListener("blur", abandonCapture);
+      document.removeEventListener("visibilitychange", abandonHiddenCapture);
+    };
+  }, []);
   if (!voiceEnabled) {
     const loading = access.status === "loading";
     const unavailable = access.status === "unavailable";
     const anonymous = access.status === "ready" && access.snapshot.auth === "anonymous";
-    return <Surface className={`voice-console voice-access ${unavailable?"unavailable":"locked"}`} aria-busy={loading||undefined} aria-label="Voice score input access"><header><div><span className="voice-kicker">VOICE INPUT</span><h3>{loading?"Checking voice access":unavailable?"Voice access unavailable":"Voice scoring is a Pro feature"}</h3></div><span className="voice-state"><i />{loading?"CHECKING":unavailable?"UNAVAILABLE":"LOCKED"}</span></header><p className="voice-guidance">{loading?"Local scoring stays ready while Dartio checks this feature.":unavailable?"Dartio could not verify paid access. Your match and manual scoring are unaffected.":"Pro includes push-to-talk voice scoring."}</p><div className="voice-access-actions">{unavailable?<Button variant="secondary" onClick={()=>void access.retry()}>Retry access</Button>:anonymous?<><Link className="button-link" href="/auth/sign-in">Sign in</Link><Link className="button-link button-link-secondary" href="/pricing">View Pro</Link></>:!loading?<Link className="button-link" href="/pricing">Upgrade to Pro</Link>:null}</div></Surface>;
+    return <Surface className={`voice-console voice-access ${unavailable?"unavailable":"locked"}`} aria-busy={loading||undefined} aria-label="Voice score input access"><header><div><span className="voice-kicker">VOICE INPUT</span><h3>{loading?"Checking voice access":unavailable?"Voice access unavailable":"Voice scoring is a Pro feature"}</h3></div><span className="voice-state"><i />{loading?"CHECKING":unavailable?"UNAVAILABLE":"LOCKED"}</span></header><p className="voice-guidance">{loading?"Local scoring stays ready while Dartio checks this feature.":unavailable?"Dartio could not verify paid access. Your match and manual scoring are unaffected.":"Pro includes push-to-talk and opt-in hands-free voice scoring."}</p><div className="voice-access-actions">{unavailable?<Button variant="secondary" onClick={()=>void access.retry()}>Retry access</Button>:anonymous?<><Link className="button-link" href="/auth/sign-in">Sign in</Link><Link className="button-link button-link-secondary" href="/pricing">View Pro</Link></>:!loading?<Link className="button-link" href="/pricing">Upgrade to Pro</Link>:null}</div></Surface>;
   }
+
+  function changePhase(next: VoicePhase) {
+    phaseRef.current = next;
+    setPhase(next);
+  }
+
+  function storeDialogue(next: DialogueState) {
+    dialogueRef.current = next;
+    setDialogue(next);
+  }
+
+  function isRequestContextCurrent(request: VoiceRequest) {
+    return (
+      alive.current &&
+      revisionRef.current === request.revision &&
+      !disabledRef.current &&
+      voiceEnabledRef.current
+    );
+  }
+
+  function isRequestCurrent(request: VoiceRequest) {
+    return (
+      requestGeneration.current === request.id &&
+      isRequestContextCurrent(request)
+    );
+  }
+
+  function scheduleAlwaysRestart() {
+    if (
+      !alive.current ||
+      !alwaysRef.current ||
+      disabledRef.current ||
+      !voiceEnabledRef.current
+    )
+      return;
+    clearCycle();
+    cycleTimer.current = window.setTimeout(() => {
+      cycleTimer.current = null;
+      if (
+        alive.current &&
+        alwaysRef.current &&
+        !disabledRef.current &&
+        voiceEnabledRef.current
+      ) {
+        void beginRef.current("always");
+      }
+    }, 0);
+  }
+
+  /** Invalidates permission, recording, and fetch work without applying stale audio. */
+  function invalidateCapture(restart: boolean, afterStop: (() => void) | null = null) {
+    requestGeneration.current += 1;
+    transcription.current?.abort();
+    transcription.current = null;
+    clearPermissionTimer();
+    clearCycle();
+    discard.current = true;
+    restartAfterStop.current = restart;
+    afterCaptureStop.current = afterStop;
+    if (recorder.current?.state === "recording") {
+      recorder.current.stop();
+      return;
+    }
+    cleanupRecorder();
+    restartAfterStop.current = false;
+    afterCaptureStop.current = null;
+    if (afterStop) afterStop();
+    else if (restart) scheduleAlwaysRestart();
+  }
+  invalidateCaptureRef.current = invalidateCapture;
 
   function clearCycle() {
     if (cycleTimer.current !== null) {
@@ -108,7 +300,11 @@ export function VoiceControl({
    * hidden — a phone on a stool with the screen off should not be holding a
    * microphone open and sending audio.
    */
-  function startMonitor(media: MediaStream) {
+  function startMonitor(
+    media: MediaStream,
+    request: VoiceRequest,
+    startCapture: () => void,
+  ): boolean {
     stopMonitor();
     try {
       const context = new AudioContext();
@@ -119,20 +315,24 @@ export function VoiceControl({
       const frame = new Float32Array(analyser.fftSize);
 
       const tick = () => {
-        if (!alive.current || recorder.current?.state !== "recording") return;
+        if (
+          !isRequestCurrent(request) ||
+          stream.current !== media
+        )
+          return;
         analyser.getFloatTimeDomainData(frame);
         const step = observeLevel(segmenter.current, frameLevel(frame), context.currentTime * 1000);
         segmenter.current = step.state;
+        if (step.event.kind === "speech-started") startCapture();
         if (step.event.kind === "clip") { stop(false); return; }
         // Too short to be a score: drop it and keep listening without a word.
         if (step.event.kind === "discarded") { stop(true); return; }
         monitorFrame.current = window.requestAnimationFrame(tick);
       };
       monitorFrame.current = window.requestAnimationFrame(tick);
+      return true;
     } catch {
-      // No analyser available: fall back to the old fixed clip rather than
-      // recording until the tab is closed.
-      cycleTimer.current = window.setTimeout(() => stop(false), 4500);
+      return false;
     }
   }
 
@@ -145,28 +345,35 @@ export function VoiceControl({
 
   async function begin(mode: "push" | "always") {
     if (
-      disabled ||
-      phase === "requesting" ||
-      phase === "processing" ||
+      disabledRef.current ||
+      !voiceEnabledRef.current ||
+      phaseRef.current === "requesting" ||
+      phaseRef.current === "processing" ||
       recorder.current?.state === "recording"
     )
       return;
-    const requestId = ++requestGeneration.current;
+    const request: VoiceRequest = {
+      id: ++requestGeneration.current,
+      revision: revisionRef.current,
+    };
     setError(null);
-    setResult(null);
+    if (mode === "push") setResult(null);
     discard.current = false;
-    setPhase("requesting");
+    restartAfterStop.current = false;
+    afterCaptureStop.current = null;
+    changePhase("requesting");
     clearPermissionTimer();
     permissionTimer.current = window.setTimeout(() => {
-      if (requestGeneration.current !== requestId) return;
+      if (!isRequestCurrent(request)) return;
       requestGeneration.current += 1;
       permissionTimer.current = null;
+      holdActive.current = false;
       setAlwaysOn(false);
       alwaysRef.current = false;
       setError(
         "The browser did not finish the microphone permission request. Close the browser prompt or update this site’s microphone permission, then try again.",
       );
-      setPhase("error");
+      changePhase("error");
     }, 12000);
     try {
       const media = await navigator.mediaDevices.getUserMedia({
@@ -176,8 +383,15 @@ export function VoiceControl({
           autoGainControl: true,
         },
       });
-      if (!alive.current || requestGeneration.current !== requestId) {
+      if (!isRequestCurrent(request)) {
         media.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      if (mode === "push" && !holdActive.current) {
+        requestGeneration.current += 1;
+        clearPermissionTimer();
+        media.getTracks().forEach((track) => track.stop());
+        changePhase(pending(dialogueRef.current).length > 0 ? "confirm" : "idle");
         return;
       }
       clearPermissionTimer();
@@ -195,21 +409,56 @@ export function VoiceControl({
         if (event.data.size) chunks.current.push(event.data);
       };
       next.onerror = () => {
+        if (!isRequestCurrent(request)) return;
+        requestGeneration.current += 1;
+        discard.current = true;
+        next.onstop = null;
+        next.ondataavailable = null;
+        next.onerror = null;
         cleanupRecorder();
+        alwaysRef.current = false;
+        setAlwaysOn(false);
         setError("The browser recorder stopped unexpectedly.");
-        setPhase("error");
+        changePhase("error");
       };
-      next.onstop = () => void finishRecording(next.mimeType || "audio/webm");
-      next.start(250);
-      setPhase(mode === "always" ? "listening" : "recording");
+      next.onstop = () =>
+        void finishRecording(next.mimeType || "audio/webm", request, mode);
+      const startCapture = () => {
+        if (
+          !isRequestCurrent(request) ||
+          recorder.current !== next ||
+          next.state !== "inactive"
+        )
+          return;
+        chunks.current = [];
+        next.start(250);
+        // The wall-clock ceiling begins with speech, never with idle listening.
+        // It remains independent of animation frames, which pause in hidden tabs.
+        cycleTimer.current = window.setTimeout(() => {
+          if (isRequestCurrent(request) && recorder.current === next)
+            stop(false);
+        }, 9000);
+      };
       // A clip is a sentence, not a stopwatch: the segmenter closes it when the
       // room goes quiet, and throws away anything too short to be a score — which
       // is mostly darts hitting the board.
-      if (mode === "always") startMonitor(media);
-      if (mode === "push" && !holdActive.current)
-        window.setTimeout(() => stop(false), 120);
+      if (mode === "always") {
+        changePhase("listening");
+        if (!startMonitor(media, request, startCapture)) {
+          cleanupRecorder();
+          alwaysRef.current = false;
+          setAlwaysOn(false);
+          setError(
+            "This browser cannot detect speech for hands-free listening. Hold to speak instead.",
+          );
+          changePhase("error");
+        }
+      } else {
+        startCapture();
+        changePhase("recording");
+      }
     } catch (problem) {
-      if (requestGeneration.current !== requestId) return;
+      if (!isRequestCurrent(request)) return;
       clearPermissionTimer();
       cleanupRecorder();
       const denied =
@@ -221,38 +470,80 @@ export function VoiceControl({
           ? "Microphone permission was denied. Allow microphone access in this site’s browser settings, then try again."
           : "No usable microphone was found on this device.",
       );
-      setPhase(denied ? "denied" : "error");
+      changePhase(denied ? "denied" : "error");
+      alwaysRef.current = false;
       setAlwaysOn(false);
     }
   }
+  beginRef.current = begin;
 
   function stop(shouldDiscard: boolean) {
     clearCycle();
     discard.current = shouldDiscard;
     if (recorder.current?.state === "recording") recorder.current.stop();
   }
-  async function finishRecording(mime: string) {
+
+  /** A release owns the permission request too, not only an existing recorder. */
+  function releasePush(shouldDiscard: boolean) {
+    if (!holdActive.current) return;
+    holdActive.current = false;
+    if (phaseRef.current === "requesting") {
+      invalidateCapture(false);
+      setError(null);
+      changePhase(pending(dialogueRef.current).length > 0 ? "confirm" : "idle");
+      return;
+    }
+    stop(shouldDiscard);
+  }
+  async function finishRecording(
+    mime: string,
+    request: VoiceRequest,
+    captureMode: "push" | "always",
+  ) {
     const ignored = discard.current,
       blob = new Blob(chunks.current, { type: mime });
     cleanupRecorder();
     chunks.current = [];
+    const continuation = afterCaptureStop.current;
+    const restart = restartAfterStop.current;
+    afterCaptureStop.current = null;
+    restartAfterStop.current = false;
+    if (!isRequestCurrent(request)) {
+      const contextIsCurrent = isRequestContextCurrent(request);
+      if (
+        requestGeneration.current !== request.id &&
+        contextIsCurrent &&
+        continuation
+      )
+        continuation();
+      else if (
+        requestGeneration.current !== request.id &&
+        contextIsCurrent &&
+        restart
+      )
+        scheduleAlwaysRestart();
+      return;
+    }
     if (ignored) {
-      if (!alive.current) return;
       // A cough, a chair, a dart in the board. Always-on goes back to listening
       // without saying anything — stopping to be restarted after every noise in
       // the room is exactly what made the old mode unusable.
-      if (alwaysRef.current) { void begin("always"); return; }
-      setPhase("idle");
+      if (alwaysRef.current) scheduleAlwaysRestart();
+      else changePhase("idle");
       return;
     }
     if (!blob.size) {
       setError(
         "No speech was captured. Hold the control until you finish speaking.",
       );
-      setPhase("error");
+      alwaysRef.current = false;
+      setAlwaysOn(false);
+      changePhase("error");
       return;
     }
-    setPhase("processing");
+    changePhase("processing");
+    const controller = new AbortController();
+    transcription.current = controller;
     try {
       const form = new FormData();
       form.append(
@@ -264,37 +555,93 @@ export function VoiceControl({
       const response = await fetch("/api/voice/transcribe", {
         method: "POST",
         body: form,
+        signal: controller.signal,
       });
-      const payload = (await response.json()) as {
-        transcript?: string;
-        command?: VoiceCommand | null;
-        error?: string;
-      };
+      const payload: unknown = await response.json().catch(() => null);
+      if (!isRequestCurrent(request)) return;
       if (!response.ok) {
         if ([401, 402, 403, 503].includes(response.status)) void access.refresh();
-        throw new Error(response.status === 401?"Sign in to use cloud voice scoring.":response.status===402||response.status===403?"Voice scoring requires active Pro access.":response.status===503?"Voice access could not be verified. Try again shortly.":payload.error||"Transcription failed");
+        throw new Error(response.status === 401?"Sign in to use cloud voice scoring.":response.status===402||response.status===403?"Voice scoring requires active Pro access.":response.status===503?"Voice access could not be verified. Try again shortly.":payloadError(payload)||"Transcription failed");
       }
-      const next = {
-        transcript: payload.transcript?.trim() || "",
-        command: payload.command ?? null,
-      };
-      // Always-on applies what it understood and goes straight back to listening.
-      // Stopping to be confirmed after every visit is what made the old mode a
-      // single clip with extra steps; a misheard dart is corrected by saying
-      // "undo", which is in the vocabulary.
-      if (alwaysRef.current && next.command) {
-        setResult(null);
-        if (applyCommand(next.command, next.transcript)) { void begin("always"); return; }
-        return;
-      }
-      setResult(next);
-      setPhase(next.command ? "confirm" : "ambiguous");
+      const next = parseVoiceTranscription(payload);
+      if (!next) throw new Error("Transcription returned an invalid response.");
+      if (!isRequestCurrent(request)) return;
+      routeTranscription(next, captureMode, request);
     } catch (problem) {
+      if (
+        controller.signal.aborted ||
+        !isRequestCurrent(request)
+      )
+        return;
+      alwaysRef.current = false;
+      setAlwaysOn(false);
       setError(
         problem instanceof Error ? problem.message : "Transcription failed",
       );
-      setPhase("error");
+      changePhase("error");
+    } finally {
+      if (transcription.current === controller) transcription.current = null;
     }
+  }
+
+  /** Routes one server-parsed command through the FIFO confidence policy. */
+  function routeTranscription(
+    next: VoiceTranscription,
+    source: "push" | "always" | "ui",
+    request: VoiceRequest | null = null,
+  ) {
+    if (request && !isRequestCurrent(request)) return;
+    const outcome = hearCommand(
+      dialogueRef.current,
+      next.transcript,
+      next.command,
+      mode,
+      { confidence: next.confidence, forceReview: source === "push" },
+    );
+    storeDialogue(outcome.state);
+
+    if (outcome.kind === "apply" || outcome.kind === "confirmed") {
+      // An external score can commit after fetch resolution but before this
+      // branch. The render refs close that pre-effect window at the last moment.
+      if (request && !isRequestCurrent(request)) return;
+      setResult(null);
+      if (!applyCommand(outcome.command, next.transcript)) return;
+      changePhase(alwaysRef.current ? "paused" : "idle");
+      if (alwaysRef.current) scheduleAlwaysRestart();
+      return;
+    }
+    if (outcome.kind === "queued") {
+      setResult(null);
+      changePhase("confirm");
+      if (alwaysRef.current) scheduleAlwaysRestart();
+      return;
+    }
+    if (outcome.kind === "cancelled") {
+      setResult(null);
+      setError(null);
+      changePhase(
+        pending(outcome.state).length > 0
+          ? "confirm"
+          : alwaysRef.current
+            ? "paused"
+            : "idle",
+      );
+      if (alwaysRef.current) scheduleAlwaysRestart();
+      return;
+    }
+
+    setResult({
+      transcript: next.transcript,
+      command:
+        outcome.kind === "out-of-vocabulary" ||
+        outcome.kind === "uncertain-control"
+          ? outcome.command
+          : next.command,
+      confidence: next.confidence,
+      reason: outcome.kind,
+    });
+    changePhase("ambiguous");
+    if (alwaysRef.current) scheduleAlwaysRestart();
   }
 
   /**
@@ -310,52 +657,59 @@ export function VoiceControl({
     else if (command.type === "next_player") onNextPlayer();
     else {
       setError(`“${transcript}” is a voice-control word, not a score to apply here.`);
-      setPhase("ambiguous");
+      changePhase("ambiguous");
       return false;
     }
     return true;
   }
 
-  function apply() {
-    const command = result?.command;
-    if (!command) return;
-    if (!applyCommand(command, result?.transcript ?? "")) return;
-    setResult(null);
-    setPhase(alwaysOn ? "paused" : "idle");
-  }
-  function cancel() {
-    setResult(null);
-    setError(null);
-    setPhase(alwaysOn ? "paused" : "idle");
+  function resolveHeld(type: "confirm" | "cancel") {
+    const resolve = () =>
+      routeTranscription(
+        {
+          transcript: type,
+          command: { type },
+          confidence: 1,
+        },
+        "ui",
+      );
+    invalidateCapture(false, resolve);
   }
   function cancelPermissionRequest() {
-    requestGeneration.current += 1;
-    clearPermissionTimer();
-    setAlwaysOn(false);
     alwaysRef.current = false;
+    setAlwaysOn(false);
+    invalidateCapture(false);
     setError(null);
-    setPhase("idle");
+    changePhase(pending(dialogueRef.current).length > 0 ? "confirm" : "idle");
   }
   function toggleAlways() {
-    if (phase === "requesting") {
+    if (
+      phaseRef.current === "requesting" ||
+      phaseRef.current === "recording" ||
+      phaseRef.current === "processing"
+    ) {
       cancelPermissionRequest();
       return;
     }
-    if (alwaysOn) {
-      setAlwaysOn(false);
+    if (alwaysRef.current) {
       alwaysRef.current = false;
-      stop(true);
-      setPhase("idle");
+      setAlwaysOn(false);
+      invalidateCapture(false);
+      changePhase(pending(dialogueRef.current).length > 0 ? "confirm" : "idle");
     } else {
-      setAlwaysOn(true);
       alwaysRef.current = true;
+      setAlwaysOn(true);
       void begin("always");
     }
   }
   function resume() {
     void begin("always");
   }
-  const label = phaseLabel(phase);
+  const held = pending(dialogue);
+  const oldest = held[0];
+  const label = phaseLabel(phase, held.length);
+  const stopping =
+    phase === "requesting" || phase === "recording" || phase === "processing";
   return (
     <Surface
       className={`voice-console voice-${phase}`}
@@ -394,26 +748,28 @@ export function VoiceControl({
             }
             aria-label="Hold to record a voice score"
             onPointerDown={(event) => {
-              if (event.pointerType === "mouse") {
+              if (event.pointerType === "mouse" || event.pointerType === "pen") {
                 holdActive.current = true;
                 event.currentTarget.setPointerCapture(event.pointerId);
                 void begin("push");
               }
             }}
             onPointerUp={(event) => {
-              if (event.pointerType === "mouse") {
-                holdActive.current = false;
-                stop(false);
-              }
+              if (event.pointerType === "mouse" || event.pointerType === "pen")
+                releasePush(false);
+            }}
+            onPointerCancel={() => releasePush(true)}
+            onLostPointerCapture={() => {
+              if (!holdActive.current) return;
+              holdActive.current = false;
+              stop(true);
             }}
             onTouchStart={() => {
               holdActive.current = true;
               void begin("push");
             }}
-            onTouchEnd={() => {
-              holdActive.current = false;
-              stop(false);
-            }}
+            onTouchEnd={() => releasePush(false)}
+            onTouchCancel={() => releasePush(true)}
             onKeyDown={(event) => {
               if (
                 (event.key === " " || event.key === "Enter") &&
@@ -427,9 +783,11 @@ export function VoiceControl({
             onKeyUp={(event) => {
               if (event.key === " " || event.key === "Enter") {
                 event.preventDefault();
-                holdActive.current = false;
-                stop(false);
+                releasePush(false);
               }
+            }}
+            onBlur={() => {
+              releasePush(true);
             }}
           >
             <span className="mic"><RecordDotIcon /></span>
@@ -441,40 +799,54 @@ export function VoiceControl({
         <button
           type="button"
           className={`always-toggle ${alwaysOn ? "active" : ""}`}
-          aria-label={alwaysOn ? "End hands-free clip mode" : "Listen for one voice clip"}
+          aria-label={
+            stopping
+              ? "Stop voice capture and processing"
+              : alwaysOn
+                ? "Stop continuous hands-free listening"
+                : "Start continuous hands-free listening"
+          }
+          aria-pressed={alwaysOn}
           onClick={toggleAlways}
-          disabled={disabled || phase === "processing"}
+          disabled={disabled}
         >
-          <span>{phase === "requesting" ? "Cancel mic" : alwaysOn ? "End clip mode" : "Listen once"}</span>
-          <i>{phase === "requesting" ? "CANCEL" : alwaysOn ? "ACTIVE" : "4.5 SEC"}</i>
+          <span>{stopping ? "Stop" : alwaysOn ? "Stop listening" : "Hands-free"}</span>
+          <i>{stopping ? "CANCEL" : alwaysOn ? "ACTIVE" : "9 SEC MAX"}</i>
         </button>
       </div>
+      {oldest && (
+        <div className="voice-result ambiguous held">
+          <span>
+            HELD FOR REVIEW · 1 OF {held.length}
+          </span>
+          <blockquote>“{oldest.text}”</blockquote>
+          <p>
+            Parsed as <strong>{describeCommand(oldest.command)}</strong> ·{" "}
+            {Math.round(oldest.confidence * 100)}% confidence. {oldest.reason === "forced-review"
+              ? "Push-to-talk always waits for your explicit confirmation."
+              : oldest.reason === "confidence"
+                ? "Dartio is not confident enough to change the match."
+                : "This waits behind an earlier held command so nothing applies out of order."}
+          </p>
+          <div>
+            <Button onClick={() => resolveHeld("confirm")}>
+              Confirm oldest
+            </Button>
+            <Button variant="secondary" onClick={() => resolveHeld("cancel")}>
+              Discard oldest
+            </Button>
+          </div>
+        </div>
+      )}
       {result && (
         <div
-          className={`voice-result ${phase === "ambiguous" ? "ambiguous" : ""}`}
+          className="voice-result ambiguous"
         >
           <span>TRANSCRIPT</span>
           <blockquote>
             “{result.transcript || "No speech recognized"}”
           </blockquote>
-          {result.command ? (
-            <p>
-              Parsed as <strong>{describeCommand(result.command)}</strong>
-            </p>
-          ) : (
-            <p>
-              I couldn’t map that safely. Try “score sixty”, “treble twenty”,
-              “undo”, or “next player”.
-            </p>
-          )}
-          <div>
-            <Button onClick={apply} disabled={!result.command}>
-              Apply to match
-            </Button>
-            <Button variant="secondary" onClick={cancel}>
-              Discard
-            </Button>
-          </div>
+          <p>{describeResult(result)}</p>
         </div>
       )}
       {error && (
@@ -486,7 +858,7 @@ export function VoiceControl({
           <button
             onClick={() => {
               setError(null);
-              setPhase(alwaysOn ? "paused" : "idle");
+              changePhase(alwaysOn ? "paused" : "idle");
             }}
           >
             Dismiss
@@ -494,10 +866,14 @@ export function VoiceControl({
         </div>
       )}
       <p className="voice-privacy">
-        <span>PRIVATE BY DEFAULT</span> Audio is recorded only after you hold
-        the control or choose Listen once. A hands-free clip stops after 4.5
-        seconds. Clips are sent to Dartio for transcription, are limited to 10
-        MB, and are never applied to the match without confirmation.
+        <span>PRIVATE BY DEFAULT</span> Audio is recorded only while you hold the
+        control, or after hands-free listening detects that speech began.
+        Speech-aware clips stop when you finish talking and are capped at 9
+        seconds. Clips are sent through Dartio to OpenAI for transcription and
+        limited to 10 MB.
+        Push-to-talk always waits for review. Clear hands-free commands apply
+        immediately; uncertain commands wait for confirmation or dismissal,
+        oldest first.
       </p>
       <div className="voice-live" role="status" aria-live="polite">
         {label.announcement}
@@ -513,7 +889,51 @@ function describeCommand(command: VoiceCommand) {
   if (command.type === "next_player") return "end visit / next player";
   return command.type;
 }
-function phaseLabel(phase: VoicePhase) {
+
+function describeResult(result: VoiceResult) {
+  if (result.reason === "uncertain-control")
+    return "That confirmation was also uncertain. Say it again clearly, or use the buttons on the held score.";
+  if (result.reason === "nothing-pending")
+    return "Nothing is waiting for confirmation. Say a score or dart first.";
+  if (result.reason === "out-of-vocabulary" && result.command)
+    return `Parsed as ${describeCommand(result.command)}, but that command does not belong in this match mode.`;
+  return "I couldn’t map that safely. Try “score sixty”, “treble twenty”, “undo”, or “next player”.";
+}
+
+/** Accepts only the server contract; malformed success payloads never touch a match. */
+function parseVoiceTranscription(value: unknown): VoiceTranscription | null {
+  if (!value || typeof value !== "object") return null;
+  const payload = value as Record<string, unknown>;
+  if (
+    typeof payload.transcript !== "string" ||
+    typeof payload.confidence !== "number" ||
+    !Number.isFinite(payload.confidence) ||
+    payload.confidence < 0 ||
+    payload.confidence > 1
+  )
+    return null;
+  if (payload.command === null)
+    return {
+      transcript: payload.transcript.trim(),
+      command: null,
+      confidence: payload.confidence,
+    };
+  const command = voiceCommandSchema.safeParse(payload.command);
+  if (!command.success) return null;
+  return {
+    transcript: payload.transcript.trim(),
+    command: command.data,
+    confidence: payload.confidence,
+  };
+}
+
+function payloadError(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const error = (value as Record<string, unknown>).error;
+  return typeof error === "string" ? error : null;
+}
+
+function phaseLabel(phase: VoicePhase, pendingCount: number) {
   switch (phase) {
     case "requesting":
       return {
@@ -531,11 +951,16 @@ function phaseLabel(phase: VoicePhase) {
       };
     case "listening":
       return {
-        title: "Listening for one command",
+        title: pendingCount > 0 ? "Listening for your decision" : "Listening continuously",
         state: "LISTENING",
         guidance:
-          "Speak one command. This clip stops after 4.5 seconds, then waits for confirmation.",
-        announcement: "One voice clip is recording.",
+          pendingCount > 0
+            ? "Say confirm or cancel for the oldest held command. Each clip ends with your speech and is capped at 9 seconds."
+            : "Speak one command. Each clip ends with your speech, is capped at 9 seconds, then listening resumes.",
+        announcement:
+          pendingCount > 0
+            ? "Listening for confirmation of the oldest held command."
+            : "Continuous voice listening is active.",
       };
     case "paused":
       return {
@@ -554,10 +979,11 @@ function phaseLabel(phase: VoicePhase) {
       };
     case "confirm":
       return {
-        title: "Confirm before scoring",
+        title: "A command is held",
         state: "REVIEW",
-        guidance: "Nothing changes until you apply the parsed command below.",
-        announcement: "Voice command ready for confirmation.",
+        guidance:
+          "Nothing changes until you confirm or discard the oldest held command.",
+        announcement: `${pendingCount} voice ${pendingCount === 1 ? "command is" : "commands are"} waiting for review.`,
       };
     case "ambiguous":
       return {
@@ -587,7 +1013,7 @@ function phaseLabel(phase: VoicePhase) {
         title: "Score without breaking stance",
         state: "READY",
         guidance:
-          "Hold to speak, or choose Listen once for a 4.5-second hands-free clip. Every result waits for confirmation.",
+          "Hold to speak and review one command, or start continuous hands-free listening. Clear hands-free commands apply immediately.",
         announcement: "Voice input is ready.",
       };
   }

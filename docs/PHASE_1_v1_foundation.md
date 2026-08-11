@@ -30,9 +30,9 @@ Build and release a fresh Dartio `v1.0.0` using Navi UI `v1.0.0`, Neon PostgreSQ
     - [x] Add complete X01 S/D/T 1–20, SB/DB/MISS and aggregate visit entry with 44 px scoring targets.
     - [x] Complete deployed keyboard/focus/reduced-motion proof and visit-level correction.
 - [ ] Voice scoring
-  - [ ] Implement push-to-talk and a true opt-in always-on session mode.
+  - [x] Implement push-to-talk and a true opt-in always-on session mode.
     - [x] Implement push-to-talk plus explicit listening, processing, confirmation, ambiguity, privacy, and failure states.
-    - [ ] Replace the current manually resumed 4.5-second clip cycle with continuous opt-in capture, silence segmentation, automatic re-arming, and queued correction.
+    - [x] Replace the manually resumed 4.5-second clip cycle with continuous opt-in capture, silence segmentation, automatic re-arming, and confidence-aware queued correction.
   - [x] Use OpenAI transcription with structured command parsing through the current shared game-command path.
   - [x] Implement confirmation, ambiguity, correction, privacy, and failure states.
   - [ ] Extend and prove the shared voice-command path across every remaining game mode.
