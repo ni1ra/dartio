@@ -178,6 +178,14 @@ Exact local candidate, 2026-08-11:
   returned HTTP 200 from password rotation, other sessions were revoked, and
   ignored `.env.local` was updated without placing the replacement in source,
   a command argument, or subsequent output.
+- Promotion-boundary candidate `2291bef` keeps the ordinary card-backed Checkout
+  policy while asserting `allow_promotion_codes: true`; its focused billing suite
+  passed 40/40, with typecheck, scoped lint, and diff check all at exit 0.
+- PR #30 Preview `dpl_G7qA4YNWmWCgj8TSTR3hAhspWBhJ` is `READY` at
+  `https://dartio-91mkk8son-niras-projects-868b6f5f.vercel.app` on exact commit
+  `2291befba3abaa288254c7de09121929867a0777`. GitHub CI run `31522326293`
+  passed typecheck, lint, 723 unit tests, build, and the complete 227-pass plus
+  4-designed-skip browser matrix on that same revision.
 
 Merge and Production receipts remain deliberately unrecorded until the exact
 committed revision reaches each gate.
