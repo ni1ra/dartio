@@ -13,23 +13,21 @@
  * error that every unit test passed straight through, since a fake database never
  * renders SQL. Only real clients on a real deployment could see it.
  *
- *   node scripts/verify-rooms-live.mjs <preview-url> <preview-database-url>
+ *   pnpm verify:rooms:live <preview-url>
  */
 
+import { readFileSync } from "node:fs";
 import { neon } from "@neondatabase/serverless";
+import { resolveLiveRoomConfiguration } from "./verify-rooms-live-config.mjs";
 
-const [target, databaseUrl] = process.argv.slice(2);
-if (!target || !databaseUrl) {
-  console.error("usage: node scripts/verify-rooms-live.mjs <preview-url> <preview-database-url>");
+const configuration = resolveLiveRoomConfiguration(process.argv.slice(2), () =>
+  readFileSync(new URL("../.env.local", import.meta.url), "utf8"),
+);
+if (!configuration.ok) {
+  console.error(configuration.message);
   process.exit(2);
 }
-const origin = new URL(target).origin;
-// Named explicitly rather than inferred: "does not look like production" is not a
-// safety property, and this script grants subscriptions.
-if (/dartioopus46\.vercel\.app|^https:\/\/dartio\.vercel\.app/.test(origin)) {
-  console.error("REFUSED this script grants temporary Pro rows and must never run against production");
-  process.exit(2);
-}
+const { origin, databaseUrl } = configuration;
 const sql = neon(databaseUrl);
 const granted = [];
 

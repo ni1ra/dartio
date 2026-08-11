@@ -90,11 +90,16 @@ reconnect, spectate, handover, and close are all live, so `/friends` carries zer
   live anomalies all 0; historical signatures open=2, multi-user=3.
 - [x] `verify:rooms:live` expanded to exercise the lifecycle SQL once deployed:
   competing handovers, canonical owner agreement, close versus completion,
-  post-close refusal, and history/statistics exclusion.
+  post-close refusal, and history/statistics exclusion. Its package entrypoint
+  now reads `DATABASE_URL` directly from ignored `.env.local`, validates the
+  exact Preview pooler, and rejects a positional database argument. The package
+  entrypoint contains no credential; callers must not add one because `pnpm`
+  echoes arguments before script code runs.
 - [x] Full local gates on the corrective branch: typecheck 0, lint 0, test
-  600/600, build 0, browser 161 passed / 4 skipped by design; all unpiped.
-- [ ] Fresh Preview deployment and `verify:rooms:live` against the corrective
-  revision. PR #27's Preview proof cannot cover changed SQL.
+  616/616, build 0, browser 161 passed / 4 skipped by design; all unpiped.
+- [ ] Fresh Preview deployment and rerun through the remediated credential-safe
+  `verify:rooms:live` entrypoint. PR #27's Preview proof and the pre-rotation
+  corrective run cannot cover this final revision.
 - [ ] Corrective PR CI green, merged, then all three production verify gates and
   touched browser surfaces green against `https://dartioopus46.vercel.app`.
 - [ ] Physical expiry archive/purge — parked because the active goal forbids
@@ -131,7 +136,24 @@ reconnect, spectate, handover, and close are all live, so `/friends` carries zer
   packages for the same Manrope, Syne, and DM Mono families. The final standalone
   `pnpm build` compiled in 8.9 seconds, exit 0, without a Google request.
 - 2026-08-11 · Final corrective local gates: `pnpm typecheck` 0, `pnpm lint` 0,
-  `pnpm test` 600/600 across 44 files, `pnpm build` 0; all unpiped. The authenticated
-  room matrix passed 15/15 in 141.7 seconds at all three viewports, including a
-  close-after-finishing-visit state. The full browser matrix passed 161 with 4
-  design skips across 165 cases in 199 seconds, exit 0.
+  `pnpm test` 616/616 across 45 files, `pnpm build` 0; all unpiped. The
+  credential boundary's pure no-write matrix passed 16/16, including ambient
+  override immunity, generic malformed-input refusals, exact Preview database
+  shape, and both Production aliases across HTTP, HTTPS, and DNS-root-dot
+  variants. The authenticated room matrix passed 15/15 in 141.7 seconds at all
+  three viewports, including a close-after-finishing-visit state. The final full
+  browser matrix passed 161 with 4 design skips across 165 cases in 200.9
+  seconds, exit 0.
+- 2026-08-11 · The first corrective Preview live run passed, but its invocation
+  supplied the Preview database URI as a `pnpm` argument and `pnpm` echoed the
+  expanded command. Release stopped before merge. The branch-local Neon role was
+  reset once; its returned operation finished; Vercel's all-Preview
+  `DATABASE_URL` was replaced and marked `sensitive`; and the ignored local
+  value was replaced without pulling or overwriting the QA variables. The
+  control-plane URI and local value then matched exactly. A read-only audit
+  through the replacement credential exited 0 with every surviving-room anomaly
+  count at zero and the known historical Preview signatures unchanged at
+  open=2, multi_user=3. No Production credential or environment variable was
+  targeted. The live verifier no longer accepts the secret-bearing invocation,
+  ignores ambient database overrides, and refuses a database outside the named
+  Preview branch before constructing its SQL client.
