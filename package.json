@@ -22,7 +22,8 @@
     "verify:rooms": "node --env-file=.env.local scripts/verify-rooms.mjs",
     "verify:rooms:live": "node scripts/verify-rooms-live.mjs",
     "verify:rooms:integrity": "node scripts/verify-room-integrity.mjs",
-    "verify:ai:live": "node --env-file=.env.local scripts/verify-ai-live.mjs"
+    "verify:ai:live": "node --env-file=.env.local scripts/verify-ai-live.mjs",
+    "verify:voice:live": "node --env-file=.env.local scripts/verify-voice-live.mjs"
   },
   "dependencies": {
     "@better-auth/api-key": "1.6.13",

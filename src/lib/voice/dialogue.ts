@@ -20,6 +20,9 @@ export interface PendingUtterance {
   readonly id: number;
   readonly text: string;
   readonly command: VoiceCommand;
+  /** The signal that caused this utterance to be held, retained for honest UI copy. */
+  readonly confidence: number;
+  readonly reason: "confidence" | "queue" | "forced-review";
 }
 
 export interface DialogueState {
@@ -35,6 +38,8 @@ export type DialogueOutcome =
   | { readonly kind: "queued"; readonly pending: PendingUtterance; readonly state: DialogueState }
   | { readonly kind: "confirmed"; readonly command: VoiceCommand; readonly state: DialogueState }
   | { readonly kind: "cancelled"; readonly text: string; readonly state: DialogueState }
+  /** A doubtful control word never resolves a doubtful score. */
+  | { readonly kind: "uncertain-control"; readonly command: VoiceCommand; readonly state: DialogueState }
   /** Heard, understood, and not something this mode can do. */
   | { readonly kind: "out-of-vocabulary"; readonly command: VoiceCommand; readonly state: DialogueState }
   | { readonly kind: "unheard"; readonly text: string; readonly state: DialogueState }
@@ -64,6 +69,8 @@ export interface HearOptions {
    */
   readonly confidenceFloor?: number;
   readonly confidence?: number;
+  /** Push-to-talk is a deliberate one-shot input and always waits for review. */
+  readonly forceReview?: boolean;
 }
 
 export function hear(
@@ -72,15 +79,39 @@ export function hear(
   mode: VoiceMode,
   options: HearOptions = {},
 ): DialogueOutcome {
-  const command = parseVoiceCommand(text);
+  return hearCommand(state, text, parseVoiceCommand(text), mode, options);
+}
+
+/**
+ * Routes a command that was parsed at the transcription boundary.
+ *
+ * Production uses the server's command instead of parsing the transcript a
+ * second time in the browser. That keeps one authority for what was heard while
+ * retaining `hear` as the convenient text-only entry point for pure tests.
+ */
+export function hearCommand(
+  state: DialogueState,
+  text: string,
+  command: VoiceCommand | null,
+  mode: VoiceMode,
+  options: HearOptions = {},
+): DialogueOutcome {
   if (!command) return { kind: "unheard", text, state };
 
+  const floor = options.confidenceFloor ?? 0.6;
+  const suppliedConfidence = options.confidence ?? 1;
+  const confidence = Number.isFinite(suppliedConfidence)
+    ? Math.min(1, Math.max(0, suppliedConfidence))
+    : 0;
+
   if (command.type === "confirm") {
+    if (confidence < floor) return { kind: "uncertain-control", command, state };
     const [oldest, ...rest] = state.queue;
     if (!oldest) return { kind: "nothing-pending", state };
     return { kind: "confirmed", command: oldest.command, state: { ...state, queue: rest } };
   }
   if (command.type === "cancel") {
+    if (confidence < floor) return { kind: "uncertain-control", command, state };
     const [oldest, ...rest] = state.queue;
     if (!oldest) return { kind: "nothing-pending", state };
     return { kind: "cancelled", text: oldest.text, state: { ...state, queue: rest } };
@@ -88,11 +119,22 @@ export function hear(
 
   if (!speaks(mode, command)) return { kind: "out-of-vocabulary", command, state };
 
-  const floor = options.confidenceFloor ?? 0.6;
-  const confidence = options.confidence ?? 1;
-  if (confidence >= floor) return { kind: "apply", command, state };
+  // Once review is waiting, later gameplay commands join the back of the queue.
+  // Applying a newer command first would change the match underneath the oldest.
+  if (confidence >= floor && state.queue.length === 0 && !options.forceReview)
+    return { kind: "apply", command, state };
 
-  const pending: PendingUtterance = { id: state.nextId, text, command };
+  const pending: PendingUtterance = {
+    id: state.nextId,
+    text,
+    command,
+    confidence,
+    reason: options.forceReview
+      ? "forced-review"
+      : confidence < floor
+        ? "confidence"
+        : "queue",
+  };
   return { kind: "queued", pending, state: { queue: [...state.queue, pending], nextId: state.nextId + 1 } };
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clearDialogue, createDialogue, hear, pending, speaks, type DialogueState } from "./dialogue";
+import { clearDialogue, createDialogue, hear, hearCommand, pending, speaks, type DialogueState } from "./dialogue";
 
 function sure(state: DialogueState, text: string, mode: Parameters<typeof hear>[2] = "x01") {
   return hear(state, text, mode, { confidence: 1 });
@@ -25,7 +25,49 @@ describe("holding something it is not sure about", () => {
     const outcome = unsure(createDialogue(), "treble twenty");
 
     expect(outcome.kind).toBe("queued");
-    expect(pending(outcome.state)).toHaveLength(1);
+    expect(pending(outcome.state)).toEqual([
+      {
+        id: 1,
+        text: "treble twenty",
+        command: { type: "dart", segment: 20, multiplier: 3 },
+        confidence: 0.3,
+        reason: "confidence",
+      },
+    ]);
+  });
+
+  it("uses the command parsed at the server boundary without reinterpreting its text", () => {
+    const outcome = hearCommand(
+      createDialogue(),
+      "the provider transcript is deliberately not parseable",
+      { type: "dart", segment: 16, multiplier: 2 },
+      "x01",
+      { confidence: 0.3 },
+    );
+
+    expect(outcome).toMatchObject({
+      kind: "queued",
+      pending: {
+        text: "the provider transcript is deliberately not parseable",
+        command: { type: "dart", segment: 16, multiplier: 2 },
+        confidence: 0.3,
+      },
+    });
+  });
+
+  it("can require explicit review even for a clear push-to-talk command", () => {
+    const outcome = hearCommand(
+      createDialogue(),
+      "treble twenty",
+      { type: "dart", segment: 20, multiplier: 3 },
+      "x01",
+      { confidence: 0.99, forceReview: true },
+    );
+
+    expect(outcome).toMatchObject({
+      kind: "queued",
+      pending: { confidence: 0.99 },
+    });
   });
 
   it("applies the held command when the player confirms it", () => {
@@ -54,6 +96,27 @@ describe("holding something it is not sure about", () => {
 
     const second = sure(first.state, "confirm");
     expect(second).toMatchObject({ kind: "confirmed", command: { segment: 16, multiplier: 2 } });
+  });
+
+  it("does not let a clear command leapfrog a doubtful one", () => {
+    const doubtful = unsure(createDialogue(), "treble twenty");
+    const later = sure(doubtful.state, "double sixteen");
+
+    expect(later).toMatchObject({ kind: "queued" });
+    expect(pending(later.state).map((item) => item.command)).toEqual([
+      { type: "dart", segment: 20, multiplier: 3 },
+      { type: "dart", segment: 16, multiplier: 2 },
+    ]);
+  });
+
+  it("requires a clear confirm or cancel before resolving a held score", () => {
+    const queued = unsure(createDialogue(), "treble twenty");
+
+    for (const control of ["confirm", "cancel"] as const) {
+      const outcome = unsure(queued.state, control);
+      expect(outcome).toMatchObject({ kind: "uncertain-control" });
+      expect(pending(outcome.state)).toEqual(pending(queued.state));
+    }
   });
 
   it("does nothing when there is nothing to confirm", () => {
