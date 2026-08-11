@@ -86,7 +86,7 @@ X01 does.
   ordinary auth session required to exercise the boundary; it creates no account,
   match, billing row, product row, or database access path.
 - [x] Full local typecheck, lint, unit, build, and browser gates.
-- [ ] Exact Preview deployment: authentication, premium live verifier, touched
+- [x] Exact Preview deployment: authentication, premium live verifier, touched
   browser matrix, CI, and origin cleanup.
 - [ ] Merge only a green exact revision; repeat auth, history, rooms, premium AI,
   touched browser, and main-CI proof on Production.
@@ -119,6 +119,33 @@ Exact local candidate, 2026-08-11:
 - Fresh-context static audit found no remaining blocking product, authorization,
   secret-handling, async, atomicity, or mode-rule leak after the persistence and
   statistical-verifier corrections.
+- PR #29 candidate `a72d52a` deployed as
+  `dpl_HVzmaXALkcQKy6PHGXRFoG1fhXwv` at
+  `https://dartio-qq215pjc3-niras-projects-868b6f5f.vercel.app`; Vercel and
+  GitHub CI run `31472630526` passed on that exact revision.
+- `pnpm verify:auth <preview>` — the temporary origin reached Neon Auth
+  validation instead of `INVALID_ORIGIN` (status 400), exit 0.
+- A disposable Preview identity obtained genuine Pro authority through Stripe
+  Sandbox Checkout: 14-day annual trial, EUR 0 due, then cancellation scheduled
+  before any charge. Its first webhook deliveries exposed the old Cycle 2
+  endpoint's stale post-rotation database credential (four HTTP 500s). Redeploy
+  `dpl_FfHXJZ9ZJJk7mWoDGiqieGx6LWCq` retained the branch-scoped signing secret,
+  loaded the current Preview database URL, accepted two fresh signed deliveries
+  with HTTP 200, and `/api/access` returned Pro, `advanced_ai`, and level 20.
+- `DARTIO_QA_EMAIL=<disposable-preview-identity> pnpm verify:ai:live <preview>` —
+  anonymous refusal, authenticated authority, 25 physical darts centered on
+  each of S20, D20, T20, outer bull, and inner bull, plus all four strict-body
+  refusals; exit 0 in 39 seconds.
+- `DARTIO_BASE_URL=<preview> pnpm exec playwright test
+  tests/browser/mode-ai.spec.ts` — 75/75 passed across mobile, tablet, and
+  desktop; exit 0 in 63.1 seconds.
+- The exact Preview origin was removed from Neon Auth after verification; a
+  readback showed only the pre-existing stable Cycle 2 origin.
+- A browser diagnostic reflected the dedicated QA app password in tool output.
+  It was treated as compromised immediately: both isolated Neon Auth identities
+  returned HTTP 200 from password rotation, other sessions were revoked, and
+  ignored `.env.local` was updated without placing the replacement in source,
+  a command argument, or subsequent output.
 
-Preview, CI, merge, and Production receipts remain deliberately unrecorded until
-the exact committed revision reaches each gate.
+Merge and Production receipts remain deliberately unrecorded until the exact
+committed revision reaches each gate.
