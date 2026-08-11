@@ -1,6 +1,7 @@
-import type { Aim, AiTactics } from "./ai";
+import type { AiTactics } from "./ai";
+import type { Aim } from "./ai-throw";
 import type { BoardNumber, Dart, Multiplier } from "./darts";
-import { roundTarget, type RoundState } from "./round-modes";
+import { liveRoundView, type RoundState } from "./round-modes";
 
 /**
  * What a round-mode opponent aims at.
@@ -30,9 +31,11 @@ export function chooseRoundAim(
   state: RoundState,
   player: number,
   tactics: AiTactics,
-  thrownThisVisit: readonly Dart[] = [],
+  thrownThisVisit: readonly Dart[] = state.currentDarts,
 ): Aim {
-  const target = roundTarget(state);
+  // Around the Clock advances inside a visit. The live projection, unlike the
+  // banked round target, therefore moves 1 → 2 → 3 as exact hits arrive.
+  const target = liveRoundView(state).target;
 
   if (state.mode === "countUp" || target === null) return { segment: 20, multiplier: 3 };
   // The bull has no treble, so the outer bull is the aim whatever the level.

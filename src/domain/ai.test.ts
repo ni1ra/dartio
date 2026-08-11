@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aiSpread, applyDart, createX01, generateAiVisit, seededRandom, throwAiDart } from "@/domain";
+import { aiSpread, applyDart, chooseX01Aim, createX01, generateAiVisit, seededRandom, throwAiDart } from "@/domain";
 
 describe("AI levels", () => {
   it("has strictly improving measured accuracy from 1 through 20", () => {
@@ -78,6 +78,34 @@ describe("AI levels", () => {
     // S1 then D1 is the only double-out from 3, and an expert takes it.
     expect(darts.length).toBeGreaterThan(1);
     expect(darts[0]).toMatchObject({ segment: 1, multiplier: 1 });
+  });
+
+  it("uses the production X01 chooser for opening and checkout policy", () => {
+    const expert = createX01({
+      startingScore: 135,
+      legsToWin: 1,
+      setsToWin: 1,
+      inRule: "straight",
+      outRule: "double",
+    }, [{ id: "ai", name: "AI" }]);
+    const doubleIn = createX01({
+      startingScore: 301,
+      legsToWin: 1,
+      setsToWin: 1,
+      inRule: "double",
+      outRule: "double",
+    }, [{ id: "ai", name: "AI" }]);
+    const masterIn = createX01({
+      startingScore: 301,
+      legsToWin: 1,
+      setsToWin: 1,
+      inRule: "master",
+      outRule: "double",
+    }, [{ id: "ai", name: "AI" }]);
+
+    expect(chooseX01Aim(expert, 0, 20)).toEqual({ segment: 25, multiplier: 2 });
+    expect(chooseX01Aim(doubleIn, 0, 20)).toEqual({ segment: 20, multiplier: 2 });
+    expect(chooseX01Aim(masterIn, 0, 20)).toEqual({ segment: 20, multiplier: 3 });
   });
 
   it("keeps throwing without scoring until a double-in is proven", () => {

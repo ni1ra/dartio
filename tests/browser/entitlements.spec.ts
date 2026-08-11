@@ -30,8 +30,8 @@ test("free play works and the paid surfaces say so", async ({ page }) => {
 test("an AI level above the free ceiling continues instead of blocking play", async ({ page }) => {
   await page.goto("/play/match?start=501&level=15&best=5&out=double", { waitUntil: "networkidle" });
 
-  // The server refuses to generate a level-15 visit for an anonymous player.
-  // The match must say so and keep playing at the free ceiling — never stall.
+  // The canonical access snapshot refuses premium execution for an anonymous
+  // player. The match must say so and keep playing locally at the free ceiling.
   const status = page.locator(".ai-access-status");
   await expect(status).toBeVisible();
   await expect(status).toContainText(/PRO REQUIRED|CHECKING PRO ACCESS|VERIFICATION UNAVAILABLE/);

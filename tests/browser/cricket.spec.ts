@@ -11,7 +11,7 @@ const CRICKET = "/play/match?mode=cricket&variant=standard&opponent=local";
 
 test.beforeEach(async ({ page }) => {
   await page.goto(CRICKET, { waitUntil: "domcontentloaded" });
-  await page.evaluate(() => window.localStorage.removeItem("dartio:cricket-log:v1"));
+  await page.evaluate(() => window.localStorage.removeItem("dartio:cricket-log:v2:local"));
   await page.reload({ waitUntil: "networkidle" });
 });
 

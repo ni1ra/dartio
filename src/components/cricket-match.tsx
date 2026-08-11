@@ -7,42 +7,22 @@ import {
   aiTactics, applyCricketDart,
   appendCricketEvent, chooseCricketAim, createCricketLog, CRICKET_NUMBERS, cricketDartEvent, cricketMatchRecord,
   cricketPlayerStats,
-  dartMarks, hasClosed, isCricketNumber, notation, replayCricket, rewindCricketToVisit, seededRandom, throwAiDart,
+  dartMarks, hasClosed, isCricketNumber, notation, replayCricket, rewindCricketToVisit,
   undoLastCricketEvent,
-  type CricketLog, type CricketOptions, type CricketState, type CricketVariant, type Dart,
+  type CricketLog, type CricketOptions, type CricketVariant, type Dart,
 } from "@/domain";
+import { seededRandom, throwAiDart } from "@/domain/ai-throw";
+import { requestPremiumAiThrow } from "@/lib/product/ai-throw-client";
+import { collectAiVisit } from "@/lib/product/ai-visit";
+import { opponentSeatIdentity } from "@/lib/product/ai-match-identity";
 import { clearCricketMatch, loadCricketMatch, matchesCricketSetup, saveCricketMatch } from "@/lib/product/cricket-store";
 import { DartInputPad } from "./dart-input-pad";
 import { Dartboard } from "./dartboard";
 import { useAiVisit } from "./use-ai-visit";
 import { useMatchKeyboard } from "./use-match-keyboard";
 import { useRecordMatch } from "./use-record-match";
-
-/**
- * Plays out one opponent visit and returns the darts, not the resulting state.
- *
- * Everything that scores reaches the match as events, so a corrected or resumed
- * game replays the opponent's throws exactly as it replays the player's. The seed
- * comes from the completed-visit count, so the same log always produces the same
- * visit.
- *
- * Levels stop at eight because that is exactly the free tier. Nine to twenty are
- * server-authorized for X01, and the route that authorizes them speaks X01 —
- * extending it would mean teaching the server Cricket's rules, which is the one
- * thing the architecture is built to avoid.
- */
-function cricketAiDarts(state: CricketState, level: number): readonly Dart[] {
-  const rng = seededRandom(state.turns.length * 101 + level);
-  const tactics = aiTactics(level);
-  let next = state;
-  const thrown: Dart[] = [];
-  while (next.status === "playing" && next.currentPlayer === 1) {
-    const value = throwAiDart(level, chooseCricketAim(next, 1, tactics), rng).dart;
-    thrown.push(value);
-    next = applyCricketDart(next, value);
-  }
-  return thrown;
-}
+import { OpponentAiAccessBanner, useOpponentAiAccess } from "./opponent-ai-access";
+import { describeAiFailure, describeAiRefresh, type AiRecovery } from "./opponent-ai-recovery";
 
 const VARIANTS: readonly CricketVariant[] = ["standard", "cut-throat", "tactics"];
 const VARIANT_LABEL: Record<CricketVariant, string> = {
@@ -67,8 +47,13 @@ export function CricketMatch() {
   const roundLimit = Number.isInteger(roundParam) && roundParam >= 1 && roundParam <= 99 ? roundParam : null;
 
   const isAi = params.get("opponent") === "ai";
-  const requestedLevel = Number(params.get("level"));
-  const level = Number.isInteger(requestedLevel) ? Math.min(8, Math.max(1, requestedLevel)) : 5;
+  const levelParam = params.get("level");
+  const requestedLevel = levelParam === null || levelParam.trim() === "" ? Number.NaN : Number(levelParam);
+  const selectedLevel = Number.isInteger(requestedLevel) ? Math.min(20, Math.max(1, requestedLevel)) : 5;
+  const storageScope = isAi ? `ai-${selectedLevel}` : "local";
+  const aiAccess = useOpponentAiAccess(isAi, selectedLevel);
+  const restoreLevelEight = aiAccess.continueAtEight;
+  const level = aiAccess.level;
 
   const options = useMemo<CricketOptions>(() => ({ variant, winByTwo, roundLimit }), [variant, winByTwo, roundLimit]);
   const freshLog = useMemo(
@@ -87,30 +72,45 @@ export function CricketMatch() {
   const [resumed, setResumed] = useState(false);
   const [correction, setCorrection] = useState(false);
   const [message, setMessage] = useState("Your throw · 3 darts");
+  const [aiRecovery, setAiRecovery] = useState<AiRecovery | null>(null);
+  const [aiLevelsUsed, setAiLevelsUsed] = useState<readonly number[]>([]);
+  const retryGeneration = useRef(0);
   const { state: game } = useMemo(() => replayCricket(log), [log]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
-      const stored = loadCricketMatch();
-      if (!stored || stored.events.length === 0 || !matchesCricketSetup(stored, freshLog)) return;
-      logRef.current = stored;
-      setLog(stored);
+      const stored = loadCricketMatch(storageScope);
+      if (!stored || stored.log.events.length === 0 || !matchesCricketSetup(stored.log, freshLog)) return;
+      logRef.current = stored.log;
+      setLog(stored.log);
+      setAiLevelsUsed(stored.aiLevelsUsed);
+      if (stored.continuedAtEight) restoreLevelEight();
       setResumed(true);
       setMessage("Match resumed where you left off");
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [freshLog]);
-  useEffect(() => { if (log.events.length > 0) saveCricketMatch(log); }, [log]);
-  useEffect(() => { if (game.status === "complete") clearCricketMatch(); }, [game.status]);
+  }, [freshLog, storageScope, restoreLevelEight]);
+  useEffect(() => {
+    if (log.events.length > 0) {
+      saveCricketMatch(log, storageScope, aiAccess.continuedAtEight, aiLevelsUsed);
+    }
+  }, [log, storageScope, aiAccess.continuedAtEight, aiLevelsUsed]);
+  useEffect(() => {
+    if (game.status === "complete") clearCricketMatch(storageScope);
+  }, [game.status, storageScope]);
   // Seat one is the opponent's when there is one; the log records what was thrown,
   // never who threw it, so that is supplied here.
   const completedRecord = useMemo(
-    () => (game.status === "complete" ? cricketMatchRecord(log, [{}, { isBot: isAi, ...(isAi ? { botLevel: level } : {}) }]) : null),
-    [game.status, log, isAi, level],
+    () => (game.status === "complete"
+      ? cricketMatchRecord(log, [{}, opponentSeatIdentity(isAi, level, aiLevelsUsed)])
+      : null),
+    [game.status, log, isAi, level, aiLevelsUsed],
   );
   useRecordMatch(completedRecord);
 
-  const disabled = game.status === "complete" || (isAi && game.currentPlayer !== 0);
+  const disabled = game.status === "complete"
+    || (isAi && game.currentPlayer !== 0)
+    || aiAccess.accessChecking;
 
   function commit(darts: readonly Dart[]) {
     if (darts.length === 0) return;
@@ -128,31 +128,110 @@ export function CricketMatch() {
       : `${notation(value)} · no mark`);
   }
 
-  useAiVisit({
-    ready: isAi && game.status === "playing" && game.currentPlayer === 1,
-    play: () => {
+  const aiVisit = useAiVisit<{ readonly darts: readonly Dart[]; readonly level: number }>({
+    ready: isAi
+      && game.status === "playing"
+      && game.currentPlayer === 1
+      && !aiAccess.accessChecking
+      && aiRecovery === null
+      && !correction,
+    revision: log.events.length,
+    generate: async (signal) => {
       const current = replayCricket(logRef.current).state;
-      if (current.status !== "playing" || current.currentPlayer !== 1) return;
-      commit(cricketAiDarts(current, level));
+      const executionLevel = aiAccess.level;
+      const premium = aiAccess.premiumReady;
+      const tactics = aiTactics(executionLevel);
+      const random = seededRandom(current.turns.length * 101 + executionLevel);
+      setMessage(premium
+        ? `AI level ${executionLevel} is calculating on Dartio…`
+        : `AI level ${executionLevel} is at the oche…`);
+      const darts = await collectAiVisit({
+        initial: current,
+        signal,
+        rules: {
+          continues: (state) => state.status === "playing" && state.currentPlayer === 1,
+          boundary: (state) => state.turns.length,
+          target: (state) => chooseCricketAim(state, 1, tactics),
+          apply: applyCricketDart,
+        },
+        sample: premium
+          ? (target, currentSignal) => requestPremiumAiThrow(
+            { level: executionLevel, target },
+            { signal: currentSignal },
+          )
+          : async (target) => throwAiDart(executionLevel, target, random).dart,
+      });
+      return { darts, level: executionLevel };
+    },
+    commit: (visit) => {
+      setAiRecovery(null);
+      setAiLevelsUsed((current) => current.includes(visit.level) ? current : [...current, visit.level]);
+      if (aiAccess.premiumRequested && visit.level === 8) aiAccess.continueAtEight();
+      commit(visit.darts);
       setMessage("Your throw · 3 darts");
     },
+    fail: (problem) => {
+      const recovery = describeAiFailure(problem);
+      setAiRecovery(recovery);
+      setMessage(recovery.announcement);
+    },
   });
+  useEffect(() => () => { retryGeneration.current += 1; }, []);
+  function cancelPendingAi() {
+    retryGeneration.current += 1;
+    aiVisit.cancel();
+  }
   function undo() {
-    if (log.events.length === 0) return;
-    const undone = undoLastCricketEvent(log);
+    cancelPendingAi();
+    setAiRecovery(null);
+    if (logRef.current.events.length === 0) return;
+    const undone = undoLastCricketEvent(logRef.current);
     logRef.current = undone;
     setLog(undone);
     setMessage("Last entry removed");
   }
   function rewind(visitIndex: number) {
-    const rewound = rewindCricketToVisit(log, visitIndex);
-    const dropped = log.events.length - rewound.events.length;
+    cancelPendingAi();
+    setAiRecovery(null);
+    const rewound = rewindCricketToVisit(logRef.current, visitIndex);
+    const dropped = logRef.current.events.length - rewound.events.length;
     // The ref moves with the state, or the opponent's next visit folds over the
     // log as it was before the correction.
     logRef.current = rewound;
     setLog(rewound);
     setCorrection(false);
     setMessage(`Rewound ${dropped} ${dropped === 1 ? "entry" : "entries"} · throw the visit again`);
+  }
+  function openCorrection() {
+    cancelPendingAi();
+    setAiRecovery(null);
+    setCorrection(true);
+    setMessage("AI paused while you review the match");
+  }
+  function closeCorrection() {
+    setCorrection(false);
+  }
+  async function retryPremiumAi() {
+    if (!isAi || game.status !== "playing" || game.currentPlayer !== 1 || !aiRecovery) return;
+    const attempt = ++retryGeneration.current;
+    const result = aiRecovery.kind === "denied" || !aiAccess.premiumReady
+      ? await aiAccess.refresh()
+      : "ready";
+    if (attempt !== retryGeneration.current) return;
+    const recovery = describeAiRefresh(result);
+    if (recovery) {
+      setAiRecovery(recovery);
+      setMessage(recovery.announcement);
+      return;
+    }
+    setAiRecovery(null);
+    aiVisit.retry();
+  }
+  function continueWithLevelEight() {
+    cancelPendingAi();
+    aiAccess.continueAtEight();
+    setAiRecovery(null);
+    setMessage("Continuing this match with AI level 8");
   }
 
   const keyboard = useMatchKeyboard({ onDart: addDart, onUndo: undo, disabled });
@@ -168,8 +247,9 @@ export function CricketMatch() {
         <b>Cricket · {VARIANT_LABEL[variant]}{roundLimit === null ? "" : ` · ${roundLimit} rounds`}</b>
       </div>
       <div className="match-tools">
-        <IconButton label="Correct a visit" onClick={() => setCorrection(true)} disabled={disabled || game.turns.length === 0}>✎</IconButton>
-        <IconButton label="Undo last dart" onClick={undo} disabled={disabled || log.events.length === 0}>↶</IconButton>
+        <span>{isAi ? `AI level ${level}` : "Local match"}</span>
+        <IconButton label="Correct a visit" onClick={openCorrection} disabled={game.status === "complete" || game.turns.length === 0}>✎</IconButton>
+        <IconButton label="Undo last dart" onClick={undo} disabled={game.status === "complete" || log.events.length === 0}>↶</IconButton>
       </div>
     </header>
 
@@ -177,6 +257,8 @@ export function CricketMatch() {
       Resumed the match that was in progress on this device.
       <button type="button" onClick={() => setResumed(false)}>Dismiss</button>
     </div>}
+
+    <OpponentAiAccessBanner access={aiAccess} />
 
     {winner && <div className="match-notice" role="status">{winner.name} wins the match.</div>}
 
@@ -238,13 +320,18 @@ export function CricketMatch() {
       <span aria-live="polite">{message}</span>
       {keyboard.pending !== "" && <span className="keyboard-buffer" aria-hidden="true">{keyboard.pending} · Enter single · D double · T treble</span>}
       <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">{keyboard.announcement}</span>
-      <div>
-        <button onClick={undo} disabled={disabled || log.events.length === 0}>Undo</button>
-        <button onClick={() => setCorrection(true)} disabled={disabled || game.turns.length === 0}>Correct a visit</button>
+      <div className={aiRecovery ? "ai-access-actions" : undefined}>
+        {aiRecovery && <>
+          <span className="ai-access-recovery" role="alert">{aiRecovery.message}</span>
+          <button onClick={() => void retryPremiumAi()} disabled={aiAccess.accessChecking}>{aiRecovery.kind === "denied" ? "Check again" : "Retry"}</button>
+          <button onClick={continueWithLevelEight}>Continue at level 8</button>
+        </>}
+        <button onClick={undo} disabled={game.status === "complete" || log.events.length === 0}>Undo</button>
+        <button onClick={openCorrection} disabled={game.status === "complete" || game.turns.length === 0}>Correct a visit</button>
       </div>
     </CommandDock>
 
-    <Modal open={correction} onClose={() => setCorrection(false)} title="Correct a visit">
+    <Modal open={correction} onClose={closeCorrection} title="Correct a visit">
       <div className="correction-body">
         <p>Pick the visit that was recorded wrongly. The match rewinds to just before it, and you throw it again from there.</p>
         <ol className="correction-visits">
@@ -259,7 +346,7 @@ export function CricketMatch() {
             </li>
           ))}
         </ol>
-        <Button variant="secondary" onClick={() => setCorrection(false)}>Keep current score</Button>
+        <Button variant="secondary" onClick={closeCorrection}>Keep current score</Button>
       </div>
     </Modal>
   </div>;

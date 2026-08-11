@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyRoundDart,
   chooseCricketAim,
   chooseRoundAim,
   createCricket,
@@ -91,6 +92,15 @@ describe("a round-mode opponent", () => {
     expect(chooseRoundAim(state, 0, "novice")).toEqual({ segment: 1, multiplier: 3 });
     expect(chooseRoundAim(state, 0, "competent")).toEqual({ segment: 1, multiplier: 1 });
     expect(chooseRoundAim(state, 0, "expert")).toEqual({ segment: 1, multiplier: 1 });
+  });
+
+  it("moves the Around the Clock target after each exact landing in the visit", () => {
+    let state = createRoundMatch("aroundTheClock", PLAYERS);
+    expect(chooseRoundAim(state, 0, "expert")).toEqual({ segment: 1, multiplier: 1 });
+    state = applyRoundDart(state, dart(1, 1));
+    expect(chooseRoundAim(state, 0, "expert")).toEqual({ segment: 2, multiplier: 1 });
+    state = applyRoundDart(state, dart(2, 1));
+    expect(chooseRoundAim(state, 0, "expert")).toEqual({ segment: 3, multiplier: 1 });
   });
 
   it("plays an expert for the Shanghai and everyone else for points", () => {

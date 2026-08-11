@@ -1,39 +1,13 @@
 import { checkoutAdvice } from "./checkout";
-import { representativePoint, scoreBoardPoint, type BoardNumber, type Dart, type Multiplier } from "./darts";
-import type { InRule, OutRule } from "./x01";
+import { throwAiDart, type Aim } from "./ai-throw";
+import { type BoardNumber, type Dart } from "./darts";
+import { applyDart, createX01, type InRule, type OutRule, type X01State } from "./x01";
 
-export interface Aim { readonly segment: BoardNumber; readonly multiplier: Multiplier }
-export interface AiThrow { readonly dart: Dart; readonly aim: Aim; readonly radialError: number }
 export interface AiVisitContext {
   readonly score: number;
   readonly opened: boolean;
   readonly inRule: InRule;
   readonly outRule: OutRule;
-}
-
-/** Seeded xorshift32; returns an isolated generator with values in [0,1). */
-export function seededRandom(seed: number): () => number {
-  let state = seed | 0 || 0x6d2b79f5;
-  return () => { state ^= state << 13; state ^= state >>> 17; state ^= state << 5; return (state >>> 0) / 4294967296; };
-}
-
-/** Standard deviation in normalized board radii; strictly decreases from level 1 to 20. */
-export function aiSpread(level: number): number {
-  validateLevel(level);
-  return 0.235 * Math.exp(-0.105 * (level - 1)) + 0.012;
-}
-
-export function throwAiDart(level: number, aim: Aim, random: () => number): AiThrow {
-  validateLevel(level);
-  const center = representativePoint(aim);
-  const u1 = Math.max(random(), Number.EPSILON);
-  const u2 = random();
-  const gaussian = Math.sqrt(-2 * Math.log(u1));
-  const spread = aiSpread(level);
-  const dx = gaussian * Math.cos(2 * Math.PI * u2) * spread;
-  const dy = gaussian * Math.sin(2 * Math.PI * u2) * spread;
-  const point = { x: center.x + dx, y: center.y + dy };
-  return { aim, dart: scoreBoardPoint(point), radialError: Math.hypot(dx, dy) };
 }
 
 export function chooseAiAim(remaining: number): Aim {
@@ -42,7 +16,38 @@ export function chooseAiAim(remaining: number): Aim {
   return { segment: 20, multiplier: 3 };
 }
 
-/** Generates one complete visit without owning or trusting match state. */
+/**
+ * The X01 target policy used by both the real match and its benchmark.
+ *
+ * Keeping this beside tactics—but outside the execution sampler—means the
+ * client owns every X01 rule while `/api/ai/throw` sees only the selected bed.
+ */
+export function chooseX01Aim(state: X01State, player: number, level: number): Aim {
+  validateLevel(level);
+  if (
+    state.status !== "playing"
+    || state.currentPlayer !== player
+    || !state.players[player]
+  ) {
+    throw new RangeError("X01 AI target requires the current playing seat");
+  }
+
+  const opened = state.opened[player] ?? state.options.inRule === "straight";
+  if (!opened) {
+    return state.options.inRule === "double"
+      ? { segment: 20, multiplier: 2 }
+      : { segment: 20, multiplier: 3 };
+  }
+
+  const remaining = state.scores[player] ?? state.options.startingScore;
+  if (state.options.outRule === "straight" && remaining >= 1 && remaining <= 20) {
+    return { segment: remaining as BoardNumber, multiplier: 1 };
+  }
+  const dartsLeft = (3 - state.currentDarts.length) as 1 | 2 | 3;
+  return chooseTacticalAim({ remaining, dartsLeft, outRule: state.options.outRule, level });
+}
+
+/** Generates one complete visit through the same reducer and policy as the UI. */
 export function generateAiVisit(
   level: number,
   context: AiVisitContext,
@@ -56,45 +61,37 @@ export function generateAiVisit(
     throw new Error("AI visit score 1 requires an opened straight-out game");
   }
 
+  let state = createX01({
+    // X01 setup itself starts at two or more, but a transient straight-out
+    // position may legitimately have one remaining.
+    startingScore: Math.max(2, context.score),
+    legsToWin: 1,
+    setsToWin: 1,
+    inRule: context.inRule,
+    outRule: context.outRule,
+  }, [{ id: "ai", name: "AI" }]);
+  if (context.score === 1 || (context.opened && !(state.opened[0] ?? false))) {
+    state = Object.freeze({
+      ...state,
+      scores: [context.score],
+      turnStartScore: context.score,
+      opened: [context.opened || context.inRule === "straight"],
+    });
+  }
+
+  const boundary = state.turns.length;
   const darts: Dart[] = [];
-  let remaining = context.score;
-  let opened = context.opened || context.inRule === "straight";
-
-  while (darts.length < 3) {
-    const dartsLeft = (3 - darts.length) as 1 | 2 | 3;
-    const value = throwAiDart(level, chooseAiVisitAim(remaining, opened, context, dartsLeft, level), random).dart;
+  while (
+    darts.length < 3
+    && state.status === "playing"
+    && state.turns.length === boundary
+  ) {
+    const value = throwAiDart(level, chooseX01Aim(state, 0, level), random).dart;
     darts.push(value);
-
-    if (!opened && qualifiesIn(value, context.inRule)) opened = true;
-    if (opened) remaining -= value.score;
-
-    const bust = remaining < 0
-      || (remaining === 1 && context.outRule !== "straight")
-      || (remaining === 0 && !qualifiesOut(value, context.outRule));
-    if (bust || remaining === 0) break;
+    state = applyDart(state, value);
   }
 
   return Object.freeze(darts);
-}
-
-function chooseAiVisitAim(remaining: number, opened: boolean, context: AiVisitContext, dartsLeft: 1 | 2 | 3, level: number): Aim {
-  if (!opened) {
-    return context.inRule === "double"
-      ? { segment: 20, multiplier: 2 }
-      : { segment: 20, multiplier: 3 };
-  }
-  if (context.outRule === "straight" && remaining >= 1 && remaining <= 20) {
-    return { segment: remaining as BoardNumber, multiplier: 1 };
-  }
-  return chooseTacticalAim({ remaining, dartsLeft, outRule: context.outRule, level });
-}
-
-function qualifiesIn(value: Dart, rule: InRule): boolean {
-  return rule === "straight" || value.multiplier === 2 || (rule === "master" && value.multiplier === 3);
-}
-
-function qualifiesOut(value: Dart, rule: OutRule): boolean {
-  return rule === "straight" || value.multiplier === 2 || (rule === "master" && value.multiplier === 3);
 }
 
 function validateLevel(level: number) { if (!Number.isInteger(level) || level < 1 || level > 20) throw new Error("AI level must be an integer from 1 to 20"); }
