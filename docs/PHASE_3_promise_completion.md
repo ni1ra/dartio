@@ -36,15 +36,15 @@ The full plan and its execution contract were approved on 2026-08-11.
   evidence 2026-08-11 — PR #26, live three-identity proof on preview, all
   verify gates and the rooms browser spec green against production after
   merge. See `CYCLE_23_spectators.md`.
-- [ ] **Cycle 24 — Room handoff and lifecycle.** Deliberate handover, host-departure
+- [x] **Cycle 24 — Room handoff and lifecycle.** Deliberate handover, host-departure
   semantics, one serialized terminal lifecycle across every mutation,
   `verify-rooms-live` as a pnpm script, and the deliberately held
   `onlineMultiplayer: "coming_soon"` flag retired now that the whole promise is
   true. Physical expiry purge is explicitly parked: the campaign forbids
   destructive database operations, and expired rooms are already unreachable.
-  PR #27's first candidate reached production, but Cycle 24 remains open until
-  the corrective lifecycle branch repeats Preview, CI, merge, and production
-  proof. See `CYCLE_24_handoff.md`.
+  PR #27's first candidate reached production; corrective PR #28 then repeated
+  Preview, CI, merge, and Production proof and closed the lifecycle on
+  `705b98d` on 2026-08-11. See `CYCLE_24_handoff.md`.
 - [ ] **Cycle 25 — Levels 9–20 for every mode, server rules-blind.** What is paid is
   execution quality, not aim policy. A mode-agnostic throw authority samples the
   landing for {target, level} behind the `advanced_ai` gate; the client keeps the
