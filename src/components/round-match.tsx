@@ -13,6 +13,12 @@ import { seededRandom, throwAiDart } from "@/domain/ai-throw";
 import { requestPremiumAiThrow } from "@/lib/product/ai-throw-client";
 import { collectAiVisit } from "@/lib/product/ai-visit";
 import { opponentSeatIdentity } from "@/lib/product/ai-match-identity";
+import {
+  clearRoundMatch,
+  loadRoundMatch,
+  saveRoundMatch,
+  type RoundResumeScope,
+} from "@/lib/product/round-store";
 import { DartInputPad } from "./dart-input-pad";
 import { Dartboard } from "./dartboard";
 import { useAiVisit } from "./use-ai-visit";
@@ -20,9 +26,7 @@ import { useMatchKeyboard } from "./use-match-keyboard";
 import { useRecordMatch } from "./use-record-match";
 import { OpponentAiAccessBanner, useOpponentAiAccess } from "./opponent-ai-access";
 import { describeAiFailure, describeAiRefresh, type AiRecovery } from "./opponent-ai-recovery";
-
-const STORAGE_PREFIX = "dartio:round-log:v2:";
-const STORAGE_VERSION = 1;
+import { useScreenWakeLock } from "./use-screen-wake-lock";
 
 /**
  * One screen for every round-based mode.
@@ -62,96 +66,73 @@ export function RoundMatch({ mode }: { mode: RoundModeId }) {
   const [message, setMessage] = useState("Your throw · 3 darts");
   const [aiRecovery, setAiRecovery] = useState<AiRecovery | null>(null);
   const [aiLevelsUsed, setAiLevelsUsed] = useState<readonly number[]>([]);
+  // Hydration and persistence share one ledger so the initial empty client
+  // render cannot erase a valid (or deliberately unreadable future-version)
+  // resume. Only an observed nonempty-to-empty scoring transition is a clear.
+  const persistenceState = useRef<{
+    readonly scope: RoundResumeScope;
+    priorEventCount: number;
+  } | null>(null);
+  const [hydratedScope, setHydratedScope] = useState<RoundResumeScope | null>(null);
   const retryGeneration = useRef(0);
   const { state: game } = useMemo(() => replayRound(log), [log]);
   // Local, AI, and each requested bot level are different match setups. Keeping
   // them in distinct slots prevents a local pair from resuming as an AI match or
   // a level-eight log from later being recorded as level twenty.
-  const storageScope = solo ? "solo" : isAi ? `ai-${selectedLevel}` : "local";
-  const key = `${STORAGE_PREFIX}${mode}:${storageScope}`;
-  const legacyKey = `dartio:round-log:v1:${mode}:${solo ? "solo" : "pair"}`;
+  const resumeScope = useMemo<RoundResumeScope>(() => solo
+    ? { mode, opponent: "solo" }
+    : isAi
+      ? { mode, opponent: "ai", requestedLevel: selectedLevel }
+      : { mode, opponent: "local" }, [mode, solo, isAi, selectedLevel]);
+  const hydrated = hydratedScope === resumeScope;
+  useScreenWakeLock(hydrated && game.status === "playing");
 
   useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      try {
-        const raw = window.localStorage.getItem(key);
-        let stored: RoundLog;
-        let continuedAtEight = false;
-        let storedLevels: readonly number[] = [];
-        if (raw) {
-          const envelope = JSON.parse(raw) as {
-            storageVersion?: unknown;
-            continuedAtEight?: unknown;
-            aiLevelsUsed?: unknown;
-            log?: unknown;
-          };
-          if (
-            envelope?.storageVersion !== STORAGE_VERSION
-            || typeof envelope.continuedAtEight !== "boolean"
-            || !Array.isArray(envelope.aiLevelsUsed)
-            || envelope.aiLevelsUsed.some((level) => !Number.isInteger(level) || level < 1 || level > 20)
-            || typeof envelope.log !== "object"
-            || envelope.log === null
-          ) return;
-          stored = envelope.log as RoundLog;
-          continuedAtEight = envelope.continuedAtEight;
-          storedLevels = envelope.aiLevelsUsed as number[];
-        } else {
-          // Production's v1 `pair` key did not distinguish local from AI or
-          // carry a level. Solo and a roster-proven local pair are safe to move;
-          // an AI pair is intentionally not guessed into a v2 scope.
-          if (isAi) return;
-          const legacyRaw = window.localStorage.getItem(legacyKey);
-          if (!legacyRaw) return;
-          stored = JSON.parse(legacyRaw) as RoundLog;
-          if (!solo && stored.players[1]?.name !== "Player 2") return;
-        }
-        if (stored.mode !== mode || !Array.isArray(stored.events) || stored.events.length === 0) return;
-        if (stored.players.length !== freshLog.players.length) return;
-        // Replaying the stored log is the validation: a corrupted one throws
-        // here rather than resuming into a score that never happened.
-        replayRound(stored);
-        logRef.current = stored;
-        setLog(stored);
-        setAiLevelsUsed([...new Set(storedLevels)]);
-        if (continuedAtEight) restoreLevelEight();
-        setResumed(true);
-        setMessage("Match resumed where you left off");
-      } catch {
-        window.localStorage.removeItem(key);
-      }
-    });
+    const hydrate = () => {
+      const stored = loadRoundMatch(resumeScope, freshLog);
+      const nextLog = stored?.log ?? freshLog;
+      logRef.current = nextLog;
+      setLog(nextLog);
+      setAiLevelsUsed(stored?.aiLevelsUsed ?? []);
+      if (stored?.continuedAtEight) restoreLevelEight();
+      setResumed(stored !== null);
+      setMessage(stored ? "Match resumed where you left off" : "Your throw · 3 darts");
+      persistenceState.current = {
+        scope: resumeScope,
+        priorEventCount: nextLog.events.length,
+      };
+      setHydratedScope(resumeScope);
+    };
+    const frame = window.requestAnimationFrame(hydrate);
     return () => window.cancelAnimationFrame(frame);
-  }, [key, legacyKey, mode, freshLog.players.length, restoreLevelEight, isAi, solo]);
+  }, [resumeScope, freshLog, restoreLevelEight]);
 
   useEffect(() => {
-    if (log.events.length === 0) return;
-    try {
-      window.localStorage.setItem(key, JSON.stringify({
-        storageVersion: STORAGE_VERSION,
-        continuedAtEight: aiAccess.continuedAtEight,
-        aiLevelsUsed,
-        log,
-      }));
-    } catch { /* resume is optional */ }
-  }, [log, key, aiAccess.continuedAtEight, aiLevelsUsed]);
+    const persistence = persistenceState.current;
+    if (!persistence || persistence.scope !== resumeScope) return;
+
+    if (log.events.length > 0) {
+      saveRoundMatch(log, resumeScope, aiAccess.continuedAtEight, aiLevelsUsed);
+    } else if (persistence.priorEventCount > 0) {
+      clearRoundMatch(resumeScope);
+    }
+    persistence.priorEventCount = log.events.length;
+  }, [log, resumeScope, aiAccess.continuedAtEight, aiLevelsUsed, hydratedScope]);
   useEffect(() => {
-    if (game.status !== "complete") return;
-    try {
-      window.localStorage.removeItem(key);
-      if (!isAi) window.localStorage.removeItem(legacyKey);
-    } catch { /* ignored */ }
-  }, [game.status, key, legacyKey, isAi]);
+    if (!hydrated || game.status !== "complete") return;
+    clearRoundMatch(resumeScope);
+  }, [hydrated, game.status, resumeScope]);
   // Seat one is the opponent's when one was asked for.
   const completedRecord = useMemo(
-    () => (game.status === "complete"
+    () => (hydrated && game.status === "complete"
       ? roundMatchRecord(log, [{}, opponentSeatIdentity(isAi, level, aiLevelsUsed)])
       : null),
-    [game.status, log, isAi, level, aiLevelsUsed],
+    [hydrated, game.status, log, isAi, level, aiLevelsUsed],
   );
   useRecordMatch(completedRecord);
 
-  const disabled = game.status === "complete"
+  const disabled = !hydrated
+    || game.status === "complete"
     || (isAi && game.currentPlayer !== 0)
     || aiAccess.accessChecking;
   // Projected so the target moves and the total climbs as the visit is thrown.
@@ -171,7 +152,8 @@ export function RoundMatch({ mode }: { mode: RoundModeId }) {
   }
 
   const aiVisit = useAiVisit<{ readonly darts: readonly Dart[]; readonly level: number }>({
-    ready: isAi
+    ready: hydrated
+      && isAi
       && game.status === "playing"
       && game.currentPlayer === 1
       && !aiAccess.accessChecking
@@ -224,6 +206,7 @@ export function RoundMatch({ mode }: { mode: RoundModeId }) {
     aiVisit.cancel();
   }
   function undo() {
+    if (!hydrated) return;
     cancelPendingAi();
     setAiRecovery(null);
     if (logRef.current.events.length === 0) return;
@@ -233,6 +216,7 @@ export function RoundMatch({ mode }: { mode: RoundModeId }) {
     setMessage("Last entry removed");
   }
   function rewind(visitIndex: number) {
+    if (!hydrated) return;
     cancelPendingAi();
     setAiRecovery(null);
     const rewound = rewindRoundToVisit(logRef.current, visitIndex);
@@ -244,6 +228,7 @@ export function RoundMatch({ mode }: { mode: RoundModeId }) {
     setMessage(`Rewound ${dropped} ${dropped === 1 ? "entry" : "entries"} · throw the visit again`);
   }
   function openCorrection() {
+    if (!hydrated) return;
     cancelPendingAi();
     setAiRecovery(null);
     setCorrection(true);
@@ -253,7 +238,7 @@ export function RoundMatch({ mode }: { mode: RoundModeId }) {
     setCorrection(false);
   }
   async function retryPremiumAi() {
-    if (!isAi || game.status !== "playing" || game.currentPlayer !== 1 || !aiRecovery) return;
+    if (!hydrated || !isAi || game.status !== "playing" || game.currentPlayer !== 1 || !aiRecovery) return;
     const attempt = ++retryGeneration.current;
     const result = aiRecovery.kind === "denied" || !aiAccess.premiumReady
       ? await aiAccess.refresh()
@@ -269,6 +254,7 @@ export function RoundMatch({ mode }: { mode: RoundModeId }) {
     aiVisit.retry();
   }
   function continueWithLevelEight() {
+    if (!hydrated) return;
     cancelPendingAi();
     aiAccess.continueAtEight();
     setAiRecovery(null);
@@ -289,8 +275,8 @@ export function RoundMatch({ mode }: { mode: RoundModeId }) {
       </div>
       <div className="match-tools">
         <span>{solo ? "Solo practice" : isAi ? `AI level ${level}` : "Local match"}</span>
-        <IconButton label="Correct a visit" onClick={openCorrection} disabled={game.status === "complete" || game.visits.length === 0}>✎</IconButton>
-        <IconButton label="Undo last dart" onClick={undo} disabled={game.status === "complete" || log.events.length === 0}>↶</IconButton>
+        <IconButton label="Correct a visit" onClick={openCorrection} disabled={!hydrated || game.status === "complete" || game.visits.length === 0}>✎</IconButton>
+        <IconButton label="Undo last dart" onClick={undo} disabled={!hydrated || game.status === "complete" || log.events.length === 0}>↶</IconButton>
       </div>
     </header>
 
@@ -341,11 +327,11 @@ export function RoundMatch({ mode }: { mode: RoundModeId }) {
       <div className={aiRecovery ? "ai-access-actions" : undefined}>
         {aiRecovery && <>
           <span className="ai-access-recovery" role="alert">{aiRecovery.message}</span>
-          <button onClick={() => void retryPremiumAi()} disabled={aiAccess.accessChecking}>{aiRecovery.kind === "denied" ? "Check again" : "Retry"}</button>
-          <button onClick={continueWithLevelEight}>Continue at level 8</button>
+          <button onClick={() => void retryPremiumAi()} disabled={!hydrated || aiAccess.accessChecking}>{aiRecovery.kind === "denied" ? "Check again" : "Retry"}</button>
+          <button onClick={continueWithLevelEight} disabled={!hydrated}>Continue at level 8</button>
         </>}
-        <button onClick={undo} disabled={game.status === "complete" || log.events.length === 0}>Undo</button>
-        <button onClick={openCorrection} disabled={game.status === "complete" || game.visits.length === 0}>Correct a visit</button>
+        <button onClick={undo} disabled={!hydrated || game.status === "complete" || log.events.length === 0}>Undo</button>
+        <button onClick={openCorrection} disabled={!hydrated || game.status === "complete" || game.visits.length === 0}>Correct a visit</button>
       </div>
     </CommandDock>
 
@@ -360,7 +346,7 @@ export function RoundMatch({ mode }: { mode: RoundModeId }) {
                 <b>{visit.darts.map(notation).join(" ") || "—"}</b>
                 <small>ROUND {visit.round} · {visit.scored >= 0 ? "+" : ""}{visit.scored}</small>
               </div>
-              <Button size="sm" variant="secondary" onClick={() => rewind(index)}>Rewind here</Button>
+              <Button size="sm" variant="secondary" onClick={() => rewind(index)} disabled={!hydrated}>Rewind here</Button>
             </li>
           ))}
         </ol>

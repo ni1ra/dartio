@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "@fontsource-variable/manrope";
 import "@fontsource-variable/syne";
 import "@fontsource/dm-mono/400.css";
@@ -20,7 +20,10 @@ import { SiteShell } from "@/components/site-shell";
 export const metadata: Metadata = {
   title: { default: "Dartio — every dart tells a story", template: "%s · Dartio" },
   description: "Play, score, practise, and compete at darts from any screen.",
+  icons: { apple: "/icons/dartio-180.png" },
 };
+
+export const viewport: Viewport = { colorScheme: "dark", themeColor: "#090a0a" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (

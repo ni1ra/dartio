@@ -28,7 +28,7 @@ claiming an offline application that does not exist.
   Only legacy data whose identity can be proved from its key and roster is
   migrated.
 - Dartio publishes a same-origin standalone manifest and square 192/512 icons,
-  including a genuinely mask-safe asset. Installation launches `/` inside the
+  including a genuinely mask-safe asset. Installation launches `/play` inside the
   `/` scope. Installation availability remains browser/platform policy.
 
 ## Offline truth boundary
@@ -58,23 +58,23 @@ That boundary follows the current primary contracts checked on 2026-08-12:
 
 ## Queue
 
-- [ ] Move round and drill resume state into strict versioned Zod stores, bind
+- [x] Move round and drill resume state into strict versioned Zod stores, bind
   every envelope to its setup scope, and cover safe legacy migration plus
   malformed, unknown-version, cross-mode, completed, and ambiguous data.
-- [ ] Wire every round mode and drill to those stores without changing reducer
+- [x] Wire every round mode and drill to those stores without changing reducer
   truth, AI atomicity, correction, completion filing, or history identity.
-- [ ] Add play and practice error boundaries whose recovery copy and controls
-  are truthful about the last saved event log and work at all three viewports.
-- [ ] Add one lifecycle-safe screen wake-lock hook to every active at-the-oche
+- [x] Add root and match error boundaries whose recovery copy and controls are
+  truthful about the last saved event log and work at all three viewports.
+- [x] Add one lifecycle-safe screen wake-lock hook to every active at-the-oche
   surface and prove request, release, visibility re-acquisition, unsupported,
   refusal, completion, and unmount behaviour.
-- [ ] Add the Next.js manifest plus public 192/512 regular and maskable icons;
+- [x] Add the Next.js manifest plus public 192/512 regular and maskable icons;
   verify their MIME type, dimensions, manifest scope/start/display fields, and
   safe-zone design from the built application.
-- [ ] Audit offline behaviour mechanically: no service-worker source or
+- [x] Audit offline behaviour mechanically: no service-worker source or
   registration, no Cache Storage claim, same-device saved logs only, and an
   honest online-required statement in the control docs.
-- [ ] Pass focused persistence/unit, typecheck, lint, build, three-viewport
+- [x] Pass focused persistence/unit, typecheck, lint, build, three-viewport
   touched browser, complete browser, and independent adversarial gates on one
   frozen candidate.
 - [ ] Push one PR, pass exact-head CI and Preview proof, merge the exact green
@@ -104,5 +104,33 @@ Planning inventory, 2026-08-12:
 - Cycle 28 closure documentation is carried on this branch because the shipped
   PR cannot contain evidence produced after its merge.
 
-Local, Preview, CI, merge, and Production receipts remain open until their
-exact commands finish.
+Preview, PR CI, merge, and Production receipts remain open until their exact
+commands finish.
+
+Frozen local candidate, 2026-08-12:
+
+- `pnpm typecheck`, `pnpm lint`, and `pnpm build` all exited 0. The production
+  build generated all 23 static pages and dynamic route entries, including
+  `/manifest.webmanifest` and the exact `/play/match` error segment.
+- `pnpm test` exited 0 with 63 files and 963 passing tests. The only skip is the
+  explicitly opt-in isolated-Neon rollback proof from Cycle 28; no ordinary
+  unit test was skipped.
+- The focused manifest, recovery, hydration, round-store, and drill-store gate
+  passed 48/48. It includes strict current and legacy formats, safe migrations,
+  local-storage failures, nonempty-to-empty cleanup, mask-safe pixels, and the
+  real error-boundary components.
+- `pnpm exec playwright test tests/browser/resilience.spec.ts` passed 42/42 at
+  390x844, 834x1112, and 1440x1000. It proved wake-lock lifecycle and late
+  grants, scoring without the capability, resume cleanup, future-format
+  preservation, already-loaded offline scoring, manifest/icon delivery, zero
+  service workers, and responsive recovery controls.
+- The complete unpiped `pnpm test:browser` gate collected 330 checks: 326 passed
+  and four intentional layout checks skipped, exit 0 in 277.9 seconds. It used
+  one fresh production build and left no listener on port 3100.
+- Independent source audit found and closed four candidate defects before
+  sign-off: stale empty-log resurrection, throwing `localStorage` getters,
+  a pending wake-lock visibility race, and order-dependent deletion of future
+  raw-v1 round/drill formats. The frozen re-audit found no release blocker.
+
+Preview, PR CI, merge, and Production receipts remain open. No database,
+Stripe, OpenAI, entitlement, or service-worker state was changed locally.
