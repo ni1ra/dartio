@@ -1,0 +1,1 @@
+CREATE INDEX "matches_completed_at_desc_idx" ON "matches" USING btree ("completed_at" DESC NULLS LAST) WHERE "matches"."completed_at" is not null;

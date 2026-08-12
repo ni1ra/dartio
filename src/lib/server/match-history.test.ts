@@ -168,7 +168,64 @@ describe("reading a player's history", () => {
   it("keeps unfinished room rows out of statistics too", async () => {
     const { database, queries } = fakeDatabase();
     await expect(readStatMatches("user-1", null, database)).resolves.toEqual([]);
-    expect(rendered(queries[0]!)).toContain('"matches"."completed_at" is not null');
+    const query = rendered(queries[0]!);
+    expect(query).toContain('"matches"."completed_at" is not null');
+    expect(query).toContain('"players"."user_id" = $1');
+    expect(query).toContain('"turns"."player_id" = "players"."id"');
+    expect(query).toContain("order by thrown.ordinal");
+    expect(query).toContain('order by "matches"."completed_at" desc');
+  });
+
+  it("reads chronology, competitive result, and only the player's exact darts", async () => {
+    const row = {
+      id: "match-2",
+      mode: "x01",
+      completedAt: new Date("2026-08-12T12:00:00.000Z"),
+      outRule: "double",
+      result: "lost",
+      turns: [{
+        legNumber: 1,
+        scoreBefore: 40,
+        scoreAfter: 20,
+        bust: false,
+        dartsThrown: 2,
+        darts: [
+          { ordinal: 1, segment: 5, multiplier: 2 },
+          { ordinal: 2, segment: 5, multiplier: 2 },
+        ],
+      }],
+    };
+    const { database, queries } = fakeDatabase({ rows: [row] });
+
+    await expect(readStatMatches("user-1", 50, database)).resolves.toEqual([{
+      id: "match-2",
+      mode: "x01",
+      completedAt: "2026-08-12T12:00:00.000Z",
+      outRule: "double",
+      result: "lost",
+      turns: row.turns,
+    }]);
+
+    const query = rendered(queries[0]!);
+    expect(query).toContain("else 'lost'");
+    expect(query).toContain("when \"matches\".\"winner_player_id\" is null then 'unscored'");
+    expect(query).toContain("limit $2");
+  });
+
+  it("keeps winnerless practice rows unscored and refuses unknown result labels", async () => {
+    const base = {
+      id: "drill-1",
+      mode: "checkoutLab",
+      completedAt: "2026-08-11T12:00:00.000Z",
+      outRule: null,
+      result: "unscored",
+      turns: [],
+    };
+    const practice = fakeDatabase({ rows: [base] });
+    await expect(readStatMatches("user-1", null, practice.database)).resolves.toEqual([base]);
+
+    const corrupt = fakeDatabase({ rows: [{ ...base, result: "corrupt" }] });
+    await expect(readStatMatches("user-1", null, corrupt.database)).rejects.toBeInstanceOf(MatchHistoryError);
   });
 
   it("reports a database failure as unavailable", async () => {

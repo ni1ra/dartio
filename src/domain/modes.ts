@@ -5,9 +5,9 @@ export const GAME_MODES = {
   shanghai: { name: "Shanghai", status: "playable", options: ["rounds", "instantShanghaiWin"] },
   countUp: { name: "Count-Up", status: "playable", options: ["rounds"] },
   bobs27: { name: "Bob's 27", status: "playable", options: ["startingScore"] },
-  checkoutPractice: { name: "Checkout Practice", status: "specified", options: ["range", "attempts"] },
-  doublesPractice: { name: "Doubles Practice", status: "specified", options: ["targetOrder", "attempts"] },
-  scoringPractice: { name: "Scoring Practice", status: "specified", options: ["rounds", "target"] },
+  checkoutLab: { name: "Checkout Lab", status: "playable", options: ["attempts", "unit"] },
+  doublesMatrix: { name: "Doubles Matrix", status: "playable", options: ["attempts", "unit"] },
+  scoringSprint: { name: "Scoring Sprint", status: "playable", options: ["attempts", "unit"] },
 } as const;
 
 export type GameModeId = keyof typeof GAME_MODES;

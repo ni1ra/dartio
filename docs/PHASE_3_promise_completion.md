@@ -59,10 +59,14 @@ The full plan and its execution contract were approved on 2026-08-11.
   CI, deployment, auth/history/rooms, targeted voice, and full browser proof.
   Paid-provider proof remains parked on the same honest Free-QA boundary. See
   `CYCLE_26_voice_confidence.md`.
-- [ ] **Cycle 27 — Match replay.** The manifesto promises a board that records,
+- [x] **Cycle 27 — Match replay.** The manifesto promises a board that records,
   explains, and replays every dart; migration 0006 made stored visits lossless and
   nothing plays them back. Any stored match, dart by dart, on the regulation
-  board, every mode through one rebuild path.
+  board, every mode through one rebuild path. Shipped in PR #32 as
+  `d64997d5d8c913e94281fb0bea1585dcde9a7a52`; exact Preview, main CI,
+  Production deployment, authenticated detail/history, rooms, touched replay,
+  and the complete three-viewport browser matrix all passed. See
+  `CYCLE_27_match_replay.md`.
 - [ ] **Cycle 28 — Statistics with depth, on an honest data layer.** Per-double
   checkout table, trends over recent matches, per-mode splits, drill progress —
   withheld from Free on the server exactly as today. Same cycle: the missing
