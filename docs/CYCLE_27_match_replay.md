@@ -67,7 +67,7 @@ does not smuggle either concern into replay and needs no migration.
   of the synthetic match it files, plus anonymous refusal.
 - [x] Full local typecheck, lint, unit, build, focused browser, and full browser
   gates on the frozen candidate.
-- [ ] Exact Preview deployment, authentication/history proof, touched browser
+- [x] Exact Preview deployment, authentication/history proof, touched browser
   matrix, full browser matrix, and exact-head CI.
 - [ ] Merge the green exact revision and repeat the standing production gates,
   touched browser, full browser, exact deployment, and main CI proof.
@@ -98,5 +98,32 @@ Frozen local candidate, 2026-08-12:
   impossible dart ordinals on both storage boundaries, aggregate replay-reader
   coverage, new-leg score authority, and mode-neutral bust explanation.
 
-Preview, pull-request CI, merge, and Production receipts remain deliberately
-open until they run against one exact revision.
+Merge and Production receipts remain deliberately open. The Preview evidence
+below belongs to one exact code revision; the receipt-only follow-up must also
+finish green before merge.
+
+PR #32 Preview candidate `ffcf91a8006f1cf429da169c28024a4514ec9429`,
+2026-08-12:
+
+- GitHub Actions run
+  [31547612841](https://github.com/ni1ra/dartio/actions/runs/31547612841)
+  passed typecheck, lint, unit, build, and browser proof in 7m25s on the exact
+  head SHA.
+- Vercel deployment `dpl_2EMmeQgKBBPRcJMws9mmaGtDFJah` was READY with
+  `target=null`, PR 32, the exact head SHA, and the stable branch alias used by
+  every deployed probe.
+- `pnpm verify:auth` accepted the Preview origin. `pnpm verify:history` then
+  authenticated, filed one synthetic D20 checkout, read its summary and exact
+  owner-only detail back, verified the derived statistics, and proved anonymous
+  history/detail/statistics refusal. `pnpm verify:rooms` proved the standing
+  anonymous 401 and Free-plan 402 boundaries before room creation.
+- `tests/browser/match-replay.spec.ts`: 27/27 passed against Preview in 18.0
+  seconds. The full deployed matrix passed 272 with 4 designed skips in 2.5
+  minutes.
+- The branch alias was added to Preview Neon Auth only for these probes (201,
+  exact count 1), then removed afterwards (200, exact count 0). The pre-existing
+  stable Preview trusted domain remained present. The ignored `.env.local`
+  bridge used by the secondary worktree was likewise removed after the gates.
+
+The receipt-only follow-up commit still needs its own CI and READY Preview
+deployment before merge. Production remains open.
