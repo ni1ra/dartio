@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { authEnvSchema, billingEnvSchema, getAuthEnv, getBillingCheckoutEnv, serverEnvSchema } from "./server";
+import { authEnvSchema, billingEnvSchema, getAuthEnv, getBillingCheckoutEnv, serverEnvSchema, stripeEventMatchesMode } from "./server";
 
 const valid = {
   DATABASE_URL: "postgresql://user:password@example.neon.tech/neondb?sslmode=require",
   NEON_AUTH_BASE_URL: "https://example.neonauth.example/neondb/auth",
   NEON_AUTH_COOKIE_SECRET: "a-secure-cookie-secret-that-is-32-characters",
   OPENAI_API_KEY: "sk-example-not-a-real-secret-value",
+  STRIPE_MODE: "sandbox" as const,
   STRIPE_SECRET_KEY: "sk_test_example",
   STRIPE_WEBHOOK_SECRET: "whsec_example",
   STRIPE_PRO_MONTHLY_PRICE_ID: "price_monthly",
@@ -24,10 +25,10 @@ describe("server environment", () => {
     expect(authEnvSchema.safeParse(authOnly).success).toBe(true);
   });
   it("checkout validates without auth, database, voice, or webhook configuration", () => {
-    const checkoutOnly = { STRIPE_SECRET_KEY: valid.STRIPE_SECRET_KEY, STRIPE_PRO_MONTHLY_PRICE_ID: valid.STRIPE_PRO_MONTHLY_PRICE_ID, STRIPE_PRO_ANNUAL_PRICE_ID: valid.STRIPE_PRO_ANNUAL_PRICE_ID, STRIPE_CLUB_MONTHLY_PRICE_ID: valid.STRIPE_CLUB_MONTHLY_PRICE_ID, STRIPE_CLUB_ANNUAL_PRICE_ID: valid.STRIPE_CLUB_ANNUAL_PRICE_ID, NEXT_PUBLIC_APP_URL: valid.NEXT_PUBLIC_APP_URL };
+    const checkoutOnly = { STRIPE_MODE: valid.STRIPE_MODE, STRIPE_SECRET_KEY: valid.STRIPE_SECRET_KEY, STRIPE_PRO_MONTHLY_PRICE_ID: valid.STRIPE_PRO_MONTHLY_PRICE_ID, STRIPE_PRO_ANNUAL_PRICE_ID: valid.STRIPE_PRO_ANNUAL_PRICE_ID, STRIPE_CLUB_MONTHLY_PRICE_ID: valid.STRIPE_CLUB_MONTHLY_PRICE_ID, STRIPE_CLUB_ANNUAL_PRICE_ID: valid.STRIPE_CLUB_ANNUAL_PRICE_ID, NEXT_PUBLIC_APP_URL: valid.NEXT_PUBLIC_APP_URL };
     expect(getBillingCheckoutEnv(checkoutOnly)).toEqual(checkoutOnly);
   });
-  it.each(["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRO_MONTHLY_PRICE_ID", "STRIPE_PRO_ANNUAL_PRICE_ID", "STRIPE_CLUB_MONTHLY_PRICE_ID", "STRIPE_CLUB_ANNUAL_PRICE_ID", "NEXT_PUBLIC_APP_URL"] as const)("full billing contract rejects missing %s", (key) => {
+  it.each(["STRIPE_MODE", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRO_MONTHLY_PRICE_ID", "STRIPE_PRO_ANNUAL_PRICE_ID", "STRIPE_CLUB_MONTHLY_PRICE_ID", "STRIPE_CLUB_ANNUAL_PRICE_ID", "NEXT_PUBLIC_APP_URL"] as const)("full billing contract rejects missing %s", (key) => {
     const incomplete: Record<string, string | undefined> = { ...valid };
     delete incomplete[key];
     expect(billingEnvSchema.safeParse(incomplete).success).toBe(false);
@@ -40,4 +41,15 @@ describe("server environment", () => {
     ["query", { NEXT_PUBLIC_APP_URL: "https://dartio.app?next=bad" }],
     ["credentials", { NEXT_PUBLIC_APP_URL: "https://user:pass@dartio.app" }],
   ])("rejects %s configuration", (_label, value) => expect(serverEnvSchema.safeParse({ ...valid, ...value }).success).toBe(false));
+  it("requires the declared Stripe mode to match the secret-key data plane", () => {
+    expect(billingEnvSchema.safeParse({ ...valid, STRIPE_MODE: "live", STRIPE_SECRET_KEY: "sk_live_example" }).success).toBe(true);
+    expect(billingEnvSchema.safeParse({ ...valid, STRIPE_MODE: "live" }).success).toBe(false);
+    expect(billingEnvSchema.safeParse({ ...valid, STRIPE_SECRET_KEY: "sk_live_example" }).success).toBe(false);
+  });
+  it("matches webhook livemode to the declared Stripe data plane", () => {
+    expect(stripeEventMatchesMode("sandbox", false)).toBe(true);
+    expect(stripeEventMatchesMode("live", true)).toBe(true);
+    expect(stripeEventMatchesMode("sandbox", true)).toBe(false);
+    expect(stripeEventMatchesMode("live", false)).toBe(false);
+  });
 });

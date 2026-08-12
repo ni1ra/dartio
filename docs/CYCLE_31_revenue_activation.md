@@ -35,7 +35,7 @@ leaking identity or payment data into the repository or logs.
 
 ## Queue
 
-- [ ] Read current Stripe primary documentation for account activation, Live
+- [x] Read current Stripe primary documentation for account activation, Live
   Checkout/subscriptions, webhooks, refunds/cancellations, balances, and payouts;
   freeze the exact operational sequence and rollback.
 - [ ] Confirm the signed-in Stripe account is the Dartio integration's account;
@@ -43,7 +43,7 @@ leaking identity or payment data into the repository or logs.
 - [ ] Complete provider-hosted business verification and connect the primary bank
   payout destination. Record only capability booleans and safe provider object
   IDs.
-- [ ] Inventory Production billing environment names/scopes and current Sandbox
+- [x] Inventory Production billing environment names/scopes and current Sandbox
   catalogue/webhook state without reading secret values into logs.
 - [ ] Create or verify the Live Dartio catalogue and narrow Live webhook; install
   all Live Production values atomically and redeploy the exact candidate.
@@ -80,3 +80,36 @@ Planning baseline, 2026-08-12:
   none is counted as Live revenue or a bank payout.
 - The operator explicitly authorized a real transaction below NOK 100 and supplied
   identity and payout data in the secure session. No such data is reproduced here.
+
+Primary-source and activation baseline, 2026-08-13:
+
+- Stripe's current [API-key guide](https://docs.stripe.com/keys) and
+  [go-live checklist](https://docs.stripe.com/get-started/checklist/go-live)
+  confirm that Sandbox and Live keys, products, prices, and webhook signing
+  secrets are separate data planes. A test object cannot be used by a Live
+  payment. The repository now requires an explicit `STRIPE_MODE`; a sandbox
+  declaration accepts only `sk_test_`, a Live declaration accepts only
+  `sk_live_`, and a signed webhook whose `livemode` bit disagrees is refused.
+- Stripe documents a NOK 3 minimum non-zero charge. Its
+  [payout guide](https://docs.stripe.com/payouts) lists Norway at seven calendar
+  days for initial settlement and three business days by default thereafter,
+  while warning that a first payout is commonly scheduled 7–14 days after the
+  first successful payment. A Dashboard ETA is therefore evidence of a schedule,
+  not evidence that money reached the bank.
+- Stripe's current bank guidance requires a payout account whose holder and
+  settlement currency match the merchant profile. Stripe may request a recent
+  bank statement or other ownership proof; no such document belongs in Dartio.
+- A separate Norwegian Stripe account, `acct_1U3kLzLsMBe2Z56j`, was created for
+  Dartio rather than mixing product data into the operator's existing account.
+  The provider-hosted flow reused the already verified operator identity, records
+  Dartio's actual website and digital-subscription activity, uses free Radar
+  Lite, classifies the product as electronically supplied services, and declines
+  the optional Climate contribution. Final submission waits only on the bank
+  destination and review.
+- Vercel's billing environment was inventoried by name, target, type, and branch
+  only. No value was printed. `STRIPE_MODE=sandbox` now exists for Production and
+  for this branch's Preview so the mode guard can deploy before the Live cutover;
+  the broad Preview default remains a pre-merge follow-up.
+- Local code proof is green: 66/66 focused billing/environment tests, full unit
+  966 passed with one deliberately opt-in live rollback test skipped, TypeScript
+  passed, scoped ESLint passed, and `git diff --check` passed.

@@ -67,6 +67,7 @@ jobs:
           NEON_AUTH_BASE_URL: http://127.0.0.1:9/neondb/auth
           NEON_AUTH_COOKIE_SECRET: ci-placeholder-secret-at-least-32-chars
           NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100
+          STRIPE_MODE: sandbox
           STRIPE_SECRET_KEY: sk_test_placeholder
           STRIPE_WEBHOOK_SECRET: whsec_placeholder
           STRIPE_PRO_MONTHLY_PRICE_ID: price_placeholder

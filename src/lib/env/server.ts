@@ -14,13 +14,21 @@ const appOrigin = z.url().transform((value, context) => {
 export const databaseEnvSchema = z.object({ DATABASE_URL: databaseUrl });
 export const authEnvSchema = z.object({ NEON_AUTH_BASE_URL: authBaseUrl, NEON_AUTH_COOKIE_SECRET: z.string().min(32) });
 export const voiceEnvSchema = z.object({ OPENAI_API_KEY: z.string().min(20) });
-export const stripeClientEnvSchema = z.object({ STRIPE_SECRET_KEY: z.string().startsWith("sk_") });
+export const stripeClientEnvSchema = z.discriminatedUnion("STRIPE_MODE", [
+  z.object({ STRIPE_MODE: z.literal("sandbox"), STRIPE_SECRET_KEY: z.string().startsWith("sk_test_") }),
+  z.object({ STRIPE_MODE: z.literal("live"), STRIPE_SECRET_KEY: z.string().startsWith("sk_live_") }),
+]);
 export const billingPriceEnvSchema = z.object({ STRIPE_PRO_MONTHLY_PRICE_ID: z.string().startsWith("price_"), STRIPE_PRO_ANNUAL_PRICE_ID: z.string().startsWith("price_"), STRIPE_CLUB_MONTHLY_PRICE_ID: z.string().startsWith("price_"), STRIPE_CLUB_ANNUAL_PRICE_ID: z.string().startsWith("price_") });
-export const billingCheckoutEnvSchema = stripeClientEnvSchema.merge(billingPriceEnvSchema).extend({ NEXT_PUBLIC_APP_URL: appOrigin });
-export const billingPortalEnvSchema = stripeClientEnvSchema.extend({ NEXT_PUBLIC_APP_URL: appOrigin });
-export const billingWebhookEnvSchema = stripeClientEnvSchema.merge(billingPriceEnvSchema).extend({ STRIPE_WEBHOOK_SECRET: z.string().startsWith("whsec_") });
-export const billingEnvSchema = billingCheckoutEnvSchema.merge(billingWebhookEnvSchema);
-export const serverEnvSchema = databaseEnvSchema.merge(authEnvSchema).merge(voiceEnvSchema).merge(billingEnvSchema);
+export const billingCheckoutEnvSchema = stripeClientEnvSchema.and(billingPriceEnvSchema).and(z.object({ NEXT_PUBLIC_APP_URL: appOrigin }));
+export const billingPortalEnvSchema = stripeClientEnvSchema.and(z.object({ NEXT_PUBLIC_APP_URL: appOrigin }));
+export const billingWebhookEnvSchema = stripeClientEnvSchema.and(billingPriceEnvSchema).and(z.object({ STRIPE_WEBHOOK_SECRET: z.string().startsWith("whsec_") }));
+export const billingEnvSchema = stripeClientEnvSchema.and(billingPriceEnvSchema).and(z.object({ NEXT_PUBLIC_APP_URL: appOrigin, STRIPE_WEBHOOK_SECRET: z.string().startsWith("whsec_") }));
+export const serverEnvSchema = databaseEnvSchema.merge(authEnvSchema).merge(voiceEnvSchema).and(billingEnvSchema);
+
+/** Refuses a signed event from the opposite Stripe data plane. */
+export function stripeEventMatchesMode(mode: "sandbox" | "live", eventLivemode: boolean): boolean {
+  return eventLivemode === (mode === "live");
+}
 
 type Source = Record<string, string | undefined>;
 export function getDatabaseEnv(source: Source = process.env) { return databaseEnvSchema.parse(source); }
