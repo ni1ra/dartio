@@ -186,6 +186,29 @@ Planning inventory, 2026-08-12:
   Independent adversarial review finished with no remaining source, data,
   privacy, access, migration, rollback, or accessibility blocker.
 
+PR #33 Preview candidate `d9f2bc7462494748fbeca3c51b1329cd710926bc`,
+2026-08-12:
+
+- GitHub Actions run
+  [31553174206](https://github.com/ni1ra/dartio/actions/runs/31553174206)
+  passed typecheck, lint, unit, build, and browser proof in 7m11s on the exact
+  head SHA.
+- Vercel deployment `dpl_Atzu7izDdGbaYpnqWRJEHbRpHYw5` was READY with target
+  `preview`, PR 33, no alias error, and the exact head SHA. Its immutable URL
+  was `https://dartio-gamzeqj7r-niras-projects-868b6f5f.vercel.app`.
+- `pnpm verify:auth` accepted that origin. `verify:history` authenticated,
+  filed one synthetic D20 checkout, read its exact owner detail and summary,
+  derived the Free headline while withholding `deep`, and proved anonymous
+  history/detail/statistics refusal. The room sweep proved every anonymous
+  endpoint returns 401; its paid boundary was explicitly skipped because the
+  standing Production QA identity was not sent to Preview.
+- The touched statistics surface passed 12/12 in 7.7 seconds. The complete
+  deployed matrix passed 284 with the four designed viewport skips in 2.6
+  minutes.
+- The immutable Preview origin was added to Preview Neon Auth only for these
+  probes (exact count 1), then removed afterwards (exact count 0). The
+  pre-existing stable Cycle 2 origin remained present at count 1.
+
 PR, exact-SHA Preview application proof, CI, merge, the Production root
 snapshot/index application, and Production post-deploy receipts remain open
 until their exact commands finish.
