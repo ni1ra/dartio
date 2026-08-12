@@ -134,3 +134,26 @@ Frozen local candidate, 2026-08-12:
 
 Preview, PR CI, merge, and Production receipts remain open. No database,
 Stripe, OpenAI, entitlement, or service-worker state was changed locally.
+
+PR #34 Preview candidate `9b225dea8c280aea77b62d83ca3647bf940774f9`,
+2026-08-12:
+
+- GitHub Actions run
+  [31559456222](https://github.com/ni1ra/dartio/actions/runs/31559456222)
+  passed dependency installation, typecheck, lint, unit, build, and the full
+  browser proof in 7m57s on the exact head SHA. Both Vercel checks also passed.
+- Vercel deployment `dpl_968gSJyRd25Y13Sph56k4F6kuwQx` was READY with target
+  `preview`, PR 34, build `bld_d69kyc0bt`, no access protection, and the exact
+  head SHA. Its immutable URL was
+  `https://dartio-c54bbycvs-niras-projects-868b6f5f.vercel.app`.
+- `pnpm verify:auth` accepted the immutable origin. A throwaway Preview identity
+  authenticated; `verify:history` filed and read one strict D20 record, derived
+  the Free headline while withholding `deep`, and proved anonymous history,
+  detail, and statistics refusal. The room sweep proved every anonymous route
+  returns 401 and that the Free identity receives 402 before a room exists.
+- The deployed resilience surface passed 42/42 in 22.7 seconds. The complete
+  deployed matrix collected 330 checks and passed 326 with the four designed
+  viewport skips in 2.9 minutes, exit 0, at 390x844, 834x1112, and 1440x1000.
+- The immutable origin existed in Preview Neon Auth only for those probes:
+  its exact count moved 0 to 1 to 0. The pre-existing stable Cycle 2 origin
+  remained at count one, and no Production credential was sent to Preview.
