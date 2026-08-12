@@ -17,7 +17,7 @@
 - Preview database branch: `vercel-preview` (`br-fragrant-art-af79dyw5`); Neon Auth is provisioned independently on main and preview.
 - Neon Auth preview trusted domains include the stable Cycle 2 Vercel PR alias `https://dartio-git-cycle-2-identity-bill-2c0634-niras-projects-868b6f5f.vercel.app`; a fresh sandbox sign-up and authenticated `/account` projection passed there on 2026-07-17.
 - Hosting: Vercel team `niras-projects-868b6f5f`.
-- Payments: claimed Stripe sandbox `dartio-stripe`, resource `ir_afV2OHhg6q9l9S78`, connected to Preview and Production.
+- Payments: claimed Stripe sandbox `dartio-stripe`, resource `ir_afV2OHhg6q9l9S78`, connected to Preview and Production. The canonical Sandbox subscription-projection endpoint is `we_1U3dgDALEz0P7O2hpeRj6EFE` at `https://dartioopus46.vercel.app/api/billing/webhook`; it receives only Checkout completion and subscription create/update/delete. Its signing secret exists only as Vercel's sensitive Production `STRIPE_WEBHOOK_SECRET`. The superseded endpoint `we_1Tu0YUALEz0P7O2hYBwPCQwF` was disabled on 2026-08-12 after an exact request-log audit proved that a stale secret and unrelated event selection produced HTTP 400 instead of projecting subscriptions.
 - Stripe sandbox account: `acct_1TtxM1ALEz0P7O2h`. Pro prices are EUR 7.99 monthly (`price_1TtzgyALEz0P7O2hBlv1fWHW`) and EUR 76.70 annually (`price_1TtzgzALEz0P7O2h82O61RF7`); Club prices are EUR 24 monthly (`price_1Ttzh0ALEz0P7O2hOsw6eCEr`) and EUR 230.40 annually (`price_1Ttzh1ALEz0P7O2harPzXoGH`). All are test-mode, active, tax-inclusive catalog objects.
 - Voice: OpenAI transcription models are available; secrets stay in environment stores only.
 - GitHub repository `ni1ra/dartio` is connected to Vercel with production branch `main`.
@@ -51,15 +51,14 @@
 - The original sandbox webhook destination returned HTTP 500 to the successful Checkout's invoice events because it targets the old production alias, while Preview owns the Checkout identity/database. Dedicated Preview destination `we_1Tu1pFALEz0P7O2hQVsTftWI` is active at the stable Cycle 2 alias and listens only to `checkout.session.completed` plus the eight current `customer.subscription.*` events. Vercel has a sensitive branch-scoped signing-secret override for `cycle-2-identity-billing-voice`; the global Preview/Production secret was not changed.
 - Preview destination `we_1Tu1pFALEz0P7O2hQVsTftWI` processed two real Portal-cancellation `customer.subscription.updated` events with HTTP 200, zero failures, and 848–1305 ms response time on deployment `dpl_GvToqtNyNJCjzcGrYLDFVfZePqEV`. Neon stored both processed event IDs and exactly one owned Pro/trialing subscription row.
 - Deployment `dpl_G2u7bDCCuSCJMeaciPTkXjdwj6mG` proved explicit cancellation recovery and reprojection: reactivation cleared `cancel_at`; rescheduling stored `cancel_at=2026-07-31T02:42:12Z` while keeping `cancel_at_period_end=false`, status `trialing`, plan `pro`, and one subscription row.
-- GitHub release source: commit `29aa289bb2c5ee44e574017fccc0d457acfedd71`;
-  CI run [31554544961](https://github.com/ni1ra/dartio/actions/runs/31554544961)
+- GitHub release source: commit `6f0c2517cae6d00dd3465ccff68624b52517b51c`;
+  CI run [31571265289](https://github.com/ni1ra/dartio/actions/runs/31571265289)
   passed typecheck, lint, unit, build, and the full browser matrix.
-- Current greenfield production deployment: `dpl_Ah6KfKAFZTF9uVD4YqEwyo8z76tR`
+- Current greenfield production deployment: `dpl_CGLyHCbrBfScMgBFpZHtR4ZtyUGU`
   at `https://dartioopus46.vercel.app`, READY on the exact release SHA with no
-  alias error. Auth, strict owner-only history/detail, deep-statistics access,
-  rooms, the 12-check statistics surface, and the complete 284-run/4-skip
-  browser matrix passed there on 2026-08-12. Read-only room integrity reported
-  zero live or historical anomalies. Paid AI and voice provider success remain
+  alias error. Auth, strict owner-only history/detail, rooms, room integrity,
+  the 42-check resilience surface, and the complete 326-run/4-skip browser
+  matrix passed there on 2026-08-12. Paid AI and voice provider success remain
   parked because the standing QA identity is genuinely Free; its 403/402
   refusals were not renamed as successful gates.
 - Current Cycle 2 Auth/webhook preview deployment: `dpl_FfHXJZ9ZJJk7mWoDGiqieGx6LWCq` at `https://dartio-boreq0qif-niras-projects-868b6f5f.vercel.app`. It was redeployed on 2026-08-11 after Preview database-password rotation made its immutable predecessor stale; the stable branch alias retained its branch-scoped Stripe signing secret, picked up the current Preview `DATABASE_URL`, and then returned HTTP 200 for two signed sandbox subscription deliveries. Entitled X01 continuity/access-authority head `e3a80a4` passed GitHub verification run `29554449332`. Prior code Preview `dpl_AwDwqrqPYR8ufLdJUV5m91dQJLff` remains the rollback target for the Cycle 2 code.
@@ -68,6 +67,21 @@
 - Club Checkout is closed: `PLAN_CATALOG.club.checkout` is `unavailable`, `POST /api/billing/checkout` returns 409 for any non-`self_serve` plan before Stripe is called, and the pricing surface disables the action. Existing Club subscribers keep their projected entitlements.
 - The canonical record of a match is its event log, not its state: `src/domain/x01-log.ts` folds the pure reducers over what was thrown. Events carry the dart, not the thrower — turn order derives the player — so a visit is corrected by rewinding to it, never by excising it from the middle. The log is versioned and zod-validated on read (`src/domain/x01-persistence.ts`); an unknown version is discarded rather than migrated.
 - Active matches resume from local storage with no account, because free play requires no account. Completed matches are written to Neon as of 2026-07-30: `POST /api/matches` records `matches`, `players`, `turns`, and `darts` in one `db.batch`, which the Neon HTTP driver runs as a single transaction. Cycle 28 exercised those exact statements plus a guaranteed final constraint failure against an isolated Neon child: the transaction failed and a read-only residue check found zero marker users, matches, players, turns, or darts, with no cleanup delete. A real match also round-trips on Production. Room matches use the separate lifecycle writer described below.
+- X01, Cricket, round modes, and drills now all resume through strict versioned
+  envelopes. Round and drill readers bind the stored setup, roster, opponent,
+  rules, and requested AI level, preserve unknown future formats byte-for-byte,
+  migrate only identities they can prove, and contain every `localStorage`
+  failure. A hydrated nonempty-to-empty transition clears a resume slot; an
+  initial empty render cannot.
+- Active local matches, drills, and live room players request the best-effort
+  Screen Wake Lock capability and release it on hidden, completion, ineligibility,
+  navigation, or unmount. Late grants are released rather than adopted. Refusal
+  and unsupported browsers never block scoring or produce a support claim.
+- Dartio publishes a standalone manifest at `/manifest.webmanifest` with `/play`
+  as its start URL and mask-safe 192/512 PNG assets. It deliberately has no
+  service worker, Cache Storage writer, background sync, or offline route:
+  already-loaded local scoring may persist to `localStorage`, while cold load,
+  navigation, auth, AI, voice, rooms, and history still require the network.
 - Completed-match replay is mode-independent. `GET /api/matches/:id` reconstructs
   one completed `MatchRecord` only when the signed-in user occupies one of its
   player seats; missing and not-owned records share a private 404. Exact visits
@@ -120,7 +134,7 @@
 - `pnpm test`
 - `pnpm build`
 - `pnpm test:browser:install` (once per machine)
-- `pnpm test:browser` — 330 checks across 390×844, 834×1112, and 1440×1000; 326 run and 4 skip by design, those being the sign-up assertion at the two widths where sign-up is deliberately absent and the screenspace assertion at the two widths whose reservation it does not describe. Measured unpiped from a fresh build of the final local Cycle 29 candidate on 2026-08-12: all collected checks completed successfully, exit 0 in 277.9 seconds; the focused resilience surface passed 42/42. Set `DARTIO_BASE_URL` to run them against a preview or production deployment instead of a local build
+- `pnpm test:browser` — 333 checks across 390×844, 834×1112, and 1440×1000; 329 run and 4 skip by design, those being the sign-up assertion at the two widths where sign-up is deliberately absent and the screenspace assertion at the two widths whose reservation it does not describe. Measured unpiped from a fresh build of the local Cycle 30 candidate on 2026-08-12: every runnable check completed successfully, exit 0 in 287.7 seconds; the focused product-truth/account surface passed 6/6. Set `DARTIO_BASE_URL` to run them against a preview or production deployment instead of a local build
 - `pnpm db:generate` — writes the migration; it does not apply it
 - `DATABASE_URL=<branch-uri> pnpm exec drizzle-kit migrate` — applies pending migrations to one branch and reconciles the journal. Preview first, then main. The URI is passed only through a credential-safe in-memory wrapper, never as a positional argument or printed shell assignment. The repo has no `db:migrate` script because the URL is never the one in `.env.local` for production work
 

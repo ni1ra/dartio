@@ -54,7 +54,7 @@ export function PricingExperience() {
           <p className="eyebrow">Membership without hostage-taking</p>
           <h1>Scoring stays free.<br /><em>Momentum goes further.</em></h1>
         </div>
-        <p>Pro currently unlocks stronger AI plus push-to-talk and opt-in hands-free voice scoring. Every paid decision stays reversible in Stripe, while unfinished capabilities remain clearly marked.</p>
+        <p>Pro unlocks every AI level, advanced checkout routes, deep statistics, online rooms, and push-to-talk or opt-in hands-free voice scoring. Every paid decision stays reversible in Stripe, while custom practice and Club remain clearly marked.</p>
       </header>
       <div className="pricing-control-row">
         <fieldset className="interval-switch">
@@ -94,8 +94,9 @@ export function PricingExperience() {
             <li>Every AI level, 1 through 20 <span>AVAILABLE</span></li>
             <li>Push-to-talk voice scoring <span>AVAILABLE</span></li>
             <li>Opt-in hands-free voice scoring <span>AVAILABLE</span></li>
-            <li className="feature-soon">Advanced checkout routes <span>COMING SOON</span></li>
-            <li className="feature-soon">Deep stats, practice paths, and online rooms <span>COMING SOON</span></li>
+            <li>Advanced checkout routes <span>AVAILABLE</span></li>
+            <li>Deep statistics and online rooms <span>AVAILABLE</span></li>
+            <li className="feature-soon">Custom practice paths <span>COMING SOON</span></li>
           </ul>
           {sessionPending || access.status==="loading" ? (
             <Button disabled>Checking account…</Button>

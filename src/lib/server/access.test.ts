@@ -82,9 +82,8 @@ describe("accessSnapshot", () => {
 
   it("contains product availability but no billing identifiers", () => {
     const snapshot = accessSnapshot(true, base, new Date("2026-07-01T00:00:00.000Z"));
-    // History and deep statistics shipped in cycles 12 and 13; online rooms can be
-    // opened and joined but not yet played in, so they stay coming_soon.
-    expect(snapshot.availability).toMatchObject({ advancedAi: "implemented", advancedCheckout: "implemented", voiceInput: "implemented", history: "implemented", deepStats: "implemented", onlineMultiplayer: "implemented" });
+    // The availability map is product truth, independent from what a plan grants.
+    expect(snapshot.availability).toMatchObject({ advancedAi: "implemented", advancedCheckout: "implemented", voiceInput: "implemented", history: "implemented", deepStats: "implemented", onlineMultiplayer: "implemented", customPractice: "coming_soon", clubManagement: "coming_soon" });
     const serialized = JSON.stringify(snapshot);
     expect(serialized).toContain("coming_soon");
     expect(serialized).not.toContain("cus_secret");

@@ -78,14 +78,22 @@ The full plan and its execution contract were approved on 2026-08-11.
   and exact-SHA CI, Preview, Production, auth/history/rooms, focused statistics,
   and the complete 284-run/4-skip browser matrix passed. See
   `CYCLE_28_statistics_depth.md`.
-- [ ] **Cycle 29 — At-the-oche resilience.** `error.tsx` boundaries that tell a
+- [x] **Cycle 29 — At-the-oche resilience.** `error.tsx` boundaries that tell a
   player their match survived; a wake lock so the screen does not dim mid-leg; a
   `public/` with icons and an installable manifest; the versioned-zod resume
   treatment for the round modes and drills that X01 already has; an honest offline
-  audit with no service-worker claims beyond what is real.
-- [ ] **Cycle 30 — Phase 3 closure.** Re-score every claim against `main` and the
-  live deployment, full browser suite and the three verify gates against
-  production, archive to `past_work/phase_3/`, name what is honestly left.
+  audit with no service-worker claims beyond what is real. Shipped in PR #34 as
+  `6f0c2517cae6d00dd3465ccff68624b52517b51c`; exact Preview, main CI,
+  Production deployment, auth/history/rooms/integrity, focused resilience, and
+  the complete 326-run/4-skip browser matrix all passed. See
+  `CYCLE_29_oche_resilience.md`.
+- [ ] **Cycle 30 — Phase 3 closure and Sandbox promotion.** Re-score every claim
+  against `main`, remove stale public labels, lock the existing Hosted Checkout
+  promotion boundary, and redeem one one-use Pro-product-only 100%-off code in
+  Stripe Sandbox. Prove the next full invoice is discounted to zero, signed
+  webhook access enables paid AI/voice, and Portal cancellation prevents a later
+  renewal. Then repeat full Production gates, archive to `past_work/phase_3/`,
+  and name what is honestly left. See `CYCLE_30_phase_closure.md`.
 
 ## Phase-level gates
 
