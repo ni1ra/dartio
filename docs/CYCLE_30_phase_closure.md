@@ -47,13 +47,13 @@ payment method whenever a trial or discount makes the current total zero.
 - [x] Add focused three-viewport browser proof for the corrected landing,
   pricing, and account truth; retain the existing full responsive matrix as the
   broader release gate.
-- [ ] Provision and redeem one short-lived, one-use, Pro-product-only 100%-off
+- [x] Provision and redeem one short-lived, one-use, Pro-product-only 100%-off
   code in Stripe Sandbox through real Dartio Production Checkout; record object
   identities only, never the code, key, cookie, or payment details.
-- [ ] Prove the next full invoice has a non-zero Pro gross amount, an equal
+- [x] Prove the next full invoice has a non-zero Pro gross amount, an equal
   discount, and zero due; prove the signed webhook grants canonical Pro access;
   pass paid AI and paid voice against Production.
-- [ ] Cancel through the Stripe Customer Portal, prove the cancellation webhook
+- [x] Cancel through the Stripe Customer Portal, prove the cancellation webhook
   projects the end state, and ensure the single-use promotion cannot be reused.
 - [ ] Pass full local deterministic/browser gates, independent audit, one exact-
   head PR/CI/Preview, merge, main CI, standing Production verifiers, touched and
@@ -116,5 +116,56 @@ Local candidate, 2026-08-12:
   subscription, or payment object was created during that access check, and the
   unrelated dashboard account shown earlier was not used.
 
-Sandbox, Preview, CI, merge, Production, archive, and Phase 4 opening receipts
-remain open until their exact commands finish.
+Exact-head Preview and CI, 2026-08-12:
+
+- Draft PR #35 at `dbb5b9684f0d923c2804760f2ec515f45b844165`
+  passed CI run `31573977798`. Vercel Preview deployment
+  `dpl_Du6QP8JwYVtHx8WJHzNWCgBjqWrP` was READY at the same commit.
+- Preview authentication, history, room refusal, and the complete browser
+  matrix passed against the exact deployment. The browser gate again collected
+  333 checks, passed 329, and retained the same four intentional viewport skips.
+
+Stripe Sandbox and paid Production boundary, 2026-08-12:
+
+- Coupon `uRVkTf42` is Sandbox-only, 100%-off forever, restricted to Pro product
+  `prod_UtnHmPqRARQRAB`, and capped at one redemption. Promotion object
+  `promo_1U3XSGALEz0P7O2hxqHPA97V` is bound to the standing QA customer, capped
+  at one, and its human-entered code was never printed or persisted. Both
+  objects report `times_redeemed: 1`; both are now invalid for another use.
+- Real Production Checkout Session
+  `cs_test_b1XDfF84LBgAa3gkyxb9GZf9nGhu6OjdWLypwBlePbC9s7qdqCofz2uAq8`
+  completed in Sandbox with `amount_total: 0` and created trialing subscription
+  `sub_1U3dXsALEz0P7O2hJBUuRL7H`. The subscription has a payment method, uses
+  monthly Pro price `price_1TtzgyALEz0P7O2hBlv1fWHW`, and remains test-mode.
+- The prior Production webhook was doubly misconfigured: its signing secret did
+  not match Vercel and its event selection omitted the Checkout/subscription
+  events the Dartio route consumes. It returned 400 and granted no access. It
+  was replaced by Sandbox endpoint `we_1U3dgDALEz0P7O2hpeRj6EFE`, limited to
+  `checkout.session.completed` plus subscription create/update/delete; its new
+  secret went directly through stdin to the sensitive Production environment
+  variable and was never displayed. The old endpoint is disabled.
+- Vercel redeployed unchanged Cycle 29 merge
+  `6f0c2517cae6d00dd3465ccff68624b52517b51c` as Production deployment
+  `dpl_3jHojtdFhtKW2z4Pj5EXMNUZMUKP`; it was READY, aliased canonically, and
+  retained exact `main` Git metadata. Replayed event
+  `evt_1U3dXtALEz0P7O2hvLLURLSk` received HTTP 200 there. Authenticated
+  `/api/access` then returned canonical Pro with advanced AI, hands-free voice,
+  and online multiplayer.
+- Recurring invoice preview `upcoming_in_1U3dmjALEz0P7O2h1XbilngI` proves the
+  discount rather than the trial: EUR 799 subtotal, EUR 799 discount, EUR 0
+  total and `amount_due`, on the exact configured Pro price and product.
+- Production paid gates both exited 0. AI sampled 25 darts for each of S20, D20,
+  T20, outer bull, and inner bull and proved physical/target consistency. Voice
+  sent the checked-in synthetic clip and returned exact T20 with finite non-zero
+  confidence. Anonymous and malformed requests remained refused.
+- Customer Portal scheduled the Sandbox subscription to end exactly at trial
+  end, 2026-08-26T14:54:18Z. Stripe kept it `trialing` with
+  `cancel_at: 1787756058`, recorded the cancellation at `1786570460`, and left
+  `cancel_at_period_end: false` because the explicit `cancel_at` is authoritative.
+  Event `evt_1U3jn0ALEz0P7O2hgR2sL6kB` reached the canonical webhook with HTTP
+  200. Authenticated `/api/access` retained active Pro through the same
+  timestamp and exposes that timestamp as `accessEndsAt`, proving both continued
+  trial access and no later full-price renewal.
+
+Final exact-head freeze, merge, Production regression gates, archive, and Phase
+4 opening receipts remain open until their exact commands finish.

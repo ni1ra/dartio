@@ -17,7 +17,7 @@
 - Preview database branch: `vercel-preview` (`br-fragrant-art-af79dyw5`); Neon Auth is provisioned independently on main and preview.
 - Neon Auth preview trusted domains include the stable Cycle 2 Vercel PR alias `https://dartio-git-cycle-2-identity-bill-2c0634-niras-projects-868b6f5f.vercel.app`; a fresh sandbox sign-up and authenticated `/account` projection passed there on 2026-07-17.
 - Hosting: Vercel team `niras-projects-868b6f5f`.
-- Payments: claimed Stripe sandbox `dartio-stripe`, resource `ir_afV2OHhg6q9l9S78`, connected to Preview and Production.
+- Payments: claimed Stripe sandbox `dartio-stripe`, resource `ir_afV2OHhg6q9l9S78`, connected to Preview and Production. The canonical Sandbox subscription-projection endpoint is `we_1U3dgDALEz0P7O2hpeRj6EFE` at `https://dartioopus46.vercel.app/api/billing/webhook`; it receives only Checkout completion and subscription create/update/delete. Its signing secret exists only as Vercel's sensitive Production `STRIPE_WEBHOOK_SECRET`. The superseded endpoint `we_1Tu0YUALEz0P7O2hYBwPCQwF` was disabled on 2026-08-12 after an exact request-log audit proved that a stale secret and unrelated event selection produced HTTP 400 instead of projecting subscriptions.
 - Stripe sandbox account: `acct_1TtxM1ALEz0P7O2h`. Pro prices are EUR 7.99 monthly (`price_1TtzgyALEz0P7O2hBlv1fWHW`) and EUR 76.70 annually (`price_1TtzgzALEz0P7O2h82O61RF7`); Club prices are EUR 24 monthly (`price_1Ttzh0ALEz0P7O2hOsw6eCEr`) and EUR 230.40 annually (`price_1Ttzh1ALEz0P7O2harPzXoGH`). All are test-mode, active, tax-inclusive catalog objects.
 - Voice: OpenAI transcription models are available; secrets stay in environment stores only.
 - GitHub repository `ni1ra/dartio` is connected to Vercel with production branch `main`.
