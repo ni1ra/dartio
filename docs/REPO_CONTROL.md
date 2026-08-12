@@ -134,7 +134,7 @@
 - `pnpm test`
 - `pnpm build`
 - `pnpm test:browser:install` (once per machine)
-- `pnpm test:browser` — 330 checks across 390×844, 834×1112, and 1440×1000; 326 run and 4 skip by design, those being the sign-up assertion at the two widths where sign-up is deliberately absent and the screenspace assertion at the two widths whose reservation it does not describe. Measured unpiped from a fresh build of the final local Cycle 29 candidate on 2026-08-12: all collected checks completed successfully, exit 0 in 277.9 seconds; the focused resilience surface passed 42/42. Set `DARTIO_BASE_URL` to run them against a preview or production deployment instead of a local build
+- `pnpm test:browser` — 333 checks across 390×844, 834×1112, and 1440×1000; 329 run and 4 skip by design, those being the sign-up assertion at the two widths where sign-up is deliberately absent and the screenspace assertion at the two widths whose reservation it does not describe. Measured unpiped from a fresh build of the local Cycle 30 candidate on 2026-08-12: every runnable check completed successfully, exit 0 in 287.7 seconds; the focused product-truth/account surface passed 6/6. Set `DARTIO_BASE_URL` to run them against a preview or production deployment instead of a local build
 - `pnpm db:generate` — writes the migration; it does not apply it
 - `DATABASE_URL=<branch-uri> pnpm exec drizzle-kit migrate` — applies pending migrations to one branch and reconciles the journal. Preview first, then main. The URI is passed only through a credential-safe in-memory wrapper, never as a positional argument or printed shell assignment. The repo has no `db:migrate` script because the URL is never the one in `.env.local` for production work
 

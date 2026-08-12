@@ -7,8 +7,8 @@ import { Surface } from "navi-ui";
 const modes = ["X01", "Cricket", "Around the clock", "Shanghai", "Count-up", "Bob’s 27"];
 
 // Every entry is a shipped capability — the marquee is a claims surface, not a
-// roadmap. (An earlier version said "LIVE ROOMS", which does not exist.)
-const signals = ["VISUAL SCORING", "BELIEVABLE AI", "VOICE INPUT", "SIX GAME MODES", "SMART CHECKOUTS"];
+// roadmap.
+const signals = ["VISUAL SCORING", "BELIEVABLE AI", "VOICE INPUT", "ONLINE ROOMS", "SIX GAME MODES", "SMART CHECKOUTS"];
 
 /** One pass of the marquee text; rendered twice so the -50% loop is seamless. */
 function SignalRun({ hidden }: { hidden?: boolean }) {

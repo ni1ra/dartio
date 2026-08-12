@@ -23,9 +23,9 @@ const PRO_ACCESS = {
   accessState: "active",
   entitlements: [
     "local_scoring", "basic_checkout", "advanced_checkout", "voice_always_on",
-    "advanced_ai", "deep_stats",
+    "advanced_ai", "deep_stats", "online_multiplayer", "custom_practice",
   ],
-  limits: { aiMaxLevel: 20, historyMatches: null, onlineSeats: 0 },
+  limits: { aiMaxLevel: 20, historyMatches: null, onlineSeats: 8 },
 } as const;
 
 const PRO_STATS = {
@@ -155,6 +155,11 @@ test("Pro record separates sessions and exposes source-honest career depth", asy
   await page.route("**/api/matches?*", (route) => json(route, 200, HISTORY));
 
   await page.goto("/account", { waitUntil: "networkidle" });
+
+  const membership = page.locator(".membership-status");
+  await expect(membership).toContainText("Deep statistics");
+  await expect(membership).toContainText("Online rooms");
+  await expect(membership).toContainText("Custom practice paths and Club management are still being built.");
 
   const record = page.getByRole("region", { name: "Your record" });
   await expect(record.getByText("9 completed sessions")).toBeVisible();

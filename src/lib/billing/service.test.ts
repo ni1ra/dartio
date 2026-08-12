@@ -48,16 +48,21 @@ describe("production billing policy", () => {
     expect(paidPlanForPriceId(expected, prices)).toBe(plan);
   });
 
-  it("applies Pro trial, ownership metadata, tax, payment, and canonical absolute URLs", () => {
+  it("keeps normal Pro checkout card-backed and open to customer promotion codes", () => {
     const params = checkoutSessionParams({ userId: "user-1", customerId: "cus_1", priceId: "price_1", appOrigin: "https://dartio.app", plan: "pro", interval: "year" });
     expect(params).toMatchObject({
+      mode: "subscription",
       customer: "cus_1",
+      line_items: [{ price: "price_1", quantity: 1 }],
+      allow_promotion_codes: true,
       automatic_tax: { enabled: true },
       payment_method_collection: "always",
       tax_id_collection: { enabled: true },
       customer_update: { address: "auto", name: "auto" },
       metadata: { userId: "user-1", plan: "pro", interval: "year" },
     });
+    expect(params.discounts).toBeUndefined();
+    expect(params.subscription_data?.metadata).toEqual({ userId: "user-1", plan: "pro", interval: "year" });
     expect(params.subscription_data?.trial_period_days).toBe(14);
     expect(params.subscription_data?.trial_settings).toEqual({ end_behavior: { missing_payment_method: "cancel" } });
     expect(params.success_url).toBe("https://dartio.app/account?checkout=success&session_id={CHECKOUT_SESSION_ID}");

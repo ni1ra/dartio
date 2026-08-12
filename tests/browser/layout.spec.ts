@@ -70,6 +70,24 @@ for (const [name, path] of ROUTES) {
   });
 }
 
+test("public product claims match shipped availability", async ({ page }) => {
+  await page.goto("/", { waitUntil: "networkidle" });
+  await expect(
+    page.locator(".signal-track > span").first().locator("i", { hasText: "ONLINE ROOMS" }),
+  ).toBeVisible();
+
+  await page.goto("/pricing", { waitUntil: "networkidle" });
+  const pro = page.locator(".pro-plan");
+  await expect(pro.locator("li", { hasText: "Advanced checkout routes" })).toContainText("AVAILABLE");
+  await expect(pro.locator("li", { hasText: "Deep statistics and online rooms" })).toContainText("AVAILABLE");
+  await expect(pro.locator("li", { hasText: "Custom practice paths" })).toContainText("COMING SOON");
+  await expect(page.locator(".club-plan")).toContainText("Club management remains under active development.");
+
+  await page.goto("/account", { waitUntil: "networkidle" });
+  await expect(page.getByText("Online rooms are live with Pro.", { exact: false })).toBeVisible();
+  await expect(page.getByText("Online rooms are still being built.", { exact: false })).toHaveCount(0);
+});
+
 /*
  * The nav must offer a signed-out visitor a way into an account.
  *
