@@ -91,6 +91,7 @@ function HistoryPanel({ load }: { load: Load<readonly MatchHistoryEntryView[]> }
         const won = you !== undefined && match.winnerSeat === you.seat;
         const others = match.players.filter((player) => !player.isYou).map((player) => player.isBot ? `${player.displayName} (LV ${player.botLevel ?? "?"})` : player.displayName);
         return <li key={match.id}>
+          <Link className="history-replay-link" href={`/account/matches/${encodeURIComponent(match.id)}`} aria-label={`Replay ${modeName(match.mode)} match from ${formatDate(match.completedAt)}`}>
           <div>
             <b>{modeName(match.mode)}</b>
             <span>{others.length > 0 ? `vs ${others.join(", ")}` : "Solo"}</span>
@@ -99,6 +100,8 @@ function HistoryPanel({ load }: { load: Load<readonly MatchHistoryEntryView[]> }
             <span className={won ? "history-won" : "history-lost"}>{match.winnerSeat === null ? "Unfinished" : won ? "Won" : "Lost"}</span>
             <small>{match.dartCount} {match.dartCount === 1 ? "dart" : "darts"} · {formatDate(match.completedAt)}</small>
           </div>
+          <span className="history-replay-cue" aria-hidden="true">Replay →</span>
+          </Link>
         </li>;
       })}
     </ol>

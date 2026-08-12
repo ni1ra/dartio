@@ -18,18 +18,38 @@ function polar(radius:number,degrees:number){const angle=degrees*Math.PI/180,rou
 function ringPath(inner:number,outer:number,start:number,end:number){const a=polar(outer,start),b=polar(outer,end),c=polar(inner,end),d=polar(inner,start);return `M${a.x} ${a.y} A${outer} ${outer} 0 0 1 ${b.x} ${b.y} L${c.x} ${c.y} A${inner} ${inner} 0 0 0 ${d.x} ${d.y} Z`;}
 function positioned(value:Dart):Dart{return value.x!==undefined&&value.y!==undefined?value:dart(value.segment,value.multiplier,representativePoint(value))}
 
-export interface DartboardProps {
+interface DartboardBaseProps {
   readonly darts: readonly Dart[];
-  readonly disabled?: boolean;
-  readonly onDart: (value: Dart) => void;
   /** Shown under the board. Modes word their own instruction. */
   readonly caption?: string;
   readonly hint?: string;
 }
 
-export function Dartboard({ darts, disabled = false, onDart, caption = "Tap the landing point", hint = "or use score entry below" }: DartboardProps) {
-  function boardClick(e:React.MouseEvent<SVGSVGElement>){const rect=e.currentTarget.getBoundingClientRect();const x=(e.clientX-rect.left)*320/rect.width,y=(e.clientY-rect.top)*320/rect.height;if(disabled)return;onDart(scoreBoardPoint({x:(x-BOARD_CENTER)/BOARD_RADIUS,y:(y-BOARD_CENTER)/BOARD_RADIUS}))}
-  return <div className="board-wrap"><svg className="dartboard" viewBox="0 0 320 320" preserveAspectRatio="xMidYMid meet" role="button" tabIndex={disabled?-1:0} aria-disabled={disabled} aria-label="Dartboard. Click a landing point to record a dart. Press Enter to record treble twenty." onClick={boardClick} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();if(!disabled)onDart(dart(20,3))}}}>
+interface InteractiveDartboardProps extends DartboardBaseProps {
+  readonly readOnly?: false;
+  readonly disabled?: boolean;
+  readonly onDart: (value: Dart) => void;
+}
+
+interface ReadOnlyDartboardProps extends DartboardBaseProps {
+  /** Presentation mode has no scorer semantics, focus stop, or event handlers. */
+  readonly readOnly: true;
+  readonly disabled?: never;
+  readonly onDart?: never;
+}
+
+export type DartboardProps = InteractiveDartboardProps | ReadOnlyDartboardProps;
+
+export function Dartboard(props: DartboardProps) {
+  const { darts } = props;
+  const readOnly = props.readOnly === true;
+  const disabled = readOnly ? false : (props.disabled ?? false);
+  const caption = props.caption ?? (readOnly ? "Recorded landing" : "Tap the landing point");
+  const hint = props.hint ?? (readOnly ? "Replay only — scoring is disabled" : "or use score entry below");
+
+  function boardClick(e:React.MouseEvent<SVGSVGElement>){const rect=e.currentTarget.getBoundingClientRect();const x=(e.clientX-rect.left)*320/rect.width,y=(e.clientY-rect.top)*320/rect.height;if(props.readOnly===true||props.disabled)return;props.onDart(scoreBoardPoint({x:(x-BOARD_CENTER)/BOARD_RADIUS,y:(y-BOARD_CENTER)/BOARD_RADIUS}))}
+  function boardKeyDown(e:React.KeyboardEvent<SVGSVGElement>){if(props.readOnly===true||props.disabled)return;if(e.key==="Enter"||e.key===" "){e.preventDefault();props.onDart(dart(20,3))}}
+  return <div className="board-wrap"><svg className="dartboard" viewBox="0 0 320 320" preserveAspectRatio="xMidYMid meet" role={readOnly?"img":"button"} tabIndex={readOnly?undefined:disabled?-1:0} aria-disabled={readOnly?undefined:disabled} aria-label={readOnly?"Replay dartboard. Recorded landing points are display only.":"Dartboard. Click a landing point to record a dart. Press Enter to record treble twenty."} data-read-only={readOnly||undefined} onClick={readOnly?undefined:boardClick} onKeyDown={readOnly?undefined:boardKeyDown}>
     <circle cx={BOARD_CENTER} cy={BOARD_CENTER} r="151" className="board-shadow"/>
     {SEGMENTS.map((number,index)=>{const center=index*18-90,start=center-9,end=center+9;const label=polar(145,center);const bed=index%2===0?"bed-dark":"bed-light";const color=index%2===0?"ring-red":"ring-green";return <g key={number} data-segment={number}><path d={ringPath(R.outerBull,R.trebleInner,start,end)} className={`board-bed ${bed}`}/><path d={ringPath(R.trebleInner,R.trebleOuter,start,end)} className={`board-bed ${color}`}/><path d={ringPath(R.trebleOuter,R.doubleInner,start,end)} className={`board-bed ${bed}`}/><path d={ringPath(R.doubleInner,R.outer,start,end)} className={`board-bed ${color}`}/><text x={label.x} y={label.y} className="board-number">{number}</text></g>})}
     <circle cx={BOARD_CENTER} cy={BOARD_CENTER} r={R.outerBull} className="outer-bull"/><circle cx={BOARD_CENTER} cy={BOARD_CENTER} r={R.innerBull} className="inner-bull"/>

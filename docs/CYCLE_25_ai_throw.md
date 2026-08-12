@@ -1,6 +1,10 @@
 # Cycle 25 — Premium AI, Rules-Blind
 
-Status: active on branch `cycle-25-ai-throw`.
+Status: shipped to Production on 2026-08-11 in PR
+[#29](https://github.com/ni1ra/dartio/pull/29). The exact Preview proved the paid
+provider path with a legitimate Sandbox-created Pro identity; the separate
+Production paid-QA receipt remains parked because the standing QA identity is
+Free.
 
 Third cycle of `PHASE_3_promise_completion.md`. Levels 9–20 become playable in
 X01, Cricket, Around the Clock, Shanghai, Count-Up, and Bob's 27 without moving
@@ -88,8 +92,11 @@ X01 does.
 - [x] Full local typecheck, lint, unit, build, and browser gates.
 - [x] Exact Preview deployment: authentication, premium live verifier, touched
   browser matrix, CI, and origin cleanup.
-- [ ] Merge only a green exact revision; repeat auth, history, rooms, premium AI,
-  touched browser, and main-CI proof on Production.
+- [x] Merge the green exact revision; prove exact main CI and the exact READY
+  Production deployment.
+- [ ] Repeat the paid live sampler on Production when a legitimate entitled QA
+  identity exists. A 403 from the current Free identity remains a refusal, not
+  success evidence.
 
 ## Resume boundary
 
@@ -147,5 +154,18 @@ Exact local candidate, 2026-08-11:
   ignored `.env.local` was updated without placing the replacement in source,
   a command argument, or subsequent output.
 
-Merge and Production receipts remain deliberately unrecorded until the exact
-committed revision reaches each gate.
+Merge and Production, 2026-08-11:
+
+- PR [#29](https://github.com/ni1ra/dartio/pull/29) merged as exact commit
+  `a4c959a805e61bcbcf299707f3c687d0629464a9`.
+- Main GitHub Actions run
+  [31519353985](https://github.com/ni1ra/dartio/actions/runs/31519353985)
+  completed successfully on that exact SHA. Typecheck, lint, unit, build, and
+  the 231-check browser matrix all passed: 227 run and four intentional skips.
+- Vercel deployment `dpl_Gj5BUEKa9tHMhjbmM35jViBkCZa6` reached READY for the
+  same SHA, target Production, with no alias error. A canonical-alias lookup of
+  `https://dartioopus46.vercel.app` resolved to that deployment and SHA.
+- The later Cycle 26 Production gate authenticated the standing QA identity
+  against the unchanged premium-AI boundary and received 403 because the
+  account is Free. This is recorded as the outstanding paid-Production receipt;
+  no fake subscription or database authority was added.

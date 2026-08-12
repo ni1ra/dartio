@@ -1,7 +1,9 @@
 # Cycle 26 — Voice Confidence, End to End
 
-Status: active in PR [#31](https://github.com/ni1ra/dartio/pull/31) from
-`codex/cycle-26-voice-confidence`.
+Status: shipped to Production on 2026-08-12 in PR
+[#31](https://github.com/ni1ra/dartio/pull/31). The authenticated paid-provider
+receipt remains parked because the existing QA identity is genuinely Free; no
+entitlement was forged to make that external box green.
 
 Fourth cycle of `PHASE_3_promise_completion.md`. The continuous voice lifecycle
 already knew how to segment speech and the dialogue layer already had a hold
@@ -91,8 +93,11 @@ rename an X01 proof as cross-mode completion.
   project, so the existing Production QA identity is refused at sign-in with
   403. Do not manufacture a subscription row merely to turn this box green;
   repeat the live gate when a legitimate Preview Pro identity exists.
-- [ ] Merge only a green exact revision; repeat auth, history, rooms, premium AI,
-  voice, touched browser, full browser, and main-CI proof on Production.
+- [x] Merge the green exact revision; prove the exact Production deployment,
+  auth, history, rooms, touched browser, full browser, and main CI.
+- [ ] Paid Production provider proof is parked: the existing QA identity signs
+  in but receives the canonical entitlement refusal before OpenAI. Repeat the
+  live gate when a legitimate entitled QA identity exists.
 
 ## Live verifier safety
 
@@ -123,9 +128,6 @@ Local candidate, 2026-08-12:
   245 passed and the four documented viewport-inapplicable layout assertions
   skipped by design; exit 0 in 252.8 seconds.
 
-Merge and Production receipts remain deliberately unrecorded until the
-stabilized exact revision reaches each gate.
-
 Preview candidate, 2026-08-12:
 
 - PR [#31](https://github.com/ni1ra/dartio/pull/31) carried feature commit
@@ -146,3 +148,27 @@ Preview candidate, 2026-08-12:
   [31543086276](https://github.com/ni1ra/dartio/actions/runs/31543086276)
   completed successfully on the exact feature SHA: typecheck, lint, unit,
   build, and browser proof all passed. Both required Vercel checks passed.
+
+Merge and Production, 2026-08-12:
+
+- PR [#31](https://github.com/ni1ra/dartio/pull/31) merged as exact commit
+  `b640b6347e27c4d77bf3e078248f5a8dded0fd75`.
+- Main GitHub Actions run
+  [31544068534](https://github.com/ni1ra/dartio/actions/runs/31544068534)
+  completed successfully on that exact SHA: typecheck, lint, unit, build, and
+  browser proof all passed.
+- Vercel deployment `dpl_DmZBzaj5pu1Hrm48MfgfSSDbaEde` reached READY for the
+  same SHA, target Production, with no alias error; the canonical alias
+  `https://dartioopus46.vercel.app` resolved to it.
+- `pnpm verify:auth`, `pnpm verify:history`, and `pnpm verify:rooms` passed
+  against Production. History filed and read back a real one-dart D20 match;
+  rooms proved both anonymous and Free-plan refusal boundaries.
+- `DARTIO_BASE_URL=https://dartioopus46.vercel.app pnpm exec playwright test
+  tests/browser/voice.spec.ts` — 18/18 passed across all three viewports.
+- The full Production browser matrix collected 249 checks: 245 passed and the
+  four documented viewport-inapplicable assertions skipped by design; exit 0
+  in 2.2 minutes.
+- `pnpm verify:ai:live` and `pnpm verify:voice:live` authenticated the existing
+  QA identity but received the canonical paid-feature refusal because that
+  identity is Free. The voice request stopped before an OpenAI call. No paid
+  provider success is claimed, and no database entitlement was manufactured.

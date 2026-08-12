@@ -3,7 +3,8 @@ import { desc, eq, sql } from "drizzle-orm";
 import { createDatabase } from "@/db/client";
 import { dartRows } from "@/db/rows";
 import { darts, matches, players, turns } from "@/db/schema";
-import type { MatchRecord } from "@/domain/match-record";
+import { parseMatchRecord, type MatchRecord } from "@/domain/match-record";
+import type { MatchReplayDetail } from "@/domain/match-replay";
 import type { StatMatch, StatTurn } from "@/domain/match-stats";
 import { recordFailure } from "./observability";
 
@@ -142,6 +143,73 @@ export async function listMatches(
   return rows.map(toEntry);
 }
 
+/**
+ * Reconstructs one completed match only when the reader occupied one of its seats.
+ *
+ * Missing ids and matches owned by somebody else both produce `null`; callers must
+ * not reveal which case occurred. The whole record is aggregated in one statement
+ * so replay length does not turn into one database round trip per visit.
+ */
+export async function readMatchReplay(
+  userId: string,
+  matchId: string,
+  db: Database = createDatabase(),
+): Promise<MatchReplayDetail | null> {
+  try {
+    const result = await db.execute<MatchReplayRow>(sql`
+      select
+        ${matches.id} as "id",
+        ${matches.mode} as "mode",
+        ${matches.options} as "options",
+        ${matches.completedAt} as "completedAt",
+        winner.seat as "winnerSeat",
+        reader.seat as "ownerSeat",
+        (select coalesce(json_agg(json_build_object(
+            'seat', roster.seat,
+            'displayName', roster.display_name,
+            'isBot', roster.is_bot,
+            'botLevel', roster.bot_level
+          ) order by roster.seat), '[]'::json)
+           from ${players} as roster
+          where roster.match_id = ${matches.id}) as "players",
+        (select coalesce(json_agg(json_build_object(
+            'seat', thrower.seat,
+            'turnNumber', visit.turn_number,
+            'legNumber', visit.leg_number,
+            'scoreBefore', visit.score_before,
+            'scoreAfter', visit.score_after,
+            'bust', visit.bust,
+            'dartsThrown', visit.darts_thrown,
+            'aggregateScore', visit.aggregate_score,
+            'darts', (select coalesce(json_agg(json_build_object(
+                'ordinal', thrown.ordinal,
+                'segment', thrown.segment,
+                'multiplier', thrown.multiplier,
+                'x', thrown.x_microunits,
+                'y', thrown.y_microunits
+              ) order by thrown.ordinal), '[]'::json)
+                from ${darts} as thrown
+               where thrown.turn_id = visit.id)
+          ) order by visit.turn_number), '[]'::json)
+           from ${turns} as visit
+           join ${players} as thrower on thrower.id = visit.player_id
+          where visit.match_id = ${matches.id}) as "turns"
+      from ${matches}
+      join ${players} as reader
+        on reader.match_id = ${matches.id} and reader.user_id = ${userId}
+      left join ${players} as winner on winner.id = ${matches.winnerPlayerId}
+      where ${matches.id} = ${matchId}
+        and ${matches.completedAt} is not null
+      order by reader.seat
+      limit 1
+    `);
+    const row = result.rows[0];
+    return row ? replayFromRow(row) : null;
+  } catch (cause) {
+    throw new MatchHistoryError({ cause });
+  }
+}
+
 interface MatchRow extends Record<string, unknown> {
   id: string;
   mode: string;
@@ -150,6 +218,42 @@ interface MatchRow extends Record<string, unknown> {
   turnCount: number;
   dartCount: number;
   players: readonly { seat: number; displayName: string; isBot: boolean; botLevel: number | null; userId: string | null }[];
+}
+
+interface MatchReplayDartRow {
+  readonly ordinal: number;
+  readonly segment: number;
+  readonly multiplier: number;
+  readonly x: number | null;
+  readonly y: number | null;
+}
+
+interface MatchReplayTurnRow {
+  readonly seat: number;
+  readonly turnNumber: number;
+  readonly legNumber: number;
+  readonly scoreBefore: number;
+  readonly scoreAfter: number;
+  readonly bust: boolean;
+  readonly dartsThrown: number;
+  readonly aggregateScore: number | null;
+  readonly darts: readonly MatchReplayDartRow[];
+}
+
+interface MatchReplayRow extends Record<string, unknown> {
+  readonly id: string;
+  readonly mode: string;
+  readonly options: unknown;
+  readonly completedAt: string | Date;
+  readonly winnerSeat: number | null;
+  readonly ownerSeat: number;
+  readonly players: readonly {
+    readonly seat: number;
+    readonly displayName: string;
+    readonly isBot: boolean;
+    readonly botLevel: number | null;
+  }[];
+  readonly turns: readonly MatchReplayTurnRow[];
 }
 
 async function queryMatches(userId: string, limit: number, db: Database): Promise<MatchRow[]> {
@@ -266,4 +370,43 @@ function toEntry(row: MatchRow): MatchHistoryEntry {
       isYou: player.userId !== null,
     })),
   };
+}
+
+function replayFromRow(row: MatchReplayRow): MatchReplayDetail {
+  const record = parseMatchRecord({
+    mode: row.mode,
+    options: row.options,
+    players: row.players.map((player) => ({
+      seat: player.seat,
+      displayName: player.displayName,
+      isBot: player.isBot,
+      ...(player.botLevel === null ? {} : { botLevel: player.botLevel }),
+    })),
+    turns: row.turns.map((turn) => ({
+      seat: turn.seat,
+      turnNumber: turn.turnNumber,
+      legNumber: turn.legNumber,
+      scoreBefore: turn.scoreBefore,
+      scoreAfter: turn.scoreAfter,
+      bust: turn.bust,
+      dartsThrown: turn.dartsThrown,
+      ...(turn.aggregateScore === null ? {} : { aggregateScore: turn.aggregateScore }),
+      darts: turn.darts.map((thrown) => ({
+        ordinal: thrown.ordinal,
+        segment: thrown.segment,
+        multiplier: thrown.multiplier,
+        ...(thrown.x === null ? {} : { x: thrown.x / 1_000_000 }),
+        ...(thrown.y === null ? {} : { y: thrown.y / 1_000_000 }),
+      })),
+    })),
+    ...(row.winnerSeat === null ? {} : { winnerSeat: row.winnerSeat }),
+  });
+  const completedAt = row.completedAt instanceof Date ? row.completedAt : new Date(row.completedAt);
+  const owner = record?.players.find((player) => player.seat === row.ownerSeat);
+  if (!record || !owner || owner.isBot || !Number.isInteger(row.ownerSeat) || Number.isNaN(completedAt.valueOf())) {
+    // Stored rows crossing this branch violate the same boundary writes use. Treat
+    // that as an unavailable record instead of returning a replay with invented data.
+    throw new Error("Stored match record is invalid");
+  }
+  return { id: row.id, completedAt: completedAt.toISOString(), ownerSeat: row.ownerSeat, record };
 }

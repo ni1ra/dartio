@@ -1,5 +1,6 @@
 import { z } from "zod";
-import type { MatchRecord } from "@/domain/match-record";
+import { matchRecordSchema, type MatchRecord } from "@/domain/match-record";
+import type { MatchReplayDetail } from "@/domain/match-replay";
 
 /**
  * Talks to `/api/matches` from the device.
@@ -30,6 +31,24 @@ const entrySchema = z.object({
 const historySchema = z.object({ matches: z.array(entrySchema) }).strict();
 
 export type MatchHistoryEntryView = z.infer<typeof entrySchema>;
+
+const replayDetailSchema = z.object({
+  id: z.string().min(1),
+  completedAt: z.string().datetime(),
+  ownerSeat: z.number().int().min(0).max(7),
+  record: matchRecordSchema,
+}).strict().refine(
+  (detail) => detail.record.players.some(
+    (player) => player.seat === detail.ownerSeat && !player.isBot,
+  ),
+  "The replay owner must occupy a recorded human seat",
+);
+
+const replayResponseSchema = z.object({ match: replayDetailSchema }).strict();
+
+export type FetchMatchReplayResult =
+  | { readonly status: "ready"; readonly match: MatchReplayDetail }
+  | { readonly status: "signed-out" | "not-found" | "unavailable" };
 
 export type RecordMatchOutcome = "recorded" | "signed-out" | "rejected" | "unavailable";
 
@@ -130,4 +149,29 @@ export async function fetchMatchHistory(
   const payload: unknown = await response.json().catch(() => null);
   const parsed = historySchema.safeParse(payload);
   return parsed.success ? parsed.data.matches : null;
+}
+
+/** Reads one owner-visible replay while preserving why no replay can be shown. */
+export async function fetchMatchReplay(
+  id: string,
+  options: MatchClientOptions = {},
+): Promise<FetchMatchReplayResult> {
+  const fetcher = options.fetcher ?? fetch;
+  let response: Response;
+  try {
+    response = await fetcher(`/api/matches/${encodeURIComponent(id)}`, {
+      cache: "no-store",
+      signal: options.signal,
+    });
+  } catch {
+    return { status: "unavailable" };
+  }
+  if (response.status === 401) return { status: "signed-out" };
+  if (response.status === 404) return { status: "not-found" };
+  if (!response.ok) return { status: "unavailable" };
+  const payload: unknown = await response.json().catch(() => null);
+  const parsed = replayResponseSchema.safeParse(payload);
+  return parsed.success
+    ? { status: "ready", match: parsed.data.match as MatchReplayDetail }
+    : { status: "unavailable" };
 }
