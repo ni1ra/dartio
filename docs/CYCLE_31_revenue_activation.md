@@ -107,9 +107,10 @@ Primary-source and activation baseline, 2026-08-13:
   the optional Climate contribution. Final submission waits only on the bank
   destination and review.
 - Vercel's billing environment was inventoried by name, target, type, and branch
-  only. No value was printed. `STRIPE_MODE=sandbox` now exists for Production and
-  for this branch's Preview so the mode guard can deploy before the Live cutover;
-  the broad Preview default remains a pre-merge follow-up.
+  only. No value was printed. `STRIPE_MODE=sandbox` now exists as the global
+  Preview default and for Production, so the mode guard can deploy before the
+  Live cutover without a branch-specific exception.
 - Local code proof is green: 66/66 focused billing/environment tests, full unit
   966 passed with one deliberately opt-in live rollback test skipped, TypeScript
-  passed, scoped ESLint passed, and `git diff --check` passed.
+  passed, full ESLint passed, the 23-page production build passed, and
+  `git diff --check` passed.
