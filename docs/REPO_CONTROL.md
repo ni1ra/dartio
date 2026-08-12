@@ -45,22 +45,28 @@
   valid with the exact definition and predicate above.
 - Preview migrations `0000` through `0005` are applied and ledger-reconciled as of 2026-07-17. External verification: 10 public tables, 6 migration journal rows, strict dart/email constraints, unique user Stripe-customer index, and nullable subscription/webhook lifecycle timestamps including `subscriptions.cancel_at timestamptz`.
 - Production migrations `0000` through `0005` are applied and ledger-reconciled on main as of 2026-07-17. External verification matches Preview: 10 public tables, 6 migration journal rows, strict dart/email constraints, winner foreign key, Stripe uniqueness indexes, and nullable lifecycle timestamps including `subscriptions.cancel_at timestamptz`.
-- Stripe webhook endpoint `we_1Tu0YUALEz0P7O2hYBwPCQwF` targets `https://dartioopus46.vercel.app/api/billing/webhook`, uses API version `2026-06-24.dahlia`, is active in sandbox, and listens to 18 subscription events. Customer Portal configuration is proven in sandbox; a complete subscription lifecycle remains an unproven release gate.
+- The superseded Sandbox endpoint `we_1Tu0YUALEz0P7O2hYBwPCQwF` is disabled. The
+  canonical endpoint `we_1U3dgDALEz0P7O2hpeRj6EFE` targets
+  `https://dartioopus46.vercel.app/api/billing/webhook`, listens only to Checkout
+  completion and subscription create/update/delete, and delivered both the
+  one-use promotion subscription and its Portal cancellation with HTTP 200.
+  Production access reflected both transitions; the complete Sandbox lifecycle
+  is proven as of Cycle 30.
 - Stripe Workbench request `req_RxZryIFiSs5OAC` proves the signed-in Pro annual Checkout request selected the configured price, persistent owned customer, 14-day trial, automatic tax, billing-address collection, promotion codes, ownership metadata, and an idempotency key. The initial request failed only because the sandbox lacked a head-office address. A synthetic Norwegian sandbox address subsequently saved and persisted across reload; no live legal or tax-registration data was created.
 - Pro annual sandbox Checkout completed on 2026-07-17 for customer `cus_Utp4oZKj6432Jx`, creating trial subscription `sub_1Tu1j7ALEz0P7O2hD5xvbDeR` at EUR 76.70/year after 14 free days and EUR 0 due on creation.
 - The original sandbox webhook destination returned HTTP 500 to the successful Checkout's invoice events because it targets the old production alias, while Preview owns the Checkout identity/database. Dedicated Preview destination `we_1Tu1pFALEz0P7O2hQVsTftWI` is active at the stable Cycle 2 alias and listens only to `checkout.session.completed` plus the eight current `customer.subscription.*` events. Vercel has a sensitive branch-scoped signing-secret override for `cycle-2-identity-billing-voice`; the global Preview/Production secret was not changed.
 - Preview destination `we_1Tu1pFALEz0P7O2hQVsTftWI` processed two real Portal-cancellation `customer.subscription.updated` events with HTTP 200, zero failures, and 848–1305 ms response time on deployment `dpl_GvToqtNyNJCjzcGrYLDFVfZePqEV`. Neon stored both processed event IDs and exactly one owned Pro/trialing subscription row.
 - Deployment `dpl_G2u7bDCCuSCJMeaciPTkXjdwj6mG` proved explicit cancellation recovery and reprojection: reactivation cleared `cancel_at`; rescheduling stored `cancel_at=2026-07-31T02:42:12Z` while keeping `cancel_at_period_end=false`, status `trialing`, plan `pro`, and one subscription row.
-- GitHub release source: commit `6f0c2517cae6d00dd3465ccff68624b52517b51c`;
-  CI run [31571265289](https://github.com/ni1ra/dartio/actions/runs/31571265289)
+- GitHub release source: commit `9764652a23d509c117d2c649790b7b1466dc7d09`;
+  CI run [31643931252](https://github.com/ni1ra/dartio/actions/runs/31643931252)
   passed typecheck, lint, unit, build, and the full browser matrix.
-- Current greenfield production deployment: `dpl_CGLyHCbrBfScMgBFpZHtR4ZtyUGU`
+- Current greenfield production deployment: `dpl_HMwfhm7kpoV4HaHyaiUwgEfqabhH`
   at `https://dartioopus46.vercel.app`, READY on the exact release SHA with no
-  alias error. Auth, strict owner-only history/detail, rooms, room integrity,
-  the 42-check resilience surface, and the complete 326-run/4-skip browser
-  matrix passed there on 2026-08-12. Paid AI and voice provider success remain
-  parked because the standing QA identity is genuinely Free; its 403/402
-  refusals were not renamed as successful gates.
+  alias error. Auth, strict owner-only history/detail, rooms, paid AI, paid
+  voice, and the complete 329-run/4-skip browser matrix passed there on
+  2026-08-12. The first voice sample missed the strict command and one bounded
+  rerun passed; the first browser run met one transient network error and its
+  bounded full rerun was clean.
 - Current Cycle 2 Auth/webhook preview deployment: `dpl_FfHXJZ9ZJJk7mWoDGiqieGx6LWCq` at `https://dartio-boreq0qif-niras-projects-868b6f5f.vercel.app`. It was redeployed on 2026-08-11 after Preview database-password rotation made its immutable predecessor stale; the stable branch alias retained its branch-scoped Stripe signing secret, picked up the current Preview `DATABASE_URL`, and then returned HTTP 200 for two signed sandbox subscription deliveries. Entitled X01 continuity/access-authority head `e3a80a4` passed GitHub verification run `29554449332`. Prior code Preview `dpl_AwDwqrqPYR8ufLdJUV5m91dQJLff` remains the rollback target for the Cycle 2 code.
 - Preview has a branch-scoped `NEXT_PUBLIC_APP_URL` override for `cycle-2-identity-billing-voice`, targeting its stable Vercel alias. The global Preview and Production values were not changed.
 - Paid features are authorized server-side only. `voice_always_on` gates `POST /api/voice/transcribe` before body parsing; `advanced_ai` gates one physical sample from `POST /api/ai/throw` for each level-9–20 dart while 1–8 stay local; `advanced_checkout` gates `POST /api/checkout/advice` for alternates, setup plans, and preference ranking while Free computes one route locally. All three read the server's own access snapshot and accept no client plan, access, or seed claim. The AI throw request is exactly `{ level, target }`: tactics and every mode rule remain in the client.
@@ -134,7 +140,7 @@
 - `pnpm test`
 - `pnpm build`
 - `pnpm test:browser:install` (once per machine)
-- `pnpm test:browser` — 333 checks across 390×844, 834×1112, and 1440×1000; 329 run and 4 skip by design, those being the sign-up assertion at the two widths where sign-up is deliberately absent and the screenspace assertion at the two widths whose reservation it does not describe. Measured unpiped from a fresh build of the local Cycle 30 candidate on 2026-08-12: every runnable check completed successfully, exit 0 in 287.7 seconds; the focused product-truth/account surface passed 6/6. Set `DARTIO_BASE_URL` to run them against a preview or production deployment instead of a local build
+- `pnpm test:browser` — 333 checks across 390×844, 834×1112, and 1440×1000; 329 run and 4 skip by design, those being the sign-up assertion at the two widths where sign-up is deliberately absent and the screenspace assertion at the two widths whose reservation it does not describe. Measured unpiped from a fresh build of the local Cycle 30 candidate on 2026-08-12: every runnable check completed successfully, exit 0 in 287.7 seconds; the focused product-truth/account surface passed 6/6. The exact merge repeated the complete 329-run/4-skip matrix against Production after one bounded infrastructure retry. Set `DARTIO_BASE_URL` to run them against a preview or production deployment instead of a local build
 - `pnpm db:generate` — writes the migration; it does not apply it
 - `DATABASE_URL=<branch-uri> pnpm exec drizzle-kit migrate` — applies pending migrations to one branch and reconciles the journal. Preview first, then main. The URI is passed only through a credential-safe in-memory wrapper, never as a positional argument or printed shell assignment. The repo has no `db:migrate` script because the URL is never the one in `.env.local` for production work
 
@@ -210,6 +216,12 @@ changed deliberately and one at a time, and each is recorded above.
 - The regulation dartboard and three-viewport production visual proof passed; future board changes must rerun the same physical T20 and boundary suite.
 - Cycle 2 preview repeated the dartboard gate at exact 1440×1000, 834×1112, and 390×844 viewports: 3/3 independent contexts passed square/in-bounds geometry, 80 beds, 20 labels, zero horizontal overflow, and physical T20 → 60 / 441. Full-page tablet/mobile visual inspection also passed. Ultrawide review found and corrected a shell-centering cascade defect outside the board renderer; the corrected preview measured a centered 1472 px stage at `x=544` on a 2560 px viewport, retained a 600×600 board, and passed the full three-width matrix again with zero retries.
 - Figma library implementation is externally blocked by the current one-mode/View-seat limitation.
-- Remaining v1 work is named rather than bundled into an obsolete list: voice UI/vocabulary outside X01, Phase 3 replay/statistics/resilience, the later credibility campaign, and live Stripe activation. Additional modes, server-backed friend rooms, continuous voice, persisted matches/statistics, and Sandbox Checkout/Portal/webhook proof are already implemented.
+- Phase 3 is closed. The active remainder is Phase 4: Live Stripe activation and
+  payout proof, voice UI/vocabulary outside X01, personalized checkout evidence,
+  custom practice, room behaviour under degraded networks, and final
+  accessibility/performance/operational hardening. Additional modes,
+  server-backed friend rooms, continuous X01 voice, replay, deep statistics,
+  resilience, and the full Sandbox Checkout/Portal/webhook lifecycle are already
+  implemented.
 - Checkout success and Portal return URLs must target the implemented `/account` hub. The nonexistent `/account/billing` target was removed on 2026-07-17 and is covered by the billing policy test.
 - Stripe Customer Portal opened for the authenticated QA identity and returned to `/account` without a route error. Before the branch-scoped origin override, that return resolved to the old main alias and lost the new authenticated account surface. Deployment `dpl_8q1KD49P1Se5YxKFrSxrpGFwFAZL` proved the corrected same-origin path returns to the stable Preview alias with verified identity and active session preserved.
