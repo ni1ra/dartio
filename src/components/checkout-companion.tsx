@@ -8,6 +8,7 @@ import {
   type CheckoutRoutePlan,
   type CheckoutSetupPlan,
 } from "@/domain";
+import type { CheckoutPersonalizationReceipt } from "@/lib/product/checkout-personalization";
 
 type CheckoutPlan = CheckoutRoutePlan | CheckoutSetupPlan;
 
@@ -26,6 +27,11 @@ type CheckoutCompanionProps = {
   tier?: CheckoutTier;
   /** True while the advanced route request for this position is still in flight. */
   upgrading?: boolean;
+  /** Offered only to the signed-in seat whose history the server owns. */
+  personalizationAvailable?: boolean;
+  personalizationEnabled?: boolean;
+  personalization?: CheckoutPersonalizationReceipt | null;
+  onPersonalizationChange?: (enabled: boolean) => void;
 };
 
 function planKey(plan: CheckoutPlan) {
@@ -38,6 +44,10 @@ export function CheckoutCompanion({
   interactive = true,
   tier = "advanced",
   upgrading = false,
+  personalizationAvailable = false,
+  personalizationEnabled = false,
+  personalization = null,
+  onPersonalizationChange,
 }: CheckoutCompanionProps) {
   const [selection, setSelection] = useState({ adviceKey: "", planKey: "" });
   const plans: readonly CheckoutPlan[] = advice.primaryPlan
@@ -115,6 +125,26 @@ export function CheckoutCompanion({
         </p>
       )}
 
+      {personalizationAvailable && onPersonalizationChange && (
+        <section className="checkout-personalization" aria-labelledby="checkout-personalization-heading">
+          <button
+            type="button"
+            aria-pressed={personalizationEnabled}
+            aria-describedby="checkout-personalization-status"
+            onClick={() => onPersonalizationChange(!personalizationEnabled)}
+          >
+            <span>PERSONAL ROUTES</span>
+            <strong id="checkout-personalization-heading">
+              {personalizationEnabled ? "Using my match history" : "Use my match history"}
+            </strong>
+            <i aria-hidden="true">{personalizationEnabled ? "ON" : "OFF"}</i>
+          </button>
+          <p id="checkout-personalization-status" role="status" aria-live="polite">
+            {personalizationCopy(personalizationEnabled, upgrading, personalization)}
+          </p>
+        </section>
+      )}
+
       {interactive && tier === "advanced" && advice.alternatePlans.length > 0 && (
         <div className="checkout-alternates" role="group" aria-label="Checkout routes">
           <span>ROUTE OPTIONS</span>
@@ -142,4 +172,19 @@ export function CheckoutCompanion({
       </p>
     </Surface>
   );
+}
+
+function personalizationCopy(
+  enabled: boolean,
+  upgrading: boolean,
+  receipt: CheckoutPersonalizationReceipt | null,
+): string {
+  if (!enabled) return "Off · your history stays unread.";
+  if (upgrading) return "Reading up to 50 of your owned X01 matches…";
+  if (!receipt) return "Personalization request failed · the basic route remains active.";
+  const evidence = `${receipt.x01Matches} X01 ${receipt.x01Matches === 1 ? "match" : "matches"} · ${receipt.exactDarts} exact darts · ${receipt.finishingDoubles} finishing ${receipt.finishingDoubles === 1 ? "double" : "doubles"}`;
+  if (receipt.status === "applied") return `Personalized from ${evidence}.`;
+  if (receipt.status === "sparse") return `History on · more exact darts are needed. ${evidence}.`;
+  if (receipt.status === "unavailable") return "History is unavailable · standard Pro routes remain active without personalization.";
+  return "Off · your history stays unread.";
 }

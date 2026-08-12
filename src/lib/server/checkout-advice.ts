@@ -6,8 +6,9 @@ import type { AccessSnapshot } from "./access";
  *
  * Free players get `basicCheckoutAdvice` computed locally: one ranked route.
  * Alternate routes, setup-visit plans, and preference-driven ranking are the
- * paid `advanced_checkout` entitlement, so they are produced here — behind a
- * verified access snapshot — and never derived from anything the client claims.
+ * paid `advanced_checkout` entitlement, so they are produced here behind a
+ * verified access snapshot. Any preferences reaching this function have already
+ * been derived from the signed-in player's owned history on the server.
  */
 export interface AdvancedCheckoutInput {
   readonly score: number;
