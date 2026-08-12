@@ -35,8 +35,14 @@
   not executed on a retained branch. Preview applied it on 2026-08-12: the
   ledger moved 7→8 and the index 0→1 while 15 matches / 10 completed / 27
   players / 20 turns / 44 darts remained identical; PostgreSQL reported the
-  index ready and valid. Production remains at 7 until its named root snapshot
-  is recorded after merge.
+  index ready and valid. Production root snapshot
+  `pre-0007-production-2026-08-12` (`snap-noisy-smoke-af9q2m6b`) was created
+  from exact root `br-sweet-wildflower-afy2ygj6` after PR #33 merged and before
+  Production migration; the snapshot operation finished and the source was
+  re-read from the control plane. Production then applied `0007`: the ledger
+  moved 7→8 and the index 0→1 while 15 matches / 15 completed / 30 players / 15
+  turns / 15 darts remained identical; PostgreSQL reported the index ready and
+  valid with the exact definition and predicate above.
 - Preview migrations `0000` through `0005` are applied and ledger-reconciled as of 2026-07-17. External verification: 10 public tables, 6 migration journal rows, strict dart/email constraints, unique user Stripe-customer index, and nullable subscription/webhook lifecycle timestamps including `subscriptions.cancel_at timestamptz`.
 - Production migrations `0000` through `0005` are applied and ledger-reconciled on main as of 2026-07-17. External verification matches Preview: 10 public tables, 6 migration journal rows, strict dart/email constraints, winner foreign key, Stripe uniqueness indexes, and nullable lifecycle timestamps including `subscriptions.cancel_at timestamptz`.
 - Stripe webhook endpoint `we_1Tu0YUALEz0P7O2hYBwPCQwF` targets `https://dartioopus46.vercel.app/api/billing/webhook`, uses API version `2026-06-24.dahlia`, is active in sandbox, and listens to 18 subscription events. Customer Portal configuration is proven in sandbox; a complete subscription lifecycle remains an unproven release gate.
@@ -45,14 +51,15 @@
 - The original sandbox webhook destination returned HTTP 500 to the successful Checkout's invoice events because it targets the old production alias, while Preview owns the Checkout identity/database. Dedicated Preview destination `we_1Tu1pFALEz0P7O2hQVsTftWI` is active at the stable Cycle 2 alias and listens only to `checkout.session.completed` plus the eight current `customer.subscription.*` events. Vercel has a sensitive branch-scoped signing-secret override for `cycle-2-identity-billing-voice`; the global Preview/Production secret was not changed.
 - Preview destination `we_1Tu1pFALEz0P7O2hQVsTftWI` processed two real Portal-cancellation `customer.subscription.updated` events with HTTP 200, zero failures, and 848–1305 ms response time on deployment `dpl_GvToqtNyNJCjzcGrYLDFVfZePqEV`. Neon stored both processed event IDs and exactly one owned Pro/trialing subscription row.
 - Deployment `dpl_G2u7bDCCuSCJMeaciPTkXjdwj6mG` proved explicit cancellation recovery and reprojection: reactivation cleared `cancel_at`; rescheduling stored `cancel_at=2026-07-31T02:42:12Z` while keeping `cancel_at_period_end=false`, status `trialing`, plan `pro`, and one subscription row.
-- GitHub release source: commit `d64997d5d8c913e94281fb0bea1585dcde9a7a52`;
-  CI run [31549373061](https://github.com/ni1ra/dartio/actions/runs/31549373061)
+- GitHub release source: commit `29aa289bb2c5ee44e574017fccc0d457acfedd71`;
+  CI run [31554544961](https://github.com/ni1ra/dartio/actions/runs/31554544961)
   passed typecheck, lint, unit, build, and the full browser matrix.
-- Current greenfield production deployment: `dpl_CBAS7sCNNcpLRSreEkNjaxGxsUHn`
+- Current greenfield production deployment: `dpl_Ah6KfKAFZTF9uVD4YqEwyo8z76tR`
   at `https://dartioopus46.vercel.app`, READY on the exact release SHA with no
-  alias error. Auth, history including the strict owner-only replay detail,
-  rooms, the 27-check replay surface, and the complete 272-run/4-skip browser
-  matrix passed there on 2026-08-12. Paid AI and voice provider success remain
+  alias error. Auth, strict owner-only history/detail, deep-statistics access,
+  rooms, the 12-check statistics surface, and the complete 284-run/4-skip
+  browser matrix passed there on 2026-08-12. Read-only room integrity reported
+  zero live or historical anomalies. Paid AI and voice provider success remain
   parked because the standing QA identity is genuinely Free; its 403/402
   refusals were not renamed as successful gates.
 - Current Cycle 2 Auth/webhook preview deployment: `dpl_FfHXJZ9ZJJk7mWoDGiqieGx6LWCq` at `https://dartio-boreq0qif-niras-projects-868b6f5f.vercel.app`. It was redeployed on 2026-08-11 after Preview database-password rotation made its immutable predecessor stale; the stable branch alias retained its branch-scoped Stripe signing secret, picked up the current Preview `DATABASE_URL`, and then returned HTTP 200 for two signed sandbox subscription deliveries. Entitled X01 continuity/access-authority head `e3a80a4` passed GitHub verification run `29554449332`. Prior code Preview `dpl_AwDwqrqPYR8ufLdJUV5m91dQJLff` remains the rollback target for the Cycle 2 code.
@@ -158,8 +165,9 @@ procedure. In order:
    `pre-0006-2026-07-30` (`br-dark-cloud-afis6s5i`).
    Migration `0007` is likewise additive and older code ignores its index. Its
    Preview recovery point is `pre-0007-preview-2026-08-12`
-   (`br-polished-wind-afvq590t`); Production receives a named root snapshot
-   before application. The schema escape is
+   (`br-polished-wind-afvq590t`); Production snapshot
+   `pre-0007-production-2026-08-12` (`snap-noisy-smoke-af9q2m6b`) preserves the
+   root immediately before application. The schema escape is
    `DROP INDEX IF EXISTS matches_completed_at_desc_idx`, but executing that
    destructive step requires separate authorization.
 4. **Re-verify after the rollback**, with the same two commands plus
