@@ -23,6 +23,7 @@ import { VisitEntry } from "./visit-entry";
 import { OpponentAiAccessBanner, useOpponentAiAccess } from "./opponent-ai-access";
 import { describeAiFailure, describeAiRefresh, type AiRecovery } from "./opponent-ai-recovery";
 import { useAiVisit } from "./use-ai-visit";
+import { useScreenWakeLock } from "./use-screen-wake-lock";
 
 export function X01Match() {
   const params=useSearchParams();
@@ -44,6 +45,7 @@ export function X01Match() {
   const [rejectedNotice,setRejectedNotice]=useState<string|null>(null);
   const replayed=useMemo(()=>replay(log),[log]);
   const game=replayed.state;
+  useScreenWakeLock(game.status==="playing");
   /**
    * The authoritative log, readable synchronously.
    *

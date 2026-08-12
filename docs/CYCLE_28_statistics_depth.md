@@ -1,6 +1,7 @@
 # Cycle 28 — Statistics with Depth
 
-Status: active on `codex/cycle-28-statistics-depth`.
+Status: shipped to Production on 2026-08-12 in PR #33, merge
+`29aa289bb2c5ee44e574017fccc0d457acfedd71`.
 
 Sixth cycle of `PHASE_3_promise_completion.md`. Dartio already computes a
 small authenticated career summary and already withholds its existing deep
@@ -94,6 +95,11 @@ Preview recovery point: `pre-0007-preview-2026-08-12`
 (`br-polished-wind-afvq590t`) is an unchanged child of retained Preview
 `br-fragrant-art-af79dyw5`. It was created without an endpoint or compute and
 re-read from the control plane before migration `0007` was allowed to run.
+Production recovery point: root snapshot
+`pre-0007-production-2026-08-12` (`snap-noisy-smoke-af9q2m6b`) was created
+from exact Production root `br-sweet-wildflower-afy2ygj6` at
+`2026-08-12T01:44:03Z` and re-read with its operation finished before the
+Production migration was allowed to run.
 
 `POST /api/matches` already sends match, players, turns, and darts through one
 Neon HTTP `db.batch`. This cycle does not call a fake queue proof sufficient:
@@ -114,7 +120,7 @@ the assertion.
 - [x] Build the responsive, accessible account statistics surface and its
   three-viewport browser stories, including paid, Free, empty, and malformed
   states.
-- [ ] Generate migration `0007`, record its forward/escape contract, and prove
+- [x] Generate migration `0007`, record its forward/escape contract, and prove
   the partial index shape against actual Preview schema after its named branch
   checkpoint; take the named root snapshot before Production.
 - [x] Exercise real Neon HTTP batch rollback on an isolated child branch under
@@ -122,7 +128,7 @@ the assertion.
 - [x] Pass full local typecheck, lint, unit, build, focused browser, and full
   browser gates on one frozen candidate; complete independent adversarial
   audit.
-- [ ] Push one PR, pass exact-head CI and Preview proof, merge the exact green
+- [x] Push one PR, pass exact-head CI and Preview proof, merge the exact green
   revision, then repeat migration safety, standing verifiers, touched browser,
   full browser, exact deployment, and main CI proof on Production.
 
@@ -209,6 +215,47 @@ PR #33 Preview candidate `d9f2bc7462494748fbeca3c51b1329cd710926bc`,
   probes (exact count 1), then removed afterwards (exact count 0). The
   pre-existing stable Cycle 2 origin remained present at count 1.
 
-PR, exact-SHA Preview application proof, CI, merge, the Production root
-snapshot/index application, and Production post-deploy receipts remain open
-until their exact commands finish.
+Final PR #33 head `0829eb9fc3aa7c0c26185ca1261a202add94bc22`,
+2026-08-12:
+
+- GitHub Actions run
+  [31553895376](https://github.com/ni1ra/dartio/actions/runs/31553895376)
+  passed the complete CI workflow in 7m20s on the exact final head.
+- Vercel deployment `dpl_E5xiAMuPQbfuUGqmoM3Qr6R5AAVP` was READY with target
+  `preview`, no alias error, and that exact SHA. Its immutable URL was
+  `https://dartio-59re9unoh-niras-projects-868b6f5f.vercel.app`.
+- Auth accepted the immutable origin. The authenticated history probe filed and
+  read its strict D20 record, Free statistics withheld `deep`, every anonymous
+  history/detail/statistics route returned 401, and the room sweep returned 401
+  for every anonymous endpoint. Its paid Preview room boundary remained an
+  explicit skip because Production credentials were not sent to Preview.
+- The final touched statistics matrix passed 12/12 in 7.3 seconds. The full
+  deployed matrix passed 284 checks with the four designed viewport skips in
+  2.6 minutes. The temporary Preview Auth origin was removed afterwards at
+  exact count zero; the stable Cycle 2 grant remained at count one.
+
+Production closure, 2026-08-12:
+
+- PR #33 merged the exact green head as
+  `29aa289bb2c5ee44e574017fccc0d457acfedd71`. Main GitHub Actions run
+  [31554544961](https://github.com/ni1ra/dartio/actions/runs/31554544961)
+  passed every step in 6m38s on that exact merge SHA.
+- Before schema application, Production root snapshot
+  `pre-0007-production-2026-08-12` (`snap-noisy-smoke-af9q2m6b`) was re-read
+  from exact branch `br-sweet-wildflower-afy2ygj6` with its operation finished.
+  Migration `0007` then preserved 15 matches, 15 completed matches, 30 players,
+  15 turns, and 15 darts; the Drizzle ledger moved 7→8 and the index 0→1.
+  PostgreSQL reported the exact partial descending index ready and valid.
+- Vercel Production deployment `dpl_Ah6KfKAFZTF9uVD4YqEwyo8z76tR` was READY,
+  aliased to `https://dartioopus46.vercel.app`, with no alias error and the exact
+  merge SHA.
+- Production auth passed. The history gate authenticated, filed and read one
+  strict D20 probe, returned 16 matches / 16 wins / 120 three-dart average after
+  that probe, withheld Free `deep`, and proved anonymous history, detail, and
+  statistics refusal. The room sweep proved anonymous refusal and a genuine
+  Free-account 402 for online rooms. Read-only room integrity reported zero
+  owner, version, abandoned-field, complete-field, open-field, and orphan
+  anomalies.
+- The touched Production statistics matrix passed 12/12 in 6.7 seconds. The
+  complete three-viewport Production matrix passed 284 checks with the four
+  designed skips in 2.5 minutes. No destructive escape was executed.

@@ -67,12 +67,17 @@ The full plan and its execution contract were approved on 2026-08-11.
   Production deployment, authenticated detail/history, rooms, touched replay,
   and the complete three-viewport browser matrix all passed. See
   `CYCLE_27_match_replay.md`.
-- [ ] **Cycle 28 — Statistics with depth, on an honest data layer.** Per-double
+- [x] **Cycle 28 — Statistics with depth, on an honest data layer.** Per-double
   checkout table, trends over recent matches, per-mode splits, drill progress —
   withheld from Free on the server exactly as today. Same cycle: the missing
   `matches.completed_at` index under every history read, and the batch-rollback
   behaviour of `POST /api/matches` exercised under injected failure rather than
-  assumed.
+  assumed. Shipped in PR #33 as
+  `29aa289bb2c5ee44e574017fccc0d457acfedd71`; the isolated rollback proof left
+  zero residue, migration `0007` preserved all Preview and Production counts,
+  and exact-SHA CI, Preview, Production, auth/history/rooms, focused statistics,
+  and the complete 284-run/4-skip browser matrix passed. See
+  `CYCLE_28_statistics_depth.md`.
 - [ ] **Cycle 29 — At-the-oche resilience.** `error.tsx` boundaries that tell a
   player their match survived; a wake lock so the screen does not dim mid-leg; a
   `public/` with icons and an installable manifest; the versioned-zod resume

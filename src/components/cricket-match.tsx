@@ -23,6 +23,7 @@ import { useMatchKeyboard } from "./use-match-keyboard";
 import { useRecordMatch } from "./use-record-match";
 import { OpponentAiAccessBanner, useOpponentAiAccess } from "./opponent-ai-access";
 import { describeAiFailure, describeAiRefresh, type AiRecovery } from "./opponent-ai-recovery";
+import { useScreenWakeLock } from "./use-screen-wake-lock";
 
 const VARIANTS: readonly CricketVariant[] = ["standard", "cut-throat", "tactics"];
 const VARIANT_LABEL: Record<CricketVariant, string> = {
@@ -76,6 +77,7 @@ export function CricketMatch() {
   const [aiLevelsUsed, setAiLevelsUsed] = useState<readonly number[]>([]);
   const retryGeneration = useRef(0);
   const { state: game } = useMemo(() => replayCricket(log), [log]);
+  useScreenWakeLock(game.status === "playing");
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {

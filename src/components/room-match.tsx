@@ -18,6 +18,7 @@ import {
 import { completeRoomMatch, fileRoomTurn, readRoom, type RoomStateView } from "@/lib/product/rooms-client";
 import { DartInputPad } from "./dart-input-pad";
 import { Dartboard } from "./dartboard";
+import { useScreenWakeLock } from "./use-screen-wake-lock";
 
 /**
  * An X01 match played inside a room.
@@ -103,6 +104,7 @@ export function RoomMatch({ code }: RoomMatchProps) {
   const closed = room?.status === "abandoned";
   const yourTurn = game !== null && yourSeat !== null && !closed && game.status === "playing" && game.currentPlayer === yourSeat;
   const finished = game?.status === "complete";
+  useScreenWakeLock(phase === "playing" && yourSeat !== null && !closed && !finished);
 
   // Whoever is in the room reports the finish; the server treats the second report
   // as agreement rather than a conflict.
