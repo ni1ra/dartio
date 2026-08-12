@@ -1,6 +1,6 @@
 # Cycle 30 — Phase 3 Closure and Sandbox Promotion
 
-Status: active on `codex/cycle-30-phase-closure`.
+Status: closed 2026-08-12 on Production evidence.
 
 Final cycle of `PHASE_3_promise_completion.md`. The seven implementation cycles
 are live. This closure does two things that cannot be replaced by another claim:
@@ -55,10 +55,10 @@ payment method whenever a trial or discount makes the current total zero.
   pass paid AI and paid voice against Production.
 - [x] Cancel through the Stripe Customer Portal, prove the cancellation webhook
   projects the end state, and ensure the single-use promotion cannot be reused.
-- [ ] Pass full local deterministic/browser gates, independent audit, one exact-
+- [x] Pass full local deterministic/browser gates, independent audit, one exact-
   head PR/CI/Preview, merge, main CI, standing Production verifiers, touched and
   full Production browser matrices.
-- [ ] Re-score every Phase 3 promise against `main`, archive Cycles 23–30 only
+- [x] Re-score every Phase 3 promise against `main`, archive Cycles 23–30 only
   after Production closure, name the honest remainder, and open the improved
   Phase 4 credibility queue from evidence rather than an invented recovery.
 
@@ -167,5 +167,26 @@ Stripe Sandbox and paid Production boundary, 2026-08-12:
   timestamp and exposes that timestamp as `accessEndsAt`, proving both continued
   trial access and no later full-price renewal.
 
-Final exact-head freeze, merge, Production regression gates, archive, and Phase
-4 opening receipts remain open until their exact commands finish.
+Final exact-head release and closure, 2026-08-12:
+
+- Final PR #35 head `75f3fac046f5615850b67db9c7052f21991dfd37`
+  passed CI run
+  [31643265525](https://github.com/ni1ra/dartio/actions/runs/31643265525).
+  Its exact Vercel Preview was READY; auth, owner-only history, room refusal, and
+  all 329 runnable browser checks passed there with the four intentional skips.
+- PR #35 merged as `9764652a23d509c117d2c649790b7b1466dc7d09`.
+  Main CI run
+  [31643931252](https://github.com/ni1ra/dartio/actions/runs/31643931252)
+  completed successfully with typecheck, lint, unit, build, and browser proof.
+  Production deployment `dpl_HMwfhm7kpoV4HaHyaiUwgEfqabhH` was READY and the
+  canonical `dartioopus46.vercel.app` alias resolved to that deployment.
+- Production auth, authenticated history/detail/statistics, room refusal, paid
+  AI, and paid voice passed. Voice's first synthetic-provider call did not
+  return the required T20 command; one bounded rerun passed. This is recorded as
+  provider variance for Phase 4 hardening, not erased from the receipt.
+- The first full Production browser run had one infrastructure
+  `ERR_ADDRESS_UNREACHABLE` while loading mobile `/account`; three immediate
+  direct requests returned 200. One bounded full rerun passed all 329 runnable
+  checks with the same four designed skips and exit 0.
+- Phase 3 was re-scored against the merge, Cycles 23–30 were archived under
+  `past_work/phase_3/`, and the evidence-reconstructed Phase 4 queue was opened.

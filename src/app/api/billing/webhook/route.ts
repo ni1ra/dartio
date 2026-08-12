@@ -5,7 +5,7 @@ import { createDatabase } from "@/db/client";
 import { subscriptions, users, webhookEvents } from "@/db/schema";
 import { projectStripeSubscription, type SubscriptionProjection } from "@/lib/billing/service";
 import { currentSubscriptionForEvent } from "@/lib/billing/webhook";
-import { getBillingWebhookEnv } from "@/lib/env/server";
+import { getBillingWebhookEnv, stripeEventMatchesMode } from "@/lib/env/server";
 
 const CLAIM_STALE_AFTER_MS = 10 * 60 * 1000;
 
@@ -19,6 +19,7 @@ export async function POST(request: Request) {
     const signature = request.headers.get("stripe-signature");
     if (!signature) return NextResponse.json({ error: "Missing signature" }, { status: 400 });
     event = stripe.webhooks.constructEvent(await request.text(), signature, env.STRIPE_WEBHOOK_SECRET);
+    if (!stripeEventMatchesMode(env.STRIPE_MODE, event.livemode)) throw new Error("Stripe mode mismatch");
   } catch {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
