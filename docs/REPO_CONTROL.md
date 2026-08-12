@@ -51,15 +51,14 @@
 - The original sandbox webhook destination returned HTTP 500 to the successful Checkout's invoice events because it targets the old production alias, while Preview owns the Checkout identity/database. Dedicated Preview destination `we_1Tu1pFALEz0P7O2hQVsTftWI` is active at the stable Cycle 2 alias and listens only to `checkout.session.completed` plus the eight current `customer.subscription.*` events. Vercel has a sensitive branch-scoped signing-secret override for `cycle-2-identity-billing-voice`; the global Preview/Production secret was not changed.
 - Preview destination `we_1Tu1pFALEz0P7O2hQVsTftWI` processed two real Portal-cancellation `customer.subscription.updated` events with HTTP 200, zero failures, and 848–1305 ms response time on deployment `dpl_GvToqtNyNJCjzcGrYLDFVfZePqEV`. Neon stored both processed event IDs and exactly one owned Pro/trialing subscription row.
 - Deployment `dpl_G2u7bDCCuSCJMeaciPTkXjdwj6mG` proved explicit cancellation recovery and reprojection: reactivation cleared `cancel_at`; rescheduling stored `cancel_at=2026-07-31T02:42:12Z` while keeping `cancel_at_period_end=false`, status `trialing`, plan `pro`, and one subscription row.
-- GitHub release source: commit `29aa289bb2c5ee44e574017fccc0d457acfedd71`;
-  CI run [31554544961](https://github.com/ni1ra/dartio/actions/runs/31554544961)
+- GitHub release source: commit `6f0c2517cae6d00dd3465ccff68624b52517b51c`;
+  CI run [31571265289](https://github.com/ni1ra/dartio/actions/runs/31571265289)
   passed typecheck, lint, unit, build, and the full browser matrix.
-- Current greenfield production deployment: `dpl_Ah6KfKAFZTF9uVD4YqEwyo8z76tR`
+- Current greenfield production deployment: `dpl_CGLyHCbrBfScMgBFpZHtR4ZtyUGU`
   at `https://dartioopus46.vercel.app`, READY on the exact release SHA with no
-  alias error. Auth, strict owner-only history/detail, deep-statistics access,
-  rooms, the 12-check statistics surface, and the complete 284-run/4-skip
-  browser matrix passed there on 2026-08-12. Read-only room integrity reported
-  zero live or historical anomalies. Paid AI and voice provider success remain
+  alias error. Auth, strict owner-only history/detail, rooms, room integrity,
+  the 42-check resilience surface, and the complete 326-run/4-skip browser
+  matrix passed there on 2026-08-12. Paid AI and voice provider success remain
   parked because the standing QA identity is genuinely Free; its 403/402
   refusals were not renamed as successful gates.
 - Current Cycle 2 Auth/webhook preview deployment: `dpl_FfHXJZ9ZJJk7mWoDGiqieGx6LWCq` at `https://dartio-boreq0qif-niras-projects-868b6f5f.vercel.app`. It was redeployed on 2026-08-11 after Preview database-password rotation made its immutable predecessor stale; the stable branch alias retained its branch-scoped Stripe signing secret, picked up the current Preview `DATABASE_URL`, and then returned HTTP 200 for two signed sandbox subscription deliveries. Entitled X01 continuity/access-authority head `e3a80a4` passed GitHub verification run `29554449332`. Prior code Preview `dpl_AwDwqrqPYR8ufLdJUV5m91dQJLff` remains the rollback target for the Cycle 2 code.
@@ -68,6 +67,21 @@
 - Club Checkout is closed: `PLAN_CATALOG.club.checkout` is `unavailable`, `POST /api/billing/checkout` returns 409 for any non-`self_serve` plan before Stripe is called, and the pricing surface disables the action. Existing Club subscribers keep their projected entitlements.
 - The canonical record of a match is its event log, not its state: `src/domain/x01-log.ts` folds the pure reducers over what was thrown. Events carry the dart, not the thrower — turn order derives the player — so a visit is corrected by rewinding to it, never by excising it from the middle. The log is versioned and zod-validated on read (`src/domain/x01-persistence.ts`); an unknown version is discarded rather than migrated.
 - Active matches resume from local storage with no account, because free play requires no account. Completed matches are written to Neon as of 2026-07-30: `POST /api/matches` records `matches`, `players`, `turns`, and `darts` in one `db.batch`, which the Neon HTTP driver runs as a single transaction. Cycle 28 exercised those exact statements plus a guaranteed final constraint failure against an isolated Neon child: the transaction failed and a read-only residue check found zero marker users, matches, players, turns, or darts, with no cleanup delete. A real match also round-trips on Production. Room matches use the separate lifecycle writer described below.
+- X01, Cricket, round modes, and drills now all resume through strict versioned
+  envelopes. Round and drill readers bind the stored setup, roster, opponent,
+  rules, and requested AI level, preserve unknown future formats byte-for-byte,
+  migrate only identities they can prove, and contain every `localStorage`
+  failure. A hydrated nonempty-to-empty transition clears a resume slot; an
+  initial empty render cannot.
+- Active local matches, drills, and live room players request the best-effort
+  Screen Wake Lock capability and release it on hidden, completion, ineligibility,
+  navigation, or unmount. Late grants are released rather than adopted. Refusal
+  and unsupported browsers never block scoring or produce a support claim.
+- Dartio publishes a standalone manifest at `/manifest.webmanifest` with `/play`
+  as its start URL and mask-safe 192/512 PNG assets. It deliberately has no
+  service worker, Cache Storage writer, background sync, or offline route:
+  already-loaded local scoring may persist to `localStorage`, while cold load,
+  navigation, auth, AI, voice, rooms, and history still require the network.
 - Completed-match replay is mode-independent. `GET /api/matches/:id` reconstructs
   one completed `MatchRecord` only when the signed-in user occupies one of its
   player seats; missing and not-owned records share a private 404. Exact visits

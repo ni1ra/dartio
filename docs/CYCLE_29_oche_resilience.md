@@ -1,6 +1,7 @@
 # Cycle 29 — At-the-Oche Resilience
 
-Status: active on `codex/cycle-29-oche-resilience`.
+Status: shipped to Production on 2026-08-12 in PR #34, merge
+`6f0c2517cae6d00dd3465ccff68624b52517b51c`.
 
 Seventh cycle of `PHASE_3_promise_completion.md`. Dartio already saves X01 and
 Cricket through versioned, runtime-validated envelopes, but round modes still
@@ -77,7 +78,7 @@ That boundary follows the current primary contracts checked on 2026-08-12:
 - [x] Pass focused persistence/unit, typecheck, lint, build, three-viewport
   touched browser, complete browser, and independent adversarial gates on one
   frozen candidate.
-- [ ] Push one PR, pass exact-head CI and Preview proof, merge the exact green
+- [x] Push one PR, pass exact-head CI and Preview proof, merge the exact green
   revision, then repeat standing verifiers, touched browser, full browser,
   exact deployment, and main CI proof on Production.
 
@@ -104,9 +105,6 @@ Planning inventory, 2026-08-12:
 - Cycle 28 closure documentation is carried on this branch because the shipped
   PR cannot contain evidence produced after its merge.
 
-Preview, PR CI, merge, and Production receipts remain open until their exact
-commands finish.
-
 Frozen local candidate, 2026-08-12:
 
 - `pnpm typecheck`, `pnpm lint`, and `pnpm build` all exited 0. The production
@@ -132,9 +130,6 @@ Frozen local candidate, 2026-08-12:
   a pending wake-lock visibility race, and order-dependent deletion of future
   raw-v1 round/drill formats. The frozen re-audit found no release blocker.
 
-Preview, PR CI, merge, and Production receipts remain open. No database,
-Stripe, OpenAI, entitlement, or service-worker state was changed locally.
-
 PR #34 Preview candidate `9b225dea8c280aea77b62d83ca3647bf940774f9`,
 2026-08-12:
 
@@ -157,3 +152,43 @@ PR #34 Preview candidate `9b225dea8c280aea77b62d83ca3647bf940774f9`,
 - The immutable origin existed in Preview Neon Auth only for those probes:
   its exact count moved 0 to 1 to 0. The pre-existing stable Cycle 2 origin
   remained at count one, and no Production credential was sent to Preview.
+
+Final PR #34 head `cd11371f652ea4f5b1e533b0062fc523267e2b3a`,
+2026-08-12:
+
+- GitHub Actions run
+  [31560001714](https://github.com/ni1ra/dartio/actions/runs/31560001714)
+  completed successfully on the exact head. Typecheck, lint, unit, build, and
+  the complete browser proof all passed; both Vercel checks were green.
+- Final Preview deployment `dpl_9kkv4DkY74TgD2Tt8kXorJJ2Co8k`, build
+  `bld_h78qdu58s`, was READY on the exact head with immutable origin
+  `https://dartio-2swfbur49-niras-projects-868b6f5f.vercel.app`; `/play`
+  answered 200 without a redirect.
+- The final origin repeated auth, strict D20 history/detail, Free statistics,
+  anonymous history/statistics/room refusal, and the Free room 402 boundary.
+  Its resilience surface passed 42/42 in 24.1 seconds; the full matrix passed
+  326 with four designed skips in 3.0 minutes. Its temporary Auth-domain count
+  moved 0 to 1 to 0, while the stable Cycle 2 grant stayed at one.
+
+Production closure, 2026-08-12:
+
+- PR #34 merged the exact green head as
+  `6f0c2517cae6d00dd3465ccff68624b52517b51c`. Main GitHub Actions run
+  [31571265289](https://github.com/ni1ra/dartio/actions/runs/31571265289)
+  passed dependency installation, typecheck, lint, unit, build, and browser
+  proof in 7m58s on that exact merge SHA.
+- Vercel Production deployment `dpl_CGLyHCbrBfScMgBFpZHtR4ZtyUGU`, build
+  `bld_jw2lz92s0`, was READY on the merge SHA with `aliasError=null` and the
+  canonical `https://dartioopus46.vercel.app` alias. `/play` and
+  `/manifest.webmanifest` returned 200 without redirects and with the expected
+  HTML and manifest MIME types.
+- Production auth passed. History authenticated, filed and read a strict D20
+  record, returned 17 matches / 17 wins / 120 three-dart average, withheld Free
+  `deep`, and proved anonymous history/detail/statistics refusal. Rooms proved
+  anonymous refusal and a genuine Free-account 402 before creation. The
+  read-only integrity audit reported zero owner, version, terminal-field, open-
+  field, and orphan anomalies.
+- The touched Production resilience matrix passed 42/42 in 22.3 seconds. The
+  complete three-viewport Production matrix collected 330 checks, passed 326
+  with four designed skips, and exited 0 in 2.8 minutes. No database schema,
+  Stripe, OpenAI, entitlement, or service-worker state changed in this cycle.
