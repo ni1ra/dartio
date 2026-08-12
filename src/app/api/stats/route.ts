@@ -21,6 +21,8 @@ const NO_STORE = { "Cache-Control": "private, no-store" };
  */
 export interface StatsResponse {
   readonly matchesPlayed: number;
+  readonly competitiveMatches: number;
+  readonly practiceSessions: number;
   readonly matchesWon: number;
   readonly winPercentage: number;
   readonly visits: number;
@@ -40,7 +42,13 @@ export interface DeepStats {
   readonly bestVisit: number;
   readonly bestLegDarts: number | null;
   readonly busts: number;
+  readonly finishingBeds: CareerStats["x01"]["finishingBeds"];
+  /** Aggregate and exact non-double finishes both belong here, never in an invented bed. */
+  readonly unattributedCheckouts: number;
+  readonly recentForm: CareerStats["recentForm"];
+  readonly x01Trend: CareerStats["x01"]["trend"];
   readonly modes: CareerStats["modes"];
+  readonly drills: CareerStats["drills"];
 }
 
 export interface StatsRouteDependencies {
@@ -52,6 +60,8 @@ export function statsResponse(stats: CareerStats, access: AccessSnapshot): Stats
   const entitled = access.entitlements.includes("deep_stats");
   return {
     matchesPlayed: stats.matchesPlayed,
+    competitiveMatches: stats.competitiveMatches,
+    practiceSessions: stats.practiceSessions,
     matchesWon: stats.matchesWon,
     winPercentage: stats.winPercentage,
     visits: stats.visits,
@@ -68,7 +78,12 @@ export function statsResponse(stats: CareerStats, access: AccessSnapshot): Stats
         bestVisit: stats.x01.bestVisit,
         bestLegDarts: stats.x01.bestLegDarts,
         busts: stats.x01.busts,
+        finishingBeds: stats.x01.finishingBeds,
+        unattributedCheckouts: stats.x01.unattributedCheckouts,
+        recentForm: stats.recentForm,
+        x01Trend: stats.x01.trend,
         modes: stats.modes,
+        drills: stats.drills,
       }
       : null,
   };

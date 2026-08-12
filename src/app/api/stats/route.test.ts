@@ -19,11 +19,29 @@ const PRO = accessSnapshot(true, {
 const MATCH: StatMatch = {
   id: "match-1",
   mode: "x01",
+  completedAt: "2026-08-12T12:00:00.000Z",
   outRule: "double",
-  won: true,
+  result: "won",
   turns: [
-    { legNumber: 1, scoreBefore: 101, scoreAfter: 41, bust: false, dartsThrown: 1 },
-    { legNumber: 1, scoreBefore: 41, scoreAfter: 0, bust: false, dartsThrown: 2 },
+    {
+      legNumber: 1,
+      scoreBefore: 101,
+      scoreAfter: 41,
+      bust: false,
+      dartsThrown: 1,
+      darts: [{ ordinal: 1, segment: 20, multiplier: 3 }],
+    },
+    {
+      legNumber: 1,
+      scoreBefore: 41,
+      scoreAfter: 0,
+      bust: false,
+      dartsThrown: 2,
+      darts: [
+        { ordinal: 1, segment: 9, multiplier: 1 },
+        { ordinal: 2, segment: 16, multiplier: 2 },
+      ],
+    },
   ],
 };
 
@@ -39,6 +57,8 @@ describe("GET /api/stats", () => {
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     await expect(response.json()).resolves.toMatchObject({
       matchesPlayed: 1,
+      competitiveMatches: 1,
+      practiceSessions: 0,
       matchesWon: 1,
       winPercentage: 100,
       visits: 2,
@@ -54,6 +74,9 @@ describe("GET /api/stats", () => {
     expect(body.deep).toBeNull();
     // Nothing paid is anywhere in the payload, not merely absent from one field.
     expect(JSON.stringify(body)).not.toContain("checkoutPercentage");
+    expect(JSON.stringify(body)).not.toContain("finishingBeds");
+    expect(JSON.stringify(body)).not.toContain("recentForm");
+    expect(JSON.stringify(body)).not.toContain("drills");
     expect(body.historyLimit).toBe(50);
   });
 
@@ -70,8 +93,63 @@ describe("GET /api/stats", () => {
       bestVisit: 60,
       bestLegDarts: 3,
       busts: 0,
+      finishingBeds: [{ segment: 16, hits: 1, share: 100 }],
+      unattributedCheckouts: 0,
     });
-    expect(body.deep.modes).toEqual([{ mode: "x01", played: 1, won: 1 }]);
+    expect(body.deep.recentForm).toEqual([{
+      completedAt: "2026-08-12T12:00:00.000Z",
+      mode: "x01",
+      result: "won",
+    }]);
+    expect(body.deep.x01Trend).toEqual([{
+      completedAt: "2026-08-12T12:00:00.000Z",
+      threeDartAverage: 101,
+      checkoutPercentage: 50,
+      result: "won",
+    }]);
+    expect(body.deep.modes).toEqual([{
+      mode: "x01",
+      played: 1,
+      won: 1,
+      lost: 0,
+      unscored: 0,
+      visits: 2,
+      dartsThrown: 3,
+      winPercentage: 100,
+    }]);
+    expect(body.deep.drills).toEqual([
+      { mode: "checkoutLab", unit: "checkouts", sessions: 0, latest: null, best: null, average: null, recent: [] },
+      { mode: "doublesMatrix", unit: "doubles", sessions: 0, latest: null, best: null, average: null, recent: [] },
+      { mode: "scoringSprint", unit: "points", sessions: 0, latest: null, best: null, average: null, recent: [] },
+    ]);
+  });
+
+  it("keeps practice in sessions without lowering the competitive win percentage", async () => {
+    const practice: StatMatch = {
+      id: "drill-1",
+      mode: "scoringSprint",
+      completedAt: "2026-08-13T12:00:00.000Z",
+      outRule: null,
+      result: "unscored",
+      turns: [{
+        legNumber: 1,
+        scoreBefore: 0,
+        scoreAfter: 240,
+        bust: false,
+        dartsThrown: 3,
+        darts: [],
+      }],
+    };
+    const response = await handleStatsRequest(deps(FREE, vi.fn(async () => [MATCH, practice])));
+
+    await expect(response.json()).resolves.toMatchObject({
+      matchesPlayed: 2,
+      competitiveMatches: 1,
+      practiceSessions: 1,
+      matchesWon: 1,
+      winPercentage: 100,
+      deep: null,
+    });
   });
 
   it("reads only as far back as the plan allows", async () => {

@@ -1,6 +1,6 @@
 # Cycle 27 — Match Replay
 
-Status: active on `codex/cycle-27-match-replay`.
+Status: shipped to Production on 2026-08-12 through PR #32.
 
 Fifth cycle of `PHASE_3_promise_completion.md`. Dartio already stores a generic
 `MatchRecord` for every completed mode, but the account surface exposes only a
@@ -69,7 +69,7 @@ does not smuggle either concern into replay and needs no migration.
   gates on the frozen candidate.
 - [x] Exact Preview deployment, authentication/history proof, touched browser
   matrix, full browser matrix, and exact-head CI.
-- [ ] Merge the green exact revision and repeat the standing production gates,
+- [x] Merge the green exact revision and repeat the standing production gates,
   touched browser, full browser, exact deployment, and main CI proof.
 
 ## Release safety
@@ -98,9 +98,9 @@ Frozen local candidate, 2026-08-12:
   impossible dart ordinals on both storage boundaries, aggregate replay-reader
   coverage, new-leg score authority, and mode-neutral bust explanation.
 
-Merge and Production receipts remain deliberately open. The Preview evidence
-below belongs to one exact code revision; the receipt-only follow-up must also
-finish green before merge.
+The Preview evidence below belongs to one exact code revision. The receipt-only
+follow-up repeated both CI and Preview proof before merge, and the merged
+revision then repeated the complete Production ladder.
 
 PR #32 Preview candidate `ffcf91a8006f1cf429da169c28024a4514ec9429`,
 2026-08-12:
@@ -125,5 +125,30 @@ PR #32 Preview candidate `ffcf91a8006f1cf429da169c28024a4514ec9429`,
   stable Preview trusted domain remained present. The ignored `.env.local`
   bridge used by the secondary worktree was likewise removed after the gates.
 
-The receipt-only follow-up commit still needs its own CI and READY Preview
-deployment before merge. Production remains open.
+Final PR head `d055ba3313a05abfbd36b9128cb0de88206486de`:
+
+- GitHub Actions run
+  [31548662052](https://github.com/ni1ra/dartio/actions/runs/31548662052)
+  passed the exact head in 6m56s.
+- Vercel deployment `dpl_9bBX1ShGU5kqb3T4qnPHoq1qnCoG` was READY on that
+  exact SHA. Authentication, history/detail/statistics, rooms, the 27 replay
+  checks, and the full 272-run/4-skip browser matrix all passed against it.
+- The temporary Preview trusted-domain grant and ignored environment bridge
+  were removed after the gates.
+
+Production closure, 2026-08-12:
+
+- PR #32 merged as `d64997d5d8c913e94281fb0bea1585dcde9a7a52`.
+- Main GitHub Actions run
+  [31549373061](https://github.com/ni1ra/dartio/actions/runs/31549373061)
+  passed typecheck, lint, unit, build, and browser proof on that exact merge SHA
+  in 6m02s.
+- Production deployment `dpl_CBAS7sCNNcpLRSreEkNjaxGxsUHn` was READY with
+  `target=production`, source `git`, no alias error, and the exact merge SHA;
+  the canonical `https://dartioopus46.vercel.app` alias resolved to it.
+- `pnpm verify:auth`, `pnpm verify:history`, and `pnpm verify:rooms` passed.
+  The history gate filed one minimal D20 record and proved its exact private
+  detail, summary, statistics, and anonymous refusal.
+- The touched replay surface passed 27/27 in 16.9 seconds. The complete deployed
+  browser matrix passed 272 checks with the same 4 designed skips in 2.4
+  minutes. The temporary ignored environment bridge was removed afterwards.

@@ -5,7 +5,7 @@ import { dartRows } from "@/db/rows";
 import { darts, matches, players, turns } from "@/db/schema";
 import { parseMatchRecord, type MatchRecord } from "@/domain/match-record";
 import type { MatchReplayDetail } from "@/domain/match-replay";
-import type { StatMatch, StatTurn } from "@/domain/match-stats";
+import type { MatchResult, StatMatch, StatTurn } from "@/domain/match-stats";
 import { recordFailure } from "./observability";
 
 /**
@@ -295,8 +295,9 @@ async function queryMatches(userId: string, limit: number, db: Database): Promis
 interface StatRow extends Record<string, unknown> {
   id: string;
   mode: string;
+  completedAt: string | Date;
   outRule: string | null;
-  won: boolean;
+  result: string;
   turns: readonly StatTurn[];
 }
 
@@ -319,8 +320,13 @@ export async function readStatMatches(
       select
         ${matches.id} as "id",
         ${matches.mode} as "mode",
+        ${matches.completedAt} as "completedAt",
         ${matches.options}->>'outRule' as "outRule",
-        (${matches.winnerPlayerId} = ${players.id}) as "won",
+        case
+          when ${matches.winnerPlayerId} = ${players.id} then 'won'
+          when ${matches.winnerPlayerId} is null then 'unscored'
+          else 'lost'
+        end as "result",
         coalesce(
           json_agg(
             json_build_object(
@@ -328,7 +334,14 @@ export async function readStatMatches(
               'scoreBefore', ${turns.scoreBefore},
               'scoreAfter', ${turns.scoreAfter},
               'bust', ${turns.bust},
-              'dartsThrown', ${turns.dartsThrown}
+              'dartsThrown', ${turns.dartsThrown},
+              'darts', (select coalesce(json_agg(json_build_object(
+                  'ordinal', thrown.ordinal,
+                  'segment', thrown.segment,
+                  'multiplier', thrown.multiplier
+                ) order by thrown.ordinal), '[]'::json)
+                  from ${darts} as thrown
+                 where thrown.turn_id = ${turns.id})
             ) order by ${turns.turnNumber}
           ) filter (where ${turns.id} is not null),
           '[]'::json
@@ -345,13 +358,20 @@ export async function readStatMatches(
     return result.rows.map((row) => ({
       id: row.id,
       mode: row.mode,
+      completedAt: (row.completedAt instanceof Date ? row.completedAt : new Date(row.completedAt)).toISOString(),
       outRule: row.outRule === "straight" || row.outRule === "master" || row.outRule === "double" ? row.outRule : null,
-      won: row.won === true,
+      result: statResult(row.result),
       turns: row.turns,
     }));
   } catch (cause) {
     throw new MatchHistoryError({ cause });
   }
+}
+
+/** The SQL case emits exactly these values; anything else is a broken read, not practice. */
+function statResult(value: string): MatchResult {
+  if (value === "won" || value === "lost" || value === "unscored") return value;
+  throw new Error("Stored match result is invalid");
 }
 
 function toEntry(row: MatchRow): MatchHistoryEntry {
