@@ -12,8 +12,8 @@
  */
 import { readFile } from "node:fs/promises";
 import {
+  classifyTrebleTwentyVoiceSuccess,
   hasPrivateNoStore,
-  isExpectedTrebleTwentyVoiceSuccess,
   resolveLiveVoiceConfiguration,
 } from "./verify-voice-live-config.mjs";
 
@@ -126,16 +126,28 @@ if (
 }
 console.log("OK   invalid audio is refused before transcription (400)");
 
-const entitled = await postVoice(fixture, cookie, "entitled voice transcription");
-assertPrivateNoStore(entitled, "entitled voice transcription");
-if (entitled.status === 402 || entitled.status === 403) {
-  fail(`the QA identity is authenticated but is not entitled to voice_always_on (${entitled.status})`);
+let providerProven = false;
+for (let attempt = 1; attempt <= 2; attempt += 1) {
+  const entitled = await postVoice(fixture, cookie, "entitled voice transcription");
+  assertPrivateNoStore(entitled, "entitled voice transcription");
+  if (entitled.status === 402 || entitled.status === 403) {
+    fail(`the QA identity is authenticated but is not entitled to voice_always_on (${entitled.status})`);
+  }
+  if (entitled.status !== 200) {
+    fail(`entitled voice transcription returned ${entitled.status}, expected 200`);
+  }
+  const classification = classifyTrebleTwentyVoiceSuccess(await json(entitled));
+  if (classification === "expected") {
+    providerProven = true;
+    break;
+  }
+  if (classification === "malformed") {
+    fail("the voice route returned a malformed success response");
+  }
+  if (attempt === 1) {
+    console.log("OBS  the first provider sample was structurally valid but unexpected; retrying once");
+  }
 }
-if (entitled.status !== 200) {
-  fail(`entitled voice transcription returned ${entitled.status}, expected 200`);
-}
-if (!isExpectedTrebleTwentyVoiceSuccess(await json(entitled))) {
-  fail("the synthetic T20 clip did not return the strict command and a measured confidence signal");
-}
+if (!providerProven) fail("two bounded provider samples did not return the expected synthetic T20 command");
 console.log("OK   synthetic speech returned T20 with a finite non-zero confidence signal");
 console.log(`OK   ${origin} passed the application-data-safe live voice boundary`);

@@ -135,18 +135,20 @@ describe("each mode speaks its own vocabulary", () => {
   it("takes a visit total in X01 and nowhere else", () => {
     expect(sure(createDialogue(), "score sixty", "x01")).toMatchObject({ kind: "apply", command: { type: "turn_score", score: 60 } });
 
-    for (const mode of ["cricket", "round", "drill"] as const) {
+    for (const mode of ["cricket", "round", "drill", "room"] as const) {
       expect(sure(createDialogue(), "score sixty", mode)).toMatchObject({ kind: "out-of-vocabulary" });
     }
   });
 
-  it("has nobody to pass to in a drill", () => {
-    expect(sure(createDialogue(), "next player", "drill")).toMatchObject({ kind: "out-of-vocabulary" });
-    expect(sure(createDialogue(), "next player", "cricket")).toMatchObject({ kind: "apply" });
+  it("never invents a finished visit outside X01", () => {
+    for (const mode of ["cricket", "round", "drill", "room"] as const) {
+      expect(sure(createDialogue(), "next player", mode)).toMatchObject({ kind: "out-of-vocabulary" });
+    }
+    expect(sure(createDialogue(), "next player", "x01")).toMatchObject({ kind: "apply" });
   });
 
   it("takes a dart in every mode, because every mode is thrown at the same board", () => {
-    for (const mode of ["x01", "cricket", "round", "drill"] as const) {
+    for (const mode of ["x01", "cricket", "round", "drill", "room"] as const) {
       expect(sure(createDialogue(), "double sixteen", mode)).toMatchObject({ kind: "apply" });
     }
   });

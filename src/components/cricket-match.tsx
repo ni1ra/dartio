@@ -7,7 +7,7 @@ import {
   aiTactics, applyCricketDart,
   appendCricketEvent, chooseCricketAim, createCricketLog, CRICKET_NUMBERS, cricketDartEvent, cricketMatchRecord,
   cricketPlayerStats,
-  dartMarks, hasClosed, isCricketNumber, notation, replayCricket, rewindCricketToVisit,
+  dart, dartMarks, hasClosed, isCricketNumber, notation, replayCricket, rewindCricketToVisit,
   undoLastCricketEvent,
   type CricketLog, type CricketOptions, type CricketVariant, type Dart,
 } from "@/domain";
@@ -24,6 +24,7 @@ import { useRecordMatch } from "./use-record-match";
 import { OpponentAiAccessBanner, useOpponentAiAccess } from "./opponent-ai-access";
 import { describeAiFailure, describeAiRefresh, type AiRecovery } from "./opponent-ai-recovery";
 import { useScreenWakeLock } from "./use-screen-wake-lock";
+import { VoiceControl } from "./voice-control";
 
 const VARIANTS: readonly CricketVariant[] = ["standard", "cut-throat", "tactics"];
 const VARIANT_LABEL: Record<CricketVariant, string> = {
@@ -315,6 +316,15 @@ export function CricketMatch() {
       </section>
       <aside className="match-side">
         <DartInputPad disabled={disabled} onDart={addDart} />
+        <VoiceControl
+          revision={log.events.length}
+          disabled={disabled || correction}
+          mode="cricket"
+          onDart={(segment, multiplier) => addDart(dart(segment as Dart["segment"], multiplier))}
+          onTurnScore={() => undefined}
+          onUndo={undo}
+          onNextPlayer={() => setMessage("Record every dart before ending the visit")}
+        />
       </aside>
     </div>
 

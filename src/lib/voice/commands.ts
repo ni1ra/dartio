@@ -19,9 +19,19 @@ export function parseVoiceCommand(input: string): VoiceCommand | null {
   if (/^(confirm|yes|accept)$/.test(text)) return { type: "confirm" };
   if (/^(cancel|no|reject)$/.test(text)) return { type: "cancel" };
   if (/^(next|next player)$/.test(text)) return { type: "next_player" };
+  if (/^(miss|missed|no score)$/.test(text)) return { type: "dart", segment: 0, multiplier: 1 };
+  if (/^(bullseye|inner bull|double bull)$/.test(text)) return { type: "dart", segment: 25, multiplier: 2 };
+  if (/^(outer bull|single bull)$/.test(text)) return { type: "dart", segment: 25, multiplier: 1 };
+  if (/^(tops|double top|double tops)$/.test(text)) return { type: "dart", segment: 20, multiplier: 2 };
   const turn = text.match(/^(?:score|turn|i scored)\s+(.+)$/);
   if (turn) { const score = parseNumber(turn[1]!); return score !== null && score <= 180 ? { type: "turn_score", score } : null; }
-  const hit = text.match(/^(single|double|treble|triple)?\s*(.+)$/);
+  const notation = text.match(/^(?:hit\s+|dart\s+)?([sdt])\s*(\d{1,2})$/);
+  if (notation) {
+    const multiplier: 1 | 2 | 3 = notation[1] === "d" ? 2 : notation[1] === "t" ? 3 : 1;
+    const command = { type: "dart" as const, segment: Number(notation[2]), multiplier };
+    return voiceCommandSchema.safeParse(command).success ? command : null;
+  }
+  const hit = text.match(/^(?:hit\s+|dart\s+)?(single|double|treble|triple)?\s*(.+)$/);
   if (!hit) return null;
   const segment = parseNumber(hit[2]!);
   const multiplier: 1 | 2 | 3 = hit[1] === "double" ? 2 : hit[1] === "treble" || hit[1] === "triple" ? 3 : 1;
@@ -32,6 +42,9 @@ export function parseVoiceCommand(input: string): VoiceCommand | null {
 function parseNumber(value: string): number | null {
   if (/^\d{1,3}$/.test(value)) return Number(value);
   const normalized = value.replace(/-/g, " ").split(" ").filter((word) => word !== "and");
+  // Darts commentary normally contracts 180 to “one eighty”. It is not
+  // ordinary English arithmetic, so keep this one domain phrase explicit.
+  if (normalized.join(" ") === "one eighty") return 180;
   let total = 0; let current = 0;
   for (const word of normalized) {
     if (word === "hundred") { current = Math.max(current, 1) * 100; continue; }

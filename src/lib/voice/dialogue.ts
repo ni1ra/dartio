@@ -14,7 +14,7 @@ import { parseVoiceCommand, type VoiceCommand } from "./commands";
  */
 
 /** Which vocabulary a mode speaks. Modes that share one share it honestly. */
-export type VoiceMode = "x01" | "cricket" | "round" | "drill";
+export type VoiceMode = "x01" | "cricket" | "round" | "drill" | "room";
 
 export interface PendingUtterance {
   readonly id: number;
@@ -57,8 +57,9 @@ export function createDialogue(): DialogueState {
  */
 export function speaks(mode: VoiceMode, command: VoiceCommand): boolean {
   if (command.type === "turn_score") return mode === "x01";
-  // A drill is one player at one target, so there is nobody to pass to.
-  if (command.type === "next_player") return mode !== "drill";
+  // Only X01 exposes a legacy explanatory path for this phrase. Every other
+  // reducer requires actual darts to settle a visit and must not synthesize one.
+  if (command.type === "next_player") return mode === "x01";
   return true;
 }
 

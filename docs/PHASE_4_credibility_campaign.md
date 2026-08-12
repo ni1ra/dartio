@@ -40,7 +40,8 @@ custom practice, multiplayer under bad networks, and measurable release quality.
 - [ ] **Cycle 32 — Voice at every scoring surface.** Reuse the existing
   confidence/FIFO/lifecycle controller for Cricket, round modes, drills, and
   eligible room play; extend vocabulary without mode leakage; harden the live
-  fixture after Cycle 30's observed provider variance.
+  fixture after Cycle 30's observed provider variance. See
+  `CYCLE_32_voice_everywhere.md`.
 - [ ] **Cycle 33 — Personalized checkout intelligence.** Feed the existing
   server-authorized advanced checkout feature only aggregate, consented player
   evidence; prove alternatives and setup routes improve without inventing

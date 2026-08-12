@@ -164,9 +164,13 @@ async function installMicrophone(page: Page) {
 }
 
 async function openVoiceMatch(page: Page) {
+  await openVoiceSurface(page, MATCH);
+}
+
+async function openVoiceSurface(page: Page, path: string) {
   await installMicrophone(page);
   await page.route("**/api/access", (route) => json(route, 200, PRO_ACCESS));
-  await page.goto(MATCH, { waitUntil: "networkidle" });
+  await page.goto(path, { waitUntil: "networkidle" });
   await expect(page.getByRole("button", { name: "Hold to record a voice score" })).toBeVisible();
 }
 
@@ -187,6 +191,152 @@ async function speak(page: Page) {
 function playerScore(page: Page) {
   return page.locator(".score-player").first().locator("strong");
 }
+
+test.describe("the shared scorer reaches every local mode family", () => {
+  for (const example of [
+    {
+      name: "Cricket",
+      path: "/play/match?mode=cricket&variant=standard&opponent=local",
+      response: { transcript: "treble twenty", command: { type: "dart", segment: 20, multiplier: 3 }, confidence: 0.99 },
+      applied: /T20 · 3 marks/,
+    },
+    {
+      name: "Around the Clock",
+      path: "/play/match?mode=aroundTheClock&opponent=local",
+      response: { transcript: "single one", command: { type: "dart", segment: 1, multiplier: 1 }, confidence: 0.99 },
+      applied: /S1 recorded/,
+    },
+    {
+      name: "Checkout Lab",
+      path: "/play/match?drill=checkoutLab",
+      response: { transcript: "double twenty", command: { type: "dart", segment: 20, multiplier: 2 }, confidence: 0.99 },
+      applied: /D20 recorded/,
+    },
+  ] as const) {
+    test(`${example.name} applies one reviewed spoken dart through the shared controller`, async ({ page }) => {
+      await page.route("**/api/voice/transcribe", (route) => json(route, 200, example.response));
+      await openVoiceSurface(page, example.path);
+
+      await speak(page);
+      await expect(page.locator(".voice-result.held")).toContainText("99% confidence");
+      await page.getByRole("button", { name: "Confirm oldest" }).click();
+      await expect(page.getByText(example.applied)).toBeVisible();
+      await expect(page.locator(".voice-result.held")).toHaveCount(0);
+    });
+  }
+});
+
+test("room voice remains visit-atomic and locks capture while submission is in flight", async ({ page }) => {
+  await installMicrophone(page);
+  await page.route("**/api/access", (route) => json(route, 200, PRO_ACCESS));
+  await page.route("**/api/voice/transcribe", (route) => json(route, 200, {
+    transcript: "treble twenty",
+    command: { type: "dart", segment: 20, multiplier: 3 },
+    confidence: 0.99,
+  }));
+  let room = {
+    code: "OCHE42",
+    mode: "x01",
+    options: { startingScore: 501, legsToWin: 1, setsToWin: 1, inRule: "straight", outRule: "double" },
+    status: "active",
+    version: 0,
+    yourSeat: 0,
+    yourRole: "owner",
+    watching: 0,
+    seats: [
+      { seat: 0, displayName: "Host", isYou: true, role: "owner" },
+      { seat: 1, displayName: "Guest", isYou: false, role: "player" },
+    ],
+    turns: [] as Array<Record<string, unknown>>,
+  };
+  const submitted: unknown[] = [];
+  const submission = deferred();
+  await page.route("**/api/rooms/OCHE42**", async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === "/api/rooms/OCHE42" && request.method() === "GET") {
+      await json(route, 200, room);
+      return;
+    }
+    if (path === "/api/rooms/OCHE42/turns" && request.method() === "POST") {
+      const body = request.postDataJSON();
+      submitted.push(body);
+      await submission.promise;
+      room = { ...room, version: 1, turns: [{ turnNumber: 1, seat: 0, ...body.turn }] };
+      await json(route, 200, { version: 1 });
+      return;
+    }
+    await json(route, 404, { error: "unexpected_room_request" });
+  });
+  await page.goto("/play/match?room=OCHE42", { waitUntil: "networkidle" });
+
+  for (let dartIndex = 0; dartIndex < 3; dartIndex += 1) {
+    await speak(page);
+    await page.getByRole("button", { name: "Confirm oldest" }).click();
+    await expect(page.locator(".voice-result.held")).toHaveCount(0);
+  }
+  await expect.poll(() => submitted.length).toBe(1);
+  expect(submitted).toMatchObject([{
+    expectedVersion: 0,
+    seat: 0,
+    turn: {
+      scoreBefore: 501,
+      scoreAfter: 321,
+      dartsThrown: 3,
+      darts: [
+        { ordinal: 1, segment: 20, multiplier: 3 },
+        { ordinal: 2, segment: 20, multiplier: 3 },
+        { ordinal: 3, segment: 20, multiplier: 3 },
+      ],
+    },
+  }]);
+  await expect(page.getByRole("button", { name: "Hold to record a voice score" })).toBeDisabled();
+  submission.resolve();
+  await expect(page.getByText("321", { exact: true })).toBeVisible();
+});
+
+test("room voice is offered only to the seated player whose turn is live", async ({ page }) => {
+  await installMicrophone(page);
+  await page.route("**/api/access", (route) => json(route, 200, PRO_ACCESS));
+  let room = {
+    code: "OCHE42",
+    mode: "x01",
+    options: { startingScore: 501, legsToWin: 1, setsToWin: 1, inRule: "straight", outRule: "double" },
+    status: "active",
+    version: 0,
+    yourSeat: 1 as number | null,
+    yourRole: "player",
+    watching: 0,
+    seats: [
+      { seat: 0, displayName: "Host", isYou: false, role: "owner" },
+      { seat: 1, displayName: "Guest", isYou: true, role: "player" },
+    ],
+    turns: [] as Array<Record<string, unknown>>,
+  };
+  await page.route("**/api/rooms/OCHE42**", (route) => json(route, 200, room));
+
+  await page.goto("/play/match?room=OCHE42", { waitUntil: "networkidle" });
+  await expect(page.getByRole("button", { name: "Hold to record a voice score" })).toBeDisabled();
+
+  room = { ...room, yourSeat: null, yourRole: "spectator" };
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(page.getByRole("button", { name: "Hold to record a voice score" })).toHaveCount(0);
+
+  room = { ...room, status: "abandoned", yourSeat: 0, yourRole: "owner" };
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(page.getByRole("button", { name: "Hold to record a voice score" })).toHaveCount(0);
+});
+
+test("voice access failure leaves non-X01 manual scoring ready", async ({ page }) => {
+  await installMicrophone(page);
+  await page.route("**/api/access", (route) => json(route, 503, { error: "access_unavailable" }));
+  await page.goto("/play/match?mode=cricket&variant=standard&opponent=local", { waitUntil: "networkidle" });
+
+  await expect(page.getByRole("heading", { name: "Voice access unavailable" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retry access" })).toBeVisible();
+  await expect(page.locator(".dartboard")).toHaveAttribute("aria-disabled", "false");
+  await expect(page.getByRole("button", { name: "Treble 20, 60 points" })).toBeEnabled();
+});
 
 test("releasing push-to-talk while permission is pending records and sends nothing", async ({ page }) => {
   let requests = 0;
