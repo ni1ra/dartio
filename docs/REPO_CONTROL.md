@@ -62,17 +62,16 @@
 - The original sandbox webhook destination returned HTTP 500 to the successful Checkout's invoice events because it targets the old production alias, while Preview owns the Checkout identity/database. Dedicated Preview destination `we_1Tu1pFALEz0P7O2hQVsTftWI` is active at the stable Cycle 2 alias and listens only to `checkout.session.completed` plus the eight current `customer.subscription.*` events. Vercel has a sensitive branch-scoped signing-secret override for `cycle-2-identity-billing-voice`; the global Preview/Production secret was not changed.
 - Preview destination `we_1Tu1pFALEz0P7O2hQVsTftWI` processed two real Portal-cancellation `customer.subscription.updated` events with HTTP 200, zero failures, and 848–1305 ms response time on deployment `dpl_GvToqtNyNJCjzcGrYLDFVfZePqEV`. Neon stored both processed event IDs and exactly one owned Pro/trialing subscription row.
 - Deployment `dpl_G2u7bDCCuSCJMeaciPTkXjdwj6mG` proved explicit cancellation recovery and reprojection: reactivation cleared `cancel_at`; rescheduling stored `cancel_at=2026-07-31T02:42:12Z` while keeping `cancel_at_period_end=false`, status `trialing`, plan `pro`, and one subscription row.
-- GitHub release source: commit `d6a446082c6bd557f9e0ef9ff83565065b0743f9`;
-  CI run [31654855115](https://github.com/ni1ra/dartio/actions/runs/31654855115)
+- GitHub release source: commit `46f3a4f7b885bf6474be1e644a3458084059d6b3`;
+  CI run [31658885004](https://github.com/ni1ra/dartio/actions/runs/31658885004)
   passed typecheck, lint, unit, build, and the full browser matrix.
-- Current greenfield production deployment: `dpl_4GdoSmom4oFCBrYYGHYsx8AfsdBW`
+- Current greenfield production deployment: `dpl_A27a2m3p8BsAs2MSSGsvRrZnErzZ`
   at `https://dartioopus46.vercel.app`, READY on the exact release SHA with no
   alias error. Auth, strict owner-only history/detail, rooms, paid AI, paid
-  voice, and the complete 374-run/4-skip browser matrix passed there on
-  2026-08-13. One bounded voice gate observed two structurally valid unexpected
-  samples and failed honestly; a later diagnostic returned the supported
-  “triple twenty” synonym as exact T20, and the final bounded gate passed. No
-  unbounded retry erased the first observation.
+  voice, and the complete 395-run/4-skip browser matrix passed there on
+  2026-08-13. The aggregate room-integrity audit also returned zero owner,
+  version/turn, terminal-field, and orphan-signature anomalies without printing
+  identifiers or changing the database.
 - Current Cycle 2 Auth/webhook preview deployment: `dpl_FfHXJZ9ZJJk7mWoDGiqieGx6LWCq` at `https://dartio-boreq0qif-niras-projects-868b6f5f.vercel.app`. It was redeployed on 2026-08-11 after Preview database-password rotation made its immutable predecessor stale; the stable branch alias retained its branch-scoped Stripe signing secret, picked up the current Preview `DATABASE_URL`, and then returned HTTP 200 for two signed sandbox subscription deliveries. Entitled X01 continuity/access-authority head `e3a80a4` passed GitHub verification run `29554449332`. Prior code Preview `dpl_AwDwqrqPYR8ufLdJUV5m91dQJLff` remains the rollback target for the Cycle 2 code.
 - Preview has a branch-scoped `NEXT_PUBLIC_APP_URL` override for `cycle-2-identity-billing-voice`, targeting its stable Vercel alias. The global Preview and Production values were not changed.
 - Paid features are authorized server-side only. `voice_always_on` gates `POST /api/voice/transcribe` before body parsing; `advanced_ai` gates one physical sample from `POST /api/ai/throw` for each level-9–20 dart while 1–8 stay local; `advanced_checkout` gates `POST /api/checkout/advice` for alternates, setup plans, and preference ranking while Free computes one route locally. All three read the server's own access snapshot and accept no client plan, access, or seed claim. The AI throw request is exactly `{ level, target }`: tactics and every mode rule remain in the client.
@@ -121,7 +120,14 @@
 - Every mode reduces to one `MatchRecord` (`src/domain/match-record.ts`) before it is stored, and each mode owns the adapter that produces it. The server never learns any mode's rules, so a seventh mode needs no server change. It validates shape and ownership only: every dart is checked against the same board the `darts` constraints enforce, and the account a match is filed under comes from the session, never from the request body.
 - **`.env.local`'s `DATABASE_URL` addresses the `vercel-preview` branch, not `main`.** Its host is `ep-shy-brook-afwoyw0n`; production is `ep-raspy-lake-afeigwvp`. A row count or a schema check run with the repo's own env file describes preview and says nothing about production. Per-branch connection URIs come from the Neon control plane at `/projects/{project_id}/connection_uri?branch_id=…`.
 - Playable modes as of 2026-07-31: X01, Cricket (standard / cut-throat / tactics), Around the Clock, Shanghai, Count-Up, Bob's 27, and the three drills — Checkout Lab, Doubles Matrix, and Scoring Sprint. All nine catalogue rows are playable; nothing on `/practice` is labelled coming next any more, and the branch that rendered an inert card was removed with the last row that needed it.
-- Dartio reports on itself through `src/lib/server/observability.ts`: one line of JSON per event on stdout, which Vercel captures, with no third-party agent, key, or request made on a player's behalf. **The field list is an allow-list, not a spread** — the types forbid an email or a token and the allow-list is what actually enforces it, which a test asserts by reaching past the types.
+- Dartio reports on itself through `src/lib/server/observability.ts`: one bounded
+  JSON object per event on stdout/stderr, which Vercel captures, with no
+  third-party agent, key, cookie, or request made on a player's behalf. **The
+  field list is an allow-list, not a spread** and contains no user id, email,
+  token, cookie, room code, transcript, match payload, raw provider response,
+  error name, or error message. Failures retain only a fixed category plus
+  explicitly bounded route/status/mode/count context; tests reach past the types
+  and use sentinel exceptions to prove those private values cannot serialize.
 - `/api/auth/[...path]` now degrades honestly: an unreachable Neon Auth, or a 500 from it, answers **503 `auth_service_unavailable`** rather than 500, because a 500 says Dartio is broken and a 503 says an authority is temporarily unavailable — and only the second is true during a Neon outage. Refusals the auth service means, such as a wrong password or an untrusted origin, pass through unchanged.
 - The match fits the screen it reserves as of 2026-07-31, measured rather than assumed: it ran to 1229 px in a 1000 px viewport with the command dock at y=1036, and now measures 1000 px with the dock ending at the bottom edge. Three causes: `#main-content` and `.match-page` reserved only the nav's 76 px while the stage starts 38 px lower (both now subtract `--stage-inset`, in `dvh`); `.match-page` had a `min-height` and no height, so `flex: 1` on the grid had nothing to distribute; and Navi's shell reserves room for a bottom navigation that only exists below 1100 px. **The board was never the constraint** — the middle column was, and it now scrolls inside the grid. `tests/browser/layout.spec.ts` asserts both measurements, with a 1 px tolerance for sub-pixel rounding.
 - **The admin role is decided and deliberately not built.** Neon Auth already runs Better Auth's admin plugin, so `users` needs no `role` column and a second copy inside Dartio would leave two answers to who is an administrator. "Signed in as admin but the card reads FREE" was correct: role and entitlement are separate on purpose, and letting a role grant paid entitlements would hand out paid access with no billing record.
@@ -152,13 +158,11 @@
 - `pnpm test`
 - `pnpm build`
 - `pnpm test:browser:install` (once per machine)
-- `pnpm test:browser` — the Cycle 34 release has 378 checks across 390×844,
-  834×1112, and 1440×1000; 374 run and 4 skip by design, those being the sign-up
+- `pnpm test:browser` — the Cycle 35 release has 399 checks across 390×844,
+  834×1112, and 1440×1000; 395 run and 4 skip by design, those being the sign-up
   assertion at the two widths where sign-up is deliberately absent and the
   screenspace assertion at the two widths whose reservation it does not describe.
-  The exact merge repeated all 374 runnable checks against Production. Cycle 35
-  adds 25 room-loss and authority checks, taking its candidate to 399 collected.
-  Set
+  The exact merge repeated all 395 runnable checks against Production. Set
   `DARTIO_BASE_URL` to run against Preview or Production instead of a local build.
 - `pnpm db:generate` — writes the migration; it does not apply it
 - `DATABASE_URL=<branch-uri> pnpm exec drizzle-kit migrate` — applies pending migrations to one branch and reconciles the journal. Preview first, then main. The URI is passed only through a credential-safe in-memory wrapper, never as a positional argument or printed shell assignment. The repo has no `db:migrate` script because the URL is never the one in `.env.local` for production work

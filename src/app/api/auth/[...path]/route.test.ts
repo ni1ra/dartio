@@ -23,16 +23,22 @@ describe("the auth proxy during a Neon outage", () => {
     expect(response.status).toBe(503);
   });
 
-  it("records the failure without putting the cause in the response", async () => {
+  it("records a fixed failure category without retaining the raw cause", async () => {
     const lines: unknown[] = [];
     setObservabilitySink((line) => lines.push(line));
 
     const response = await proxyAuthRequest("GET", request, context, () => () => { throw new Error("ECONNREFUSED 10.0.0.1"); });
 
     expect(lines).toHaveLength(1);
-    expect(lines[0]).toMatchObject({ event: "auth.unreachable", severity: "error", route: "auth/get-session", status: 503 });
-    expect(JSON.stringify(lines[0])).toContain("ECONNREFUSED");
-    // The address is in the log and nowhere near the client.
+    expect(lines[0]).toMatchObject({
+      event: "auth.unreachable",
+      severity: "error",
+      route: "auth/get-session",
+      status: 503,
+      failure: "error",
+    });
+    expect(JSON.stringify(lines[0])).not.toContain("ECONNREFUSED");
+    expect(JSON.stringify(lines[0])).not.toContain("10.0.0.1");
     await expect(response.text()).resolves.not.toContain("ECONNREFUSED");
   });
 });

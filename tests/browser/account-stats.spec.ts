@@ -1,3 +1,4 @@
+import { gotoDartio } from "./navigation";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 const TIMESTAMP = "2026-08-12T18:30:00.000Z";
@@ -154,7 +155,7 @@ test("Pro record separates sessions and exposes source-honest career depth", asy
   await page.route("**/api/stats", (route) => json(route, 200, PRO_STATS));
   await page.route("**/api/matches?*", (route) => json(route, 200, HISTORY));
 
-  await page.goto("/account", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/account");
 
   const membership = page.locator(".membership-status");
   await expect(membership).toContainText("Deep statistics");
@@ -204,7 +205,7 @@ test("Free record receives headline truth and no paid figures", async ({ page })
   await page.route("**/api/stats", (route) => json(route, 200, FREE_STATS));
   await page.route("**/api/matches?*", (route) => json(route, 200, HISTORY));
 
-  await page.goto("/account", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/account");
 
   const record = page.getByRole("region", { name: "Your record" });
   await expect(record.getByText("4 completed sessions")).toBeVisible();
@@ -235,7 +236,7 @@ test("record loading resolves into an honest empty state", async ({ page }) => {
     await json(route, 200, { matches: [] });
   });
 
-  await page.goto("/account", { waitUntil: "domcontentloaded" });
+  await gotoDartio(page, "/account");
   await expect(page.getByText("Reading your completed sessions…")).toBeVisible();
   await expect(page.getByText("Loading saved sessions…")).toBeVisible();
   releaseStats();
@@ -253,7 +254,7 @@ test("malformed stats and history failures stay distinct from an empty career", 
   await page.route("**/api/stats", (route) => json(route, 200, { ...FREE_STATS, matchesWon: 4 }));
   await page.route("**/api/matches?*", (route) => json(route, 503, { error: "match_history_unavailable" }));
 
-  await page.goto("/account", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/account");
 
   await expect(page.getByText(/record could not be read just now/i)).toBeVisible();
   await expect(page.getByText(/History could not be read just now/i)).toBeVisible();

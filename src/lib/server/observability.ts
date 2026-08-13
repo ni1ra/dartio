@@ -8,24 +8,23 @@
  *
  * Two rules hold everywhere:
  *
- *   1. **Never log a secret, a token, a cookie, or an email.** A user is a `userId`
- *      and nothing else. The one exception is deliberate: an error's own message,
- *      which is written by this codebase — the routes already refuse to return
- *      those to a client, and they must not leak by the back door either.
+ *   1. **Never log identity or unbounded input.** No user id, email, token, cookie,
+ *      room code, transcript, match payload, error name, or error message belongs
+ *      here. Failures are reduced to one fixed diagnostic category.
  *   2. **A log line is not a feature.** These name things that already happen; they
  *      do not decide anything, and removing every call would change no behaviour.
  */
 
 export type Severity = "info" | "warn" | "error";
+export type FailureCategory = "abort" | "syntax" | "type" | "error" | "unknown";
 
 export interface EventFields {
-  readonly userId?: string;
   readonly mode?: string;
   readonly route?: string;
   readonly status?: number;
   readonly durationMs?: number;
   readonly count?: number;
-  readonly reason?: string;
+  readonly failure?: FailureCategory;
 }
 
 interface Emitted extends EventFields {
@@ -58,7 +57,7 @@ export function setObservabilitySink(next: Sink | null): void {
  * guarantee, and "never log a secret" has to hold when somebody reaches past them.
  * An allow-list is the only version of that rule that is actually enforced.
  */
-const FIELDS = ["userId", "mode", "route", "status", "durationMs", "count", "reason"] as const;
+const FIELDS = ["mode", "route", "status", "durationMs", "count", "failure"] as const;
 
 export function record(event: string, fields: EventFields = {}, severity: Severity = "info"): void {
   const line: Emitted = { event, severity, at: new Date().toISOString() };
@@ -70,13 +69,21 @@ export function record(event: string, fields: EventFields = {}, severity: Severi
 }
 
 /**
- * Records a failure without letting its cause escape into a response.
+ * Records a failure without letting its cause escape into logs or a response.
  *
- * The message is taken from the error rather than the caller so a log line cannot
- * drift from the thing that actually went wrong, and it is deliberately not
- * returned anywhere — every route answers with a fixed code.
+ * Error names and messages can contain provider responses, identifiers, malformed
+ * payload fragments, or credentials. A small category keeps failures searchable
+ * while making that entire class of accidental disclosure impossible.
  */
 export function recordFailure(event: string, cause: unknown, fields: EventFields = {}): void {
-  const reason = cause instanceof Error ? `${cause.name}: ${cause.message}` : "unknown";
-  record(event, { ...fields, reason }, "error");
+  const failure: FailureCategory = cause instanceof Error && cause.name === "AbortError"
+    ? "abort"
+    : cause instanceof SyntaxError
+      ? "syntax"
+      : cause instanceof TypeError
+        ? "type"
+        : cause instanceof Error
+          ? "error"
+          : "unknown";
+  record(event, { ...fields, failure }, "error");
 }

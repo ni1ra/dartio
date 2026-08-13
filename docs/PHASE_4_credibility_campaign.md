@@ -50,7 +50,7 @@ custom practice, multiplayer under bad networks, and measurable release quality.
   custom-practice entitlement into a small, real rules-defined builder with
   versioned resume, replay/statistics truth, and no generic-rule duplication.
   See `CYCLE_34_custom_practice.md`.
-- [ ] **Cycle 35 — Rooms under bad networks.** Exercise reconnect, duplicate
+- [x] **Cycle 35 — Rooms under bad networks.** Exercise reconnect, duplicate
   delivery, delayed handover, terminal races, and recovery UI under controlled
   latency/loss while preserving the server's visit-level authority. See
   `CYCLE_35_room_resilience.md`.
@@ -58,6 +58,7 @@ custom practice, multiplayer under bad networks, and measurable release quality.
   audit over all public and scoring surfaces, close actionable WCAG and keyboard
   gaps, set realistic performance budgets, and make production failures
   diagnosable without logging private match, voice, auth, or billing data.
+  See `CYCLE_36_quality_operations.md`.
 - [ ] **Cycle 37 — Credibility closure.** Re-score every manifesto and pricing
   claim against `main`, repeat the full release ladder and real billing/payout
   evidence, archive Cycles 31–37, and leave only a concrete post-v1 backlog.

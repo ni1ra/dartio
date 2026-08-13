@@ -1,3 +1,4 @@
+import { gotoDartio } from "./navigation";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import type { FiledTurn, RoomStateView } from "../../src/lib/product/rooms-client";
 
@@ -136,7 +137,7 @@ async function installRoom(page: Page, behavior: RoomBehavior = {}) {
 }
 
 async function openRoom(page: Page) {
-  await page.goto("/play/match?room=OCHE42", { waitUntil: "domcontentloaded" });
+  await gotoDartio(page, "/play/match?room=OCHE42");
   await expect(page.getByRole("button", { name: "Treble 20, 60 points" })).toBeEnabled();
 }
 
@@ -245,7 +246,7 @@ test("a lost finish response is recovered by one idempotent confirmation", async
       return true;
     },
   });
-  await page.goto("/play/match?room=OCHE42", { waitUntil: "domcontentloaded" });
+  await gotoDartio(page, "/play/match?room=OCHE42");
 
   const confirm = page.getByRole("button", { name: "Confirm finish" });
   await expect(confirm).toBeVisible();
@@ -300,7 +301,7 @@ test("canonical close wins a finish race and stale scoring never returns", async
       return true;
     },
   });
-  await page.goto("/play/match?room=OCHE42", { waitUntil: "domcontentloaded" });
+  await gotoDartio(page, "/play/match?room=OCHE42");
   await started;
   harness.setRoom({ ...harness.room(), status: "abandoned" });
   releaseFinish();

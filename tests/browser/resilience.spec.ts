@@ -1,3 +1,4 @@
+import { gotoDartio, reloadDartio } from "./navigation";
 import { expect, test, type Page } from "@playwright/test";
 
 const MATCH = "/play/match?start=501&best=5&out=double&opponent=local";
@@ -79,7 +80,7 @@ async function wakeProbe(page: Page): Promise<Pick<WakeLockProbe, "requests" | "
 
 test("an active match owns one screen wake lock and releases it when leaving", async ({ page }) => {
   await installWakeLockProbe(page);
-  await page.goto(MATCH, { waitUntil: "networkidle" });
+  await gotoDartio(page, MATCH);
   await expect.poll(() => wakeProbe(page)).toEqual({ requests: 1, releases: 0 });
 
   await page.getByRole("link", { name: "Dartio home" }).click();
@@ -89,7 +90,7 @@ test("an active match owns one screen wake lock and releases it when leaving", a
 
 test("a visible match reacquires the screen lock after the browser releases it", async ({ page }) => {
   await installWakeLockProbe(page);
-  await page.goto(MATCH, { waitUntil: "networkidle" });
+  await gotoDartio(page, MATCH);
   await expect.poll(() => wakeProbe(page)).toEqual({ requests: 1, releases: 0 });
 
   await page.evaluate(() => {
@@ -109,7 +110,7 @@ test("a visible match reacquires the screen lock after the browser releases it",
 
 test("finishing a match releases the screen wake lock without leaving the route", async ({ page }) => {
   await installWakeLockProbe(page);
-  await page.goto("/play/match?mode=shanghai", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?mode=shanghai");
   await expect.poll(() => wakeProbe(page)).toEqual({ requests: 1, releases: 0 });
 
   await page.keyboard.press("1");
@@ -124,7 +125,7 @@ test("finishing a match releases the screen wake lock without leaving the route"
 
 test("a lock granted after hidden-to-visible is released before the fresh lock wins", async ({ page }) => {
   await installWakeLockProbe(page, { deferred: true });
-  await page.goto(MATCH, { waitUntil: "domcontentloaded" });
+  await gotoDartio(page, MATCH);
   await expect.poll(async () => (await wakeProbe(page)).requests).toBe(1);
 
   await page.evaluate(() => {
@@ -141,7 +142,7 @@ test("a lock granted after hidden-to-visible is released before the fresh lock w
 
 test("a wake lock granted after the match unmounts is released immediately", async ({ page }) => {
   await installWakeLockProbe(page, { deferred: true });
-  await page.goto(MATCH, { waitUntil: "domcontentloaded" });
+  await gotoDartio(page, MATCH);
   await expect.poll(async () => (await wakeProbe(page)).requests).toBe(1);
 
   await page.getByRole("link", { name: "Dartio home" }).click();
@@ -156,7 +157,7 @@ test("a wake lock granted after the match unmounts is released immediately", asy
 
 test("scoring remains available when screen wake lock is unsupported", async ({ page }) => {
   await installWakeLockProbe(page, { outcome: "unsupported" });
-  await page.goto(MATCH, { waitUntil: "networkidle" });
+  await gotoDartio(page, MATCH);
   await page.getByRole("tab", { name: "Each dart" }).click();
   await page.getByRole("button", { name: "Treble 20, 60 points" }).click();
   await expect(page.locator(".current-darts .filled")).toContainText("T20");
@@ -164,14 +165,14 @@ test("scoring remains available when screen wake lock is unsupported", async ({ 
 
 test("scoring remains available when screen wake lock permission is denied", async ({ page }) => {
   await installWakeLockProbe(page, { outcome: "denied" });
-  await page.goto(MATCH, { waitUntil: "networkidle" });
+  await gotoDartio(page, MATCH);
   await page.getByRole("tab", { name: "Each dart" }).click();
   await page.getByRole("button", { name: "Treble 20, 60 points" }).click();
   await expect(page.locator(".current-darts .filled")).toContainText("T20");
 });
 
 test("an already-loaded local match still records a dart while the network is offline", async ({ page, context }) => {
-  await page.goto(MATCH, { waitUntil: "networkidle" });
+  await gotoDartio(page, MATCH);
   await page.getByRole("tab", { name: "Each dart" }).click();
   await context.setOffline(true);
   try {
@@ -192,21 +193,21 @@ test("an already-loaded local match still records a dart while the network is of
 
 test("undoing the only round dart removes the resume slot", async ({ page }) => {
   const key = "dartio:round-log:v3:countUp:solo";
-  await page.goto("/play/match?mode=countUp", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?mode=countUp");
   await page.getByRole("button", { name: "Treble 20, 60 points" }).click();
   await expect(page.locator(".round-totals strong").first()).toHaveText("60");
   await expect.poll(() => page.evaluate((storageKey) => window.localStorage.getItem(storageKey), key)).not.toBeNull();
   await page.getByRole("button", { name: "Undo last dart" }).click();
   await expect(page.locator(".round-totals strong").first()).toHaveText("0");
   await expect.poll(() => page.evaluate((storageKey) => window.localStorage.getItem(storageKey), key)).toBeNull();
-  await page.reload({ waitUntil: "networkidle" });
+  await reloadDartio(page);
   await expect(page.locator(".match-notice")).toHaveCount(0);
   await expect(page.locator(".round-totals strong").first()).toHaveText("0");
 });
 
 test("rewinding the first completed round visit removes the resume slot", async ({ page }) => {
   const key = "dartio:round-log:v3:countUp:solo";
-  await page.goto("/play/match?mode=countUp", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?mode=countUp");
   for (let dart = 0; dart < 3; dart += 1) {
     await page.getByRole("button", { name: "Treble 20, 60 points" }).click();
   }
@@ -215,19 +216,19 @@ test("rewinding the first completed round visit removes the resume slot", async 
   await page.locator(".correction-visits li").first().getByRole("button", { name: "Rewind here" }).click();
   await expect(page.locator(".round-totals strong").first()).toHaveText("0");
   await expect.poll(() => page.evaluate((storageKey) => window.localStorage.getItem(storageKey), key)).toBeNull();
-  await page.reload({ waitUntil: "networkidle" });
+  await reloadDartio(page);
   await expect(page.locator(".match-notice")).toHaveCount(0);
   await expect(page.locator(".round-totals strong").first()).toHaveText("0");
 });
 
 test("undoing the only drill dart removes the resume slot", async ({ page }) => {
   const key = "dartio:drill-log:v2:doublesMatrix";
-  await page.goto("/play/match?drill=doublesMatrix", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?drill=doublesMatrix");
   await page.getByRole("button", { name: "Treble 20, 60 points" }).click();
   await expect.poll(() => page.evaluate((storageKey) => window.localStorage.getItem(storageKey), key)).not.toBeNull();
   await page.getByRole("button", { name: "Undo last dart" }).click();
   await expect.poll(() => page.evaluate((storageKey) => window.localStorage.getItem(storageKey), key)).toBeNull();
-  await page.reload({ waitUntil: "networkidle" });
+  await reloadDartio(page);
   await expect(page.locator(".match-notice")).toHaveCount(0);
   await expect(page.locator(".drill-target strong")).toHaveText("1");
 });
@@ -238,13 +239,13 @@ test("future-version round and drill resumes survive initial hydration untouched
   const futureRound = '{ "storageVersion": 77, "writer": "future-round" }';
   const futureDrill = '{ "rulesVersion": 88, "writer": "future-drill" }';
 
-  await page.goto("/", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/");
   await page.evaluate(({ round, drill, roundRaw, drillRaw }) => {
     window.localStorage.setItem(round, roundRaw);
     window.localStorage.setItem(drill, drillRaw);
   }, { round: roundKey, drill: drillKey, roundRaw: futureRound, drillRaw: futureDrill });
 
-  await page.goto("/play/match?mode=countUp", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?mode=countUp");
   await expect(page.locator(".match-notice")).toHaveCount(0);
   await expect(page.locator(".round-totals strong").first()).toHaveText("0");
   await page.evaluate(() => new Promise<void>((resolve) => {
@@ -252,7 +253,7 @@ test("future-version round and drill resumes survive initial hydration untouched
   }));
   await expect.poll(() => page.evaluate((key) => window.localStorage.getItem(key), roundKey)).toBe(futureRound);
 
-  await page.goto("/play/match?drill=doublesMatrix", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?drill=doublesMatrix");
   await expect(page.locator(".match-notice")).toHaveCount(0);
   await expect(page.locator(".drill-target strong")).toHaveText("1");
   await page.evaluate(() => new Promise<void>((resolve) => {
@@ -284,7 +285,7 @@ test("the manifest and install icons describe the shipped app without an offline
     expect(response.headers()["content-type"], icon.src).toBe("image/png");
   }
 
-  await page.goto("/", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/");
   for (const icon of new Map(manifest.icons.map((entry) => [entry.src, entry])).values()) {
     const dimensions = await page.evaluate(async (src) => {
       const image = new Image();
@@ -305,7 +306,7 @@ test("the manifest and install icons describe the shipped app without an offline
 });
 
 test("the match recovery layout is responsive and keyboard reachable", async ({ page }, testInfo) => {
-  await page.goto(MATCH, { waitUntil: "networkidle" });
+  await gotoDartio(page, MATCH);
   // `route-error.test.ts` renders the real boundary. This browser fixture keeps
   // the production route graph clean and proves that component's exact classes
   // in the three release viewports.

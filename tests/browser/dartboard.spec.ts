@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { gotoDartio } from "./navigation";
 
 /**
  * The regulation dartboard gate, as an executable test.
@@ -14,7 +15,7 @@ import { expect, test } from "@playwright/test";
 const MATCH = "/play/match?start=501&level=8&best=5&out=double";
 
 test.beforeEach(async ({ page }) => {
-  await page.goto(MATCH, { waitUntil: "networkidle" });
+  await gotoDartio(page, MATCH);
   await expect(page.locator("svg.dartboard")).toBeVisible();
 });
 

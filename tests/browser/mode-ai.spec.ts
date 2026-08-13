@@ -1,3 +1,4 @@
+import { gotoDartio, reloadDartio } from "./navigation";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import type { Aim } from "../../src/domain/ai-throw";
 import { representativePoint, type Dart } from "../../src/domain/darts";
@@ -146,7 +147,7 @@ async function clearStorageOnce(page: Page) {
 
 async function openFreshMatch(page: Page, path: string, level: 8 | 20) {
   await clearStorageOnce(page);
-  await page.goto(`${path}&level=${level}`, { waitUntil: "networkidle" });
+  await gotoDartio(page, `${path}&level=${level}`);
   if (level === 20) {
     await expect(page.getByText("PRO AI VERIFIED", { exact: true })).toBeVisible();
   }
@@ -176,7 +177,7 @@ async function expectSettled(page: Page, story: ModeStory) {
 
 test("setup reaches all six opponent modes at level 20 without narrow overflow", async ({ page }) => {
   await mockProAccess(page);
-  await page.goto("/play", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play");
 
   const mode = page.getByLabel("Game mode");
   const slider = page.getByRole("slider", { name: /AI level, maximum 20/i });
@@ -198,11 +199,11 @@ test("setup reaches all six opponent modes at level 20 without narrow overflow",
 
 test("a missing level keeps each surface's intended default instead of becoming level 1", async ({ page }) => {
   await mockProAccess(page);
-  await page.goto("/play/match?opponent=ai", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?opponent=ai");
   await expect(page.locator(".match-tools > span")).toHaveText("AI level 8");
-  await page.goto("/play/match?mode=cricket&opponent=ai", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?mode=cricket&opponent=ai");
   await expect(page.locator(".match-tools > span")).toHaveText("AI level 5");
-  await page.goto("/play/match?mode=countUp&opponent=ai", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?mode=countUp&opponent=ai");
   await expect(page.locator(".match-tools > span")).toHaveText("AI level 5");
 });
 
@@ -319,7 +320,7 @@ test("Continue at level 8 remains local after reload without another server requ
   expect(requests).toBe(2);
   await expect(page.getByText("LEVEL 8 CONTINUATION", { exact: true })).toBeVisible();
 
-  await page.reload({ waitUntil: "networkidle" });
+  await reloadDartio(page);
   await expect(page.getByText("LEVEL 8 CONTINUATION", { exact: true })).toBeVisible();
   await expect(page.locator(".match-notice")).toContainText("Resumed the match");
   await enterPlayerVisit(page);
@@ -336,7 +337,7 @@ test("X01 and Cricket keep different requested AI levels in different resume slo
     await enterPlayerVisit(page);
     await expectSettled(page, story);
 
-    await page.goto(`${story.path}&level=20`, { waitUntil: "networkidle" });
+    await gotoDartio(page, `${story.path}&level=20`);
     await expect(page.getByText("PRO AI VERIFIED", { exact: true })).toBeVisible();
     await expect(page.locator(".match-notice")).toHaveCount(0);
     if (story.mode === null) {
@@ -356,7 +357,7 @@ test("an initially unentitled level 20 request falls back honestly and stays loc
     return json(route, 503, { error: "should_not_be_called" });
   });
   await clearStorageOnce(page);
-  await page.goto("/play/match?mode=countUp&opponent=ai&level=20", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?mode=countUp&opponent=ai&level=20");
   await expect(page.getByText("PRO REQUIRED", { exact: true })).toBeVisible();
   await expect(page.locator(".match-tools > span")).toHaveText("AI level 8");
 
@@ -367,7 +368,7 @@ test("an initially unentitled level 20 request falls back honestly and stays loc
   // Once the fallback has completed a visit, that execution level belongs to
   // the active match. A later entitlement must not silently upgrade it on reload.
   upgraded = true;
-  await page.reload({ waitUntil: "networkidle" });
+  await reloadDartio(page);
   await expect(page.getByText("LEVEL 8 CONTINUATION", { exact: true })).toBeVisible();
   await enterPlayerVisit(page);
   await expect(page.locator(".round-totals li").first()).toHaveClass(/active/);
@@ -382,7 +383,7 @@ test("an unavailable initial access check also falls back locally without a paid
     return json(route, 503, { error: "should_not_be_called" });
   });
   await clearStorageOnce(page);
-  await page.goto("/play/match?mode=countUp&opponent=ai&level=20", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?mode=countUp&opponent=ai&level=20");
   await expect(page.getByText("VERIFICATION UNAVAILABLE", { exact: true })).toBeVisible();
   await expect(page.locator(".match-tools > span")).toHaveText("AI level 8");
 
@@ -501,6 +502,6 @@ test("opening X01 correction aborts a held request and rejects its stale result"
 });
 
 test("round practice remains solo when no opponent is requested", async ({ page }) => {
-  await page.goto("/play/match?mode=countUp", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?mode=countUp");
   await expect(page.getByText("The Navigator")).toHaveCount(0);
 });

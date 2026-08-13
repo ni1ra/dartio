@@ -1,3 +1,4 @@
+import { gotoDartio, reloadDartio } from "./navigation";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 const PATH = "T20.D16";
@@ -49,7 +50,7 @@ test("a Pro player builds and completes one exact custom path", async ({ page })
     filed.push(route.request().postDataJSON());
     await json(route, 201, { id: "custom-1" });
   });
-  await page.goto("/practice", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/practice");
   await page.evaluate((key) => window.localStorage.removeItem(key), KEY);
 
   await page.getByRole("button", { name: "Add T20" }).click();
@@ -88,20 +89,20 @@ test("a Pro player builds and completes one exact custom path", async ({ page })
 
 test("a partial path resumes, then undo-to-empty stays discarded after reload", async ({ page }) => {
   await pro(page);
-  await page.goto(`/play/match?custom=${PATH}`, { waitUntil: "networkidle" });
+  await gotoDartio(page, `/play/match?custom=${PATH}`);
   await page.evaluate((key) => window.localStorage.removeItem(key), KEY);
-  await page.reload({ waitUntil: "networkidle" });
+  await reloadDartio(page);
 
   await page.getByRole("radio", { name: "Single" }).click();
   await page.getByRole("button", { name: "Single 1, 1 points" }).click();
   await expect.poll(() => page.evaluate((key) => window.localStorage.getItem(key), KEY)).not.toBeNull();
-  await page.reload({ waitUntil: "networkidle" });
+  await reloadDartio(page);
   await expect(page.locator(".match-notice")).toContainText("Resumed your exact T20 · D16 path");
   await expect(page.locator(".drill-figures")).toContainText("1");
 
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect.poll(() => page.evaluate((key) => window.localStorage.getItem(key), KEY)).toBeNull();
-  await page.reload({ waitUntil: "networkidle" });
+  await reloadDartio(page);
   await expect(page.locator(".match-notice")).toHaveCount(0);
   await expect(page.locator(".drill-target strong")).toHaveText("T20");
   await expect(page.locator(".drill-figures")).toContainText("Darts0");
@@ -110,10 +111,10 @@ test("a partial path resumes, then undo-to-empty stays discarded after reload", 
 test("a Pro hydration pass preserves an unreadable future envelope", async ({ page }) => {
   await pro(page);
   const future = `${JSON.stringify({ storageVersion: 99, opaque: { keep: true } })}\n`;
-  await page.goto("/practice", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/practice");
   await page.evaluate(({ key, value }) => window.localStorage.setItem(key, value), { key: KEY, value: future });
 
-  await page.goto(`/play/match?custom=${PATH}`, { waitUntil: "networkidle" });
+  await gotoDartio(page, `/play/match?custom=${PATH}`);
   await expect(page.getByRole("button", { name: "Treble 20, 60 points" })).toBeEnabled();
   await page.evaluate(() => new Promise<void>((resolve) => {
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
@@ -124,13 +125,13 @@ test("a Pro hydration pass preserves an unreadable future envelope", async ({ pa
 
 test("Free play exposes neither builder controls nor a direct-path scoring bypass", async ({ page }) => {
   await page.route("**/api/access", (route) => json(route, 200, FREE_ACCESS));
-  await page.goto("/practice", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/practice");
   await expect(page.getByText("Custom paths are a Pro tool.")).toBeVisible();
   await expect(page.getByLabel("Target number")).toHaveCount(0);
   const future = `${JSON.stringify({ storageVersion: 99 })}\n`;
   await page.evaluate(({ key, value }) => window.localStorage.setItem(key, value), { key: KEY, value: future });
 
-  await page.goto(`/play/match?custom=${PATH}`, { waitUntil: "networkidle" });
+  await gotoDartio(page, `/play/match?custom=${PATH}`);
   await expect(page.getByRole("heading", { name: "This custom path needs Pro." })).toBeVisible();
   await expect(page.getByRole("button", { name: "Treble 20, 60 points" })).toHaveCount(0);
   await expect.poll(() => page.evaluate((key) => window.localStorage.getItem(key), KEY)).toBe(future);
@@ -138,7 +139,7 @@ test("Free play exposes neither builder controls nor a direct-path scoring bypas
 
 test("an invalid path is refused before a scoring surface renders", async ({ page }) => {
   await page.route("**/api/access", (route) => json(route, 200, FREE_ACCESS));
-  await page.goto("/play/match?custom=T25", { waitUntil: "domcontentloaded" });
+  await gotoDartio(page, "/play/match?custom=T25");
   // App Router can stream the shell with HTTP 200 before the segment throws
   // notFound; the rendered 404 boundary is the stable product contract.
   await expect(page.getByRole("heading", { name: "That dart missed the board." })).toBeVisible();

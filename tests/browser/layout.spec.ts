@@ -1,3 +1,4 @@
+import { gotoDartio } from "./navigation";
 import { expect, test } from "@playwright/test";
 
 /**
@@ -53,7 +54,7 @@ for (const [name, path] of ROUTES) {
       failedRequests.push(`${response.status()} ${url.pathname}`);
     });
 
-    const response = await page.goto(path, { waitUntil: "networkidle" });
+    const response = await gotoDartio(page, path);
     expect(response?.status(), `${name} responded ${response?.status()}`).toBeLessThan(400);
 
     const overflow = await page.evaluate(() => {
@@ -71,19 +72,19 @@ for (const [name, path] of ROUTES) {
 }
 
 test("public product claims match shipped availability", async ({ page }) => {
-  await page.goto("/", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/");
   await expect(
     page.locator(".signal-track > span").first().locator("i", { hasText: "ONLINE ROOMS" }),
   ).toBeVisible();
 
-  await page.goto("/pricing", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/pricing");
   const pro = page.locator(".pro-plan");
   await expect(pro.locator("li", { hasText: "Advanced checkout routes" })).toContainText("AVAILABLE");
   await expect(pro.locator("li", { hasText: "Deep statistics and online rooms" })).toContainText("AVAILABLE");
   await expect(pro.locator("li", { hasText: "Custom practice paths" })).toContainText("AVAILABLE");
   await expect(page.locator(".club-plan")).toContainText("Club management remains under active development.");
 
-  await page.goto("/account", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/account");
   await expect(page.getByText("Online rooms are live with Pro.", { exact: false })).toBeVisible();
   await expect(page.getByText("Online rooms are still being built.", { exact: false })).toHaveCount(0);
 });
@@ -102,7 +103,7 @@ test("public product claims match shipped availability", async ({ page }) => {
  * that has run the hydration.
  */
 test("a signed-out visitor is offered a way into an account from the nav", async ({ page }) => {
-  await page.goto("/", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/");
 
   /*
    * Visible, not merely present. The defect this catches was a link that existed
@@ -126,32 +127,38 @@ test("the desktop bar also offers sign-up", async ({ page }) => {
     (page.viewportSize()?.width ?? 0) <= 1100,
     "sign-up is desktop-only by design",
   );
-  await page.goto("/", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/");
   await expect(page.locator('a[href="/auth/sign-up"]')).toBeVisible();
 });
 
 test("every interactive control on the match page takes visible keyboard focus", async ({ page }) => {
-  await page.goto("/play/match?start=501&level=8&best=5&out=double", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?start=501&level=8&best=5&out=double");
   // A focus ring that is not drawn is the accessibility defect that ships most
   // often, because it is invisible until someone tabs.
-  for (let step = 0; step < 12; step += 1) {
+  let checked = 0;
+  for (let step = 0; step < 24 && checked < 12; step += 1) {
     await page.keyboard.press("Tab");
     const focused = await page.evaluate(() => {
       const element = document.activeElement;
       if (!element || element === document.body) return null;
+      const appRoot = document.querySelector("main")?.parentElement;
+      if (!appRoot?.contains(element)) return { external: true } as const;
       const style = getComputedStyle(element);
       return {
+        external: false as const,
         tag: element.tagName.toLowerCase(),
         outlineWidth: style.outlineWidth,
         outlineStyle: style.outlineStyle,
         boxShadow: style.boxShadow,
       };
     });
-    if (!focused) continue;
+    if (!focused || focused.external) continue;
+    checked += 1;
     const ringed = focused.outlineStyle !== "none" && parseFloat(focused.outlineWidth) > 0;
     const shadowed = focused.boxShadow !== "none";
     expect(ringed || shadowed, `${focused.tag} took focus with no visible ring`).toBe(true);
   }
+  expect(checked, "fewer than 12 Dartio controls entered the tab order").toBe(12);
 });
 
 /**
@@ -165,7 +172,7 @@ test("every interactive control on the match page takes visible keyboard focus",
 test("the match fits the screen, with the dock reachable without scrolling", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "The reservation being tested is the desktop one");
 
-  await page.goto("/play/match?start=501&best=5&opponent=local", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?start=501&best=5&opponent=local");
 
   // A pixel of tolerance: sub-pixel layout rounding puts the dock's edge at
   // 1000.39 in a 1000px viewport, and a third of a pixel is not scrolling. The
