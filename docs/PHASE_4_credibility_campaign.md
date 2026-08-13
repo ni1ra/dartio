@@ -54,7 +54,7 @@ custom practice, multiplayer under bad networks, and measurable release quality.
   delivery, delayed handover, terminal races, and recovery UI under controlled
   latency/loss while preserving the server's visit-level authority. See
   `CYCLE_35_room_resilience.md`.
-- [ ] **Cycle 36 — Accessibility, performance, and operations.** Run a measured
+- [x] **Cycle 36 — Accessibility, performance, and operations.** Run a measured
   audit over all public and scoring surfaces, close actionable WCAG and keyboard
   gaps, set realistic performance budgets, and make production failures
   diagnosable without logging private match, voice, auth, or billing data.
