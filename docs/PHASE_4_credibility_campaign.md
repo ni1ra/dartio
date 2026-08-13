@@ -37,22 +37,23 @@ custom practice, multiplayer under bad networks, and measurable release quality.
   reaches the verified bank payout destination. No PayPal or second bank is
   introduced unless Stripe itself cannot support the primary payout path. See
   `CYCLE_31_revenue_activation.md`.
-- [ ] **Cycle 32 — Voice at every scoring surface.** Reuse the existing
+- [x] **Cycle 32 — Voice at every scoring surface.** Reuse the existing
   confidence/FIFO/lifecycle controller for Cricket, round modes, drills, and
   eligible room play; extend vocabulary without mode leakage; harden the live
   fixture after Cycle 30's observed provider variance. See
   `CYCLE_32_voice_everywhere.md`.
-- [ ] **Cycle 33 — Personalized checkout intelligence.** Feed the existing
+- [x] **Cycle 33 — Personalized checkout intelligence.** Feed the existing
   server-authorized advanced checkout feature only aggregate, consented player
   evidence; prove alternatives and setup routes improve without inventing
   precision when history is sparse. See `CYCLE_33_personalized_checkout.md`.
-- [ ] **Cycle 34 — Custom practice.** Turn the deliberately `coming_soon`
+- [x] **Cycle 34 — Custom practice.** Turn the deliberately `coming_soon`
   custom-practice entitlement into a small, real rules-defined builder with
   versioned resume, replay/statistics truth, and no generic-rule duplication.
   See `CYCLE_34_custom_practice.md`.
 - [ ] **Cycle 35 — Rooms under bad networks.** Exercise reconnect, duplicate
   delivery, delayed handover, terminal races, and recovery UI under controlled
-  latency/loss while preserving the server's visit-level authority.
+  latency/loss while preserving the server's visit-level authority. See
+  `CYCLE_35_room_resilience.md`.
 - [ ] **Cycle 36 — Accessibility, performance, and operations.** Run a measured
   audit over all public and scoring surfaces, close actionable WCAG and keyboard
   gaps, set realistic performance budgets, and make production failures

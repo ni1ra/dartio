@@ -1,6 +1,6 @@
 # Cycle 33 — Personalized Checkout Intelligence
 
-Status: active on `codex/cycle-33-personalized-checkout`.
+Status: closed 2026-08-13 on exact-SHA Production evidence.
 
 Dartio already calculates professional checkout alternatives and setup visits
 behind the server-authorized Pro boundary. This cycle lets a player explicitly
@@ -43,10 +43,10 @@ they aimed at.
   scoping, and session-local reset to the X01 checkout companion.
 - [x] Pass type, lint, unit, build, focused three-viewport browser, visual QA,
   and the full local browser matrix on the stacked branch.
-- [ ] Pass exact-head Preview and CI on the stacked branch.
-- [ ] Rebase or retarget only after Cycle 32 lands without changing the verified
+- [x] Pass exact-head Preview and CI on the stacked branch.
+- [x] Rebase or retarget only after Cycle 32 lands without changing the verified
   tree; merge and repeat the canonical Production verifier/browser ladder.
-- [ ] Archive the cycle and check the Phase 4 item only after exact-SHA
+- [x] Archive the cycle and check the Phase 4 item only after exact-SHA
   Production evidence.
 
 ## Safety and scope
@@ -83,3 +83,14 @@ Planning baseline, 2026-08-13:
 - The final full browser run completed with Playwright status `passed` and no
   failed test ids. Static discovery contains 363 checks; four are the existing
   designed skips, yielding 359 executed passes and four skips.
+
+Release closure, 2026-08-13:
+
+- PR #38 passed exact-head CI run `31653381593` and Vercel Preview, then merged
+  as `a7bcbc87bb2ceb30a7c3038ee75dd72ec8cea758`. Main CI run `31654001803`
+  passed, and Production deployment `dpl_3tJVGWGXgjgqt1WWFhgo4sZpReLc` was
+  READY with that exact SHA and the canonical alias.
+- The later cumulative Cycle 34 Production bundle passed authenticated history,
+  the paid AI boundary, the paid voice boundary, and all 374 runnable checks in
+  the canonical three-viewport browser matrix. The personalized advice stories
+  remained green on that deployed bundle.

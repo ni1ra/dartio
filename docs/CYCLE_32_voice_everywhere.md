@@ -1,6 +1,6 @@
 # Cycle 32 — Voice at Every Scoring Surface
 
-Status: active on `codex/cycle-32-voice-everywhere`.
+Status: closed 2026-08-13 on exact-SHA Production evidence.
 
 Cycle 26 made voice input safe and truthful for local X01. Cycle 32 reuses that
 single confidence, FIFO, capture, and stale-request controller everywhere a dart
@@ -38,10 +38,10 @@ pretend that a spoken visit total is meaningful outside X01.
 - [x] Add deterministic browser stories for every mode family, confidence hold,
   stale revision, access failure, room eligibility, and three viewports.
 - [x] Harden the live synthetic fixture with one recorded bounded retry.
-- [ ] Pass unit, type, lint, build, focused browser, full browser, exact-head
+- [x] Pass unit, type, lint, build, focused browser, full browser, exact-head
   Preview and CI; merge only after Cycle 31's code base is on `main` or rebase the
   stacked branch without changing the verified tree.
-- [ ] Repeat exact-SHA Production auth/history/rooms/AI/voice and the complete
+- [x] Repeat exact-SHA Production auth/history/rooms/AI/voice and the complete
   browser matrix, then archive this cycle and check the Phase 4 item.
 
 ## Safety and scope
@@ -76,3 +76,19 @@ Planning baseline, 2026-08-13:
 - Visual QA inspected Cricket at 390 and 1440 widths and Checkout Lab at 390.
   The shared panel uses the existing component tokens, remains readable without
   horizontal overflow, and compacts inside the desktop side rail.
+
+Release closure, 2026-08-13:
+
+- PR #37 passed exact-head CI run `31651597520` and Vercel Preview, then merged
+  as `d1765d83b6d1d61ef343df257207069cf500f418`. Main CI run `31653114740`
+  passed, and Production deployment `dpl_63FzdHNJASvb65L5AFXzSfGoHFmK` was
+  READY with that exact SHA and the canonical alias.
+- The cumulative Cycle 34 Production bundle retained this voice surface and
+  passed auth, history, room, paid AI, and paid voice gates. The first bounded
+  voice run observed two structurally valid but unexpected provider samples and
+  failed honestly. A subsequent one-sample diagnostic returned the supported
+  “triple twenty” synonym as exact T20, and one final bounded gate passed with a
+  finite non-zero confidence signal. The failed observation remains part of the
+  receipt; it was not replaced by an unbounded retry loop.
+- The full canonical Production browser matrix passed 374 runnable checks at
+  390x844, 834x1112, and 1440x1000, with only the four established layout skips.

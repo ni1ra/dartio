@@ -62,16 +62,17 @@
 - The original sandbox webhook destination returned HTTP 500 to the successful Checkout's invoice events because it targets the old production alias, while Preview owns the Checkout identity/database. Dedicated Preview destination `we_1Tu1pFALEz0P7O2hQVsTftWI` is active at the stable Cycle 2 alias and listens only to `checkout.session.completed` plus the eight current `customer.subscription.*` events. Vercel has a sensitive branch-scoped signing-secret override for `cycle-2-identity-billing-voice`; the global Preview/Production secret was not changed.
 - Preview destination `we_1Tu1pFALEz0P7O2hQVsTftWI` processed two real Portal-cancellation `customer.subscription.updated` events with HTTP 200, zero failures, and 848–1305 ms response time on deployment `dpl_GvToqtNyNJCjzcGrYLDFVfZePqEV`. Neon stored both processed event IDs and exactly one owned Pro/trialing subscription row.
 - Deployment `dpl_G2u7bDCCuSCJMeaciPTkXjdwj6mG` proved explicit cancellation recovery and reprojection: reactivation cleared `cancel_at`; rescheduling stored `cancel_at=2026-07-31T02:42:12Z` while keeping `cancel_at_period_end=false`, status `trialing`, plan `pro`, and one subscription row.
-- GitHub release source: commit `9764652a23d509c117d2c649790b7b1466dc7d09`;
-  CI run [31643931252](https://github.com/ni1ra/dartio/actions/runs/31643931252)
+- GitHub release source: commit `d6a446082c6bd557f9e0ef9ff83565065b0743f9`;
+  CI run [31654855115](https://github.com/ni1ra/dartio/actions/runs/31654855115)
   passed typecheck, lint, unit, build, and the full browser matrix.
-- Current greenfield production deployment: `dpl_HMwfhm7kpoV4HaHyaiUwgEfqabhH`
+- Current greenfield production deployment: `dpl_4GdoSmom4oFCBrYYGHYsx8AfsdBW`
   at `https://dartioopus46.vercel.app`, READY on the exact release SHA with no
   alias error. Auth, strict owner-only history/detail, rooms, paid AI, paid
-  voice, and the complete 329-run/4-skip browser matrix passed there on
-  2026-08-12. The first voice sample missed the strict command and one bounded
-  rerun passed; the first browser run met one transient network error and its
-  bounded full rerun was clean.
+  voice, and the complete 374-run/4-skip browser matrix passed there on
+  2026-08-13. One bounded voice gate observed two structurally valid unexpected
+  samples and failed honestly; a later diagnostic returned the supported
+  “triple twenty” synonym as exact T20, and the final bounded gate passed. No
+  unbounded retry erased the first observation.
 - Current Cycle 2 Auth/webhook preview deployment: `dpl_FfHXJZ9ZJJk7mWoDGiqieGx6LWCq` at `https://dartio-boreq0qif-niras-projects-868b6f5f.vercel.app`. It was redeployed on 2026-08-11 after Preview database-password rotation made its immutable predecessor stale; the stable branch alias retained its branch-scoped Stripe signing secret, picked up the current Preview `DATABASE_URL`, and then returned HTTP 200 for two signed sandbox subscription deliveries. Entitled X01 continuity/access-authority head `e3a80a4` passed GitHub verification run `29554449332`. Prior code Preview `dpl_AwDwqrqPYR8ufLdJUV5m91dQJLff` remains the rollback target for the Cycle 2 code.
 - Preview has a branch-scoped `NEXT_PUBLIC_APP_URL` override for `cycle-2-identity-billing-voice`, targeting its stable Vercel alias. The global Preview and Production values were not changed.
 - Paid features are authorized server-side only. `voice_always_on` gates `POST /api/voice/transcribe` before body parsing; `advanced_ai` gates one physical sample from `POST /api/ai/throw` for each level-9–20 dart while 1–8 stay local; `advanced_checkout` gates `POST /api/checkout/advice` for alternates, setup plans, and preference ranking while Free computes one route locally. All three read the server's own access snapshot and accept no client plan, access, or seed claim. The AI throw request is exactly `{ level, target }`: tactics and every mode rule remain in the client.
@@ -102,6 +103,12 @@
   distributes a typed total across invented beds.
 - Rooms are live as of 2026-07-30 and `rooms`/`room_members` finally have a writer. The server is authoritative over three things and no more: membership (only a member writes, and only into their own seat), ordering (the turn number is assigned server-side, never sent), and mutual exclusion. The visit claim, turn insert, and dart inserts are one data-modifying Postgres CTE: `state_version = expected` either claims one complete visit or changes nothing, so two devices cannot file the same turn and an insert failure cannot strand a version without its turn. It is not a referee — checking a visit's legality needs the mode's rules, and X01's rotating leg starter means even "whose turn is it" is unanswerable without them. `/friends` claims exactly this much.
 - A room match is played by rebuilding the log from the server's own visits: `x01LogFromTurns` is the exact inverse of `x01MatchRecord`, and `room-log.test.ts` asserts the round trip rather than assuming it. Join, reload, and catching up on an opponent's throw are therefore one code path. Visits are filed when finished, never dart by dart — a whole visit is the unit two clients can collide on.
+- Room clients preserve that visit boundary under response loss as of Cycle 35.
+  Ordinary reads do not overlap; explicit recovery supersedes them by generation;
+  four failures pause polling and scoring; and versions cannot move backwards or
+  revive pre-handover/pre-close controls. A finished local visit stays held until
+  one authoritative read proves it accepted, unchanged/retryable, superseded, or
+  terminal. Retrying is always explicit and only against the original version.
 - **`matches.state_version` is also the turn number.** Every accepted visit increments it and takes its value in the same statement that inserts that visit, so nothing that does not append a visit may increment it. Close, completion, join, spectator admission, and handover serialize through the room/match rows and recheck an open status; terminal state is monotonic. Completion is idempotent because both clients replay the same log, see the same finish, and both report it.
 - A room match must never run the local match's completion path. That files a whole `MatchRecord` as a new `matches` row, and the room already is that row; running both would put one game into history twice and into the statistics computed from it.
 - A room lives 12 hours, its code avoids O/0 and I/1, and an expired room answers identically to a code that never existed. Opening, joining, and watching a room all require the `online_multiplayer` entitlement; Free carries zero online seats and a gallery chair is an online seat. `PRODUCT_AVAILABILITY.onlineMultiplayer` reads `implemented` as of Cycle 24 — create, join, play, reconnect, spectate, handover, and close are all live, and `/friends` carries zero "Planned" chips, asserted by the browser suite.
@@ -145,7 +152,14 @@
 - `pnpm test`
 - `pnpm build`
 - `pnpm test:browser:install` (once per machine)
-- `pnpm test:browser` — 333 checks across 390×844, 834×1112, and 1440×1000; 329 run and 4 skip by design, those being the sign-up assertion at the two widths where sign-up is deliberately absent and the screenspace assertion at the two widths whose reservation it does not describe. Measured unpiped from a fresh build of the local Cycle 30 candidate on 2026-08-12: every runnable check completed successfully, exit 0 in 287.7 seconds; the focused product-truth/account surface passed 6/6. The exact merge repeated the complete 329-run/4-skip matrix against Production after one bounded infrastructure retry. Set `DARTIO_BASE_URL` to run them against a preview or production deployment instead of a local build
+- `pnpm test:browser` — the Cycle 34 release has 378 checks across 390×844,
+  834×1112, and 1440×1000; 374 run and 4 skip by design, those being the sign-up
+  assertion at the two widths where sign-up is deliberately absent and the
+  screenspace assertion at the two widths whose reservation it does not describe.
+  The exact merge repeated all 374 runnable checks against Production. Cycle 35
+  adds 25 room-loss and authority checks, taking its candidate to 399 collected.
+  Set
+  `DARTIO_BASE_URL` to run against Preview or Production instead of a local build.
 - `pnpm db:generate` — writes the migration; it does not apply it
 - `DATABASE_URL=<branch-uri> pnpm exec drizzle-kit migrate` — applies pending migrations to one branch and reconciles the journal. Preview first, then main. The URI is passed only through a credential-safe in-memory wrapper, never as a positional argument or printed shell assignment. The repo has no `db:migrate` script because the URL is never the one in `.env.local` for production work
 
@@ -221,12 +235,12 @@ changed deliberately and one at a time, and each is recorded above.
 - The regulation dartboard and three-viewport production visual proof passed; future board changes must rerun the same physical T20 and boundary suite.
 - Cycle 2 preview repeated the dartboard gate at exact 1440×1000, 834×1112, and 390×844 viewports: 3/3 independent contexts passed square/in-bounds geometry, 80 beds, 20 labels, zero horizontal overflow, and physical T20 → 60 / 441. Full-page tablet/mobile visual inspection also passed. Ultrawide review found and corrected a shell-centering cascade defect outside the board renderer; the corrected preview measured a centered 1472 px stage at `x=544` on a 2560 px viewport, retained a 600×600 board, and passed the full three-width matrix again with zero retries.
 - Figma library implementation is externally blocked by the current one-mode/View-seat limitation.
-- Phase 3 is closed. The active remainder is Phase 4: Live Stripe activation and
-  payout proof, voice UI/vocabulary outside X01, personalized checkout evidence,
-  custom practice, room behaviour under degraded networks, and final
-  accessibility/performance/operational hardening. Additional modes,
-  server-backed friend rooms, continuous X01 voice, replay, deep statistics,
-  resilience, and the full Sandbox Checkout/Portal/webhook lifecycle are already
-  implemented.
+- Phase 3 is closed. The active remainder is Phase 4: terminal Live Stripe bank
+  payout proof, room behaviour under degraded networks, and final
+  accessibility/performance/operational hardening plus credibility closure.
+  Cross-mode voice, personalized checkout evidence, custom practice, additional
+  modes, server-backed friend rooms, continuous X01 voice, replay, deep
+  statistics, resilience, and the full Sandbox Checkout/Portal/webhook lifecycle
+  are already implemented.
 - Checkout success and Portal return URLs must target the implemented `/account` hub. The nonexistent `/account/billing` target was removed on 2026-07-17 and is covered by the billing policy test.
 - Stripe Customer Portal opened for the authenticated QA identity and returned to `/account` without a route error. Before the branch-scoped origin override, that return resolved to the old main alias and lost the new authenticated account surface. Deployment `dpl_8q1KD49P1Se5YxKFrSxrpGFwFAZL` proved the corrected same-origin path returns to the stable Preview alias with verified identity and active session preserved.

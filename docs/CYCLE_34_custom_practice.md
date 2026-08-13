@@ -1,6 +1,6 @@
 # Cycle 34 — Custom Practice
 
-Status: active on `codex/cycle-34-custom-practice`.
+Status: closed 2026-08-13 on exact-SHA Production evidence.
 
 Dartio already has nine deliberately fixed games and drills. This cycle turns
 the separate custom-practice entitlement into one small, understandable Pro
@@ -48,7 +48,7 @@ language or make the fixed drills configurable shadows of themselves.
 - [x] Pass focused unit/type/lint/browser gates and mobile/desktop visual QA.
 - [x] Pass the final full local unit/build/browser matrix, rebase over merged
   Cycle 33, then repeat TypeScript and the focused contract suite.
-- [ ] Pass exact-head Preview and CI, merge, repeat the canonical Production
+- [x] Pass exact-head Preview and CI, merge, repeat the canonical Production
   verifier/browser ladder, and archive the cycle.
 
 ## Safety and scope
@@ -88,3 +88,19 @@ Local candidate, 2026-08-13:
   established layout skips. `test-results/.last-run.json` recorded `passed`
   with no failed test ids. After the rebase, TypeScript and the same 7-file,
   127-test focused contract suite both passed again.
+
+Release closure, 2026-08-13:
+
+- PR #39 passed exact-head CI run `31654115432` and Vercel Preview, then merged
+  as `d6a446082c6bd557f9e0ef9ff83565065b0743f9`. Main CI run `31654855115`
+  passed. Production deployment `dpl_4GdoSmom4oFCBrYYGHYsx8AfsdBW` was READY,
+  targeted Production, carried that exact SHA on `main`, and owned the canonical
+  Dartio aliases without an alias error.
+- The exact deployed bundle passed Production auth, a synthetic owned-history
+  write/read/detail/statistics round trip, every anonymous room refusal plus a
+  paid room open, all five level-20 AI target families, and the paid synthetic
+  voice boundary. The first bounded voice run's provider variance is retained in
+  the Cycle 32 receipt alongside the later pass.
+- The unpiped canonical Production browser run collected 378 checks and passed
+  all 374 runnable checks at 390x844, 834x1112, and 1440x1000; the remaining four
+  were the established intentional layout skips.
