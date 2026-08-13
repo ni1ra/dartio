@@ -84,6 +84,27 @@ Cycle 36 release receipt, 2026-08-13:
   Pro capability, promotion-code support, hosted-Stripe assurance, and the
   disabled/no-charge Club boundary at 390x844, 834x1112, and 1440x1000.
 
+Live-cutover release preparation, 2026-08-13:
+
+- PR #43 made a Sandbox customer reference self-heal when the active Live
+  account reports the exact resource as missing. It merged as
+  `0516826a6683462df67c7663e47a619f514ebabd`.
+- PR #44 removed the stale local Sandbox-subscription projection from the
+  pre-Checkout authority check; only subscriptions returned by the active
+  Stripe mode can block a new Checkout. It merged as
+  `70723231d4a6cbfc74291217e69e5809c6558637`. Main CI run
+  `31670699278` passed typecheck, lint, 1,037 unit tests plus one designed live-
+  database skip, build, and the complete browser job. Production deployment
+  `dpl_HfwydzpZTvtn2sQTAHfrVczV1jGf` is READY on that exact SHA with no alias
+  error. It remains Sandbox-backed until the provider-authenticated Live key and
+  `STRIPE_MODE=live` are installed together and a fresh deployment proves them.
+- This Cycle 37 branch's exact head
+  `eebbc47e97fc941f1f7e920106e46b453e0f6d6e` passed CI run `31670824431`
+  including its browser job. Exact-head Preview deployment
+  `dpl_4EvzZKLxg7ewLJ71UFuqUv67ZUA3` is READY, and the public-claim story passed
+  3/3 there. PR #42 deliberately remains draft and open until the bank payout is
+  terminal.
+
 Cycle 31's terminal Live payment/payout receipt remains the phase gate. This
 cycle stays active and the Phase 4 archive remains unclaimed until that bank
 receipt is terminal.

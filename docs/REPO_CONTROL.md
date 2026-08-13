@@ -72,17 +72,19 @@
 - The original sandbox webhook destination returned HTTP 500 to the successful Checkout's invoice events because it targets the old production alias, while Preview owns the Checkout identity/database. Dedicated Preview destination `we_1Tu1pFALEz0P7O2hQVsTftWI` is active at the stable Cycle 2 alias and listens only to `checkout.session.completed` plus the eight current `customer.subscription.*` events. Vercel has a sensitive branch-scoped signing-secret override for `cycle-2-identity-billing-voice`; the global Preview/Production secret was not changed.
 - Preview destination `we_1Tu1pFALEz0P7O2hQVsTftWI` processed two real Portal-cancellation `customer.subscription.updated` events with HTTP 200, zero failures, and 848–1305 ms response time on deployment `dpl_GvToqtNyNJCjzcGrYLDFVfZePqEV`. Neon stored both processed event IDs and exactly one owned Pro/trialing subscription row.
 - Deployment `dpl_G2u7bDCCuSCJMeaciPTkXjdwj6mG` proved explicit cancellation recovery and reprojection: reactivation cleared `cancel_at`; rescheduling stored `cancel_at=2026-07-31T02:42:12Z` while keeping `cancel_at_period_end=false`, status `trialing`, plan `pro`, and one subscription row.
-- GitHub release source: commit `e52c1f8671b728c04ed8cd556ce8bc661bf73118`;
-  CI run [31668637443](https://github.com/ni1ra/dartio/actions/runs/31668637443)
+- GitHub release source: commit `70723231d4a6cbfc74291217e69e5809c6558637`;
+  CI run [31670699278](https://github.com/ni1ra/dartio/actions/runs/31670699278)
   passed typecheck, lint, unit, build, and the full browser matrix.
-- Current greenfield production deployment: `dpl_2C7EGdcNAEAD87SZo7Q1sWyAFmWx`
+- Current greenfield production deployment: `dpl_HfwydzpZTvtn2sQTAHfrVczV1jGf`
   at `https://dartioopus46.vercel.app`, READY on the exact release SHA with no
-  alias error. Auth, strict owner-only history/detail, rooms, paid AI, paid
-  voice, and the complete 455-run/4-skip browser matrix passed there on
-  2026-08-13. The aggregate room-integrity audit also returned zero owner,
-  version/turn, terminal-field, and orphan-signature anomalies without printing
-  identifiers or changing the database. A bounded runtime audit found no error
-  clusters and no private application fields in sampled request logs.
+  alias error. This release adds mode-scoped Stripe-customer recovery and makes
+  the active Stripe data plane authoritative over duplicate-subscription checks;
+  its environment remains intentionally Sandbox-backed until the Live key's
+  provider 2FA completes. The preceding `e52c1f` Production candidate passed
+  auth, strict owner-only history/detail, rooms, room integrity, paid AI, paid
+  voice, the complete 455-run/4-skip browser matrix, and bounded runtime-log
+  inspection on 2026-08-13. Cycle 37 repeats those gates after the Live cutover
+  instead of transferring that evidence to the new environment snapshot.
 - Current Cycle 2 Auth/webhook preview deployment: `dpl_FfHXJZ9ZJJk7mWoDGiqieGx6LWCq` at `https://dartio-boreq0qif-niras-projects-868b6f5f.vercel.app`. It was redeployed on 2026-08-11 after Preview database-password rotation made its immutable predecessor stale; the stable branch alias retained its branch-scoped Stripe signing secret, picked up the current Preview `DATABASE_URL`, and then returned HTTP 200 for two signed sandbox subscription deliveries. Entitled X01 continuity/access-authority head `e3a80a4` passed GitHub verification run `29554449332`. Prior code Preview `dpl_AwDwqrqPYR8ufLdJUV5m91dQJLff` remains the rollback target for the Cycle 2 code.
 - Preview has a branch-scoped `NEXT_PUBLIC_APP_URL` override for `cycle-2-identity-billing-voice`, targeting its stable Vercel alias. The global Preview and Production values were not changed.
 - Paid features are authorized server-side only. `voice_always_on` gates `POST /api/voice/transcribe` before body parsing; `advanced_ai` gates one physical sample from `POST /api/ai/throw` for each level-9–20 dart while 1–8 stay local; `advanced_checkout` gates `POST /api/checkout/advice` for alternates, setup plans, and preference ranking while Free computes one route locally. All three read the server's own access snapshot and accept no client plan, access, or seed claim. The AI throw request is exactly `{ level, target }`: tactics and every mode rule remain in the client.
