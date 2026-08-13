@@ -62,6 +62,9 @@ export function X01Match() {
   const [inputMode,setInputMode]=useState<"board"|"score"|"darts">("board"), [correction,setCorrection]=useState(false), [message,setMessage]=useState("Your throw · 3 darts");
   const [aiRecovery,setAiRecovery]=useState<AiRecovery|null>(null);
   const [aiLevelsUsed,setAiLevelsUsed]=useState<readonly number[]>([]);
+  // Consent is intentionally match-local. History is never read merely because
+  // the account is Pro, and a reload returns this choice to off.
+  const [personalizeCheckout,setPersonalizeCheckout]=useState(false);
   const retryGeneration=useRef(0);
   const level=aiAccess.level;
   const manualInputDisabled=game.status==="complete"||(isAi&&game.currentPlayer!==0)||aiAccess.accessChecking;
@@ -81,7 +84,10 @@ export function X01Match() {
   // server-authorized advanced advice replaces it in place when it arrives.
   const basicCheckout=useMemo(()=>basicCheckoutAdvice(checkoutScore,dartsInHand,outRule),[checkoutScore,dartsInHand,outRule]);
   const advancedEntitled=productAccess.status==="ready"&&isProductAvailable(productAccess.snapshot,"advancedCheckout")&&hasAccessEntitlement(productAccess.snapshot,"advanced_checkout");
-  const advancedCheckout=useAdvancedCheckout(game.status==="playing"?{score:checkoutScore,dartsAvailable:dartsInHand,outRule}:null,advancedEntitled);
+  // Stored history belongs to seat zero. Local opponents and the Navigator get
+  // standard Pro routes even while the owner has personalization enabled.
+  const personalizationAvailable=advancedEntitled&&game.currentPlayer===0;
+  const advancedCheckout=useAdvancedCheckout(game.status==="playing"?{score:checkoutScore,dartsAvailable:dartsInHand,outRule}:null,advancedEntitled,personalizationAvailable&&personalizeCheckout);
   const checkout=advancedCheckout.advice??basicCheckout;
   const checkoutTier=advancedCheckout.advice?"advanced":"basic";
   const stats=useMemo(()=>game.players.map(player=>x01PlayerStats(game,player.id)),[game]);
@@ -179,7 +185,7 @@ export function X01Match() {
     <div className="match-grid">
       <section className="board-zone"><Dartboard darts={darts} disabled={manualInputDisabled} onDart={addDart} /></section>
       <aside className="match-side">
-        <CheckoutCompanion advice={checkout} playerName={game.players[game.currentPlayer]?.name??`Player ${game.currentPlayer+1}`} interactive={!isAi||game.currentPlayer===0} tier={checkoutTier} upgrading={advancedCheckout.pending} />
+        <CheckoutCompanion advice={checkout} playerName={game.players[game.currentPlayer]?.name??`Player ${game.currentPlayer+1}`} interactive={!isAi||game.currentPlayer===0} tier={checkoutTier} upgrading={advancedCheckout.pending} personalizationAvailable={personalizationAvailable} personalizationEnabled={personalizeCheckout} personalization={advancedCheckout.personalization} onPersonalizationChange={setPersonalizeCheckout} />
         <VisitEntry darts={darts} disabled={manualInputDisabled} mode={inputMode} onModeChange={setInputMode} onDart={addDart} onAggregate={submitAggregate} />
         <VoiceControl revision={log.events.length} disabled={manualInputDisabled||correction} onDart={(segment,multiplier)=>addDart(dart(segment as Dart["segment"],multiplier))} onTurnScore={submitVoiceAggregate} onUndo={undo} onNextPlayer={refuseSyntheticEnd} />
       </aside>

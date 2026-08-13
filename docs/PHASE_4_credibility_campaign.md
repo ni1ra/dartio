@@ -45,7 +45,7 @@ custom practice, multiplayer under bad networks, and measurable release quality.
 - [ ] **Cycle 33 — Personalized checkout intelligence.** Feed the existing
   server-authorized advanced checkout feature only aggregate, consented player
   evidence; prove alternatives and setup routes improve without inventing
-  precision when history is sparse.
+  precision when history is sparse. See `CYCLE_33_personalized_checkout.md`.
 - [ ] **Cycle 34 — Custom practice.** Turn the deliberately `coming_soon`
   custom-practice entitlement into a small, real rules-defined builder with
   versioned resume, replay/statistics truth, and no generic-rule duplication.

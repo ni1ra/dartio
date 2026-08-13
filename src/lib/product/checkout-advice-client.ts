@@ -1,5 +1,6 @@
 import { z } from "zod";
-import type { CheckoutAdvice, CheckoutPreferences, OutRule } from "@/domain";
+import type { CheckoutAdvice, OutRule } from "@/domain";
+import type { CheckoutPersonalizationReceipt } from "./checkout-personalization";
 
 const legalSegments = new Set([0, 25, ...Array.from({ length: 20 }, (_, index) => index + 1)]);
 
@@ -54,7 +55,25 @@ const adviceSchema = z.object({
   setupPlan: planSchema.nullable(),
 }).strict();
 
-const successSchema = z.object({ advice: adviceSchema }).strict();
+const personalizationSchema = z.object({
+  status: z.enum(["off", "sparse", "applied", "unavailable"]),
+  x01Matches: z.number().int().min(0).max(50),
+  exactDarts: z.number().int().min(0).max(300_000),
+  finishingDoubles: z.number().int().min(0).max(100_000),
+}).strict().superRefine((value, context) => {
+  if (value.finishingDoubles > value.exactDarts) {
+    context.addIssue({ code: "custom", message: "Finishes cannot exceed exact darts" });
+  }
+  if ((value.status === "off" || value.status === "unavailable")
+    && (value.x01Matches !== 0 || value.exactDarts !== 0 || value.finishingDoubles !== 0)) {
+    context.addIssue({ code: "custom", message: "No-read status cannot carry history evidence" });
+  }
+  if (value.status === "applied" && value.x01Matches === 0) {
+    context.addIssue({ code: "custom", message: "Applied personalization needs X01 evidence" });
+  }
+});
+
+const successSchema = z.object({ advice: adviceSchema, personalization: personalizationSchema }).strict();
 const errorSchema = z.object({
   error: z.enum([
     "invalid_checkout_request", "authentication_required", "advanced_checkout_required",
@@ -66,7 +85,13 @@ export interface AdvancedCheckoutRequest {
   readonly score: number;
   readonly dartsAvailable: 1 | 2 | 3;
   readonly outRule: OutRule;
-  readonly preferences?: CheckoutPreferences;
+  /** Explicit per-match consent. The browser never sends derived bed preferences. */
+  readonly personalize: boolean;
+}
+
+export interface AdvancedCheckoutResult {
+  readonly advice: CheckoutAdvice;
+  readonly personalization: CheckoutPersonalizationReceipt;
 }
 
 export type CheckoutAdviceClientErrorCode =
@@ -88,9 +113,8 @@ export class CheckoutAdviceClientError extends Error {
 export async function requestAdvancedCheckoutAdvice(
   input: AdvancedCheckoutRequest,
   options: { readonly signal?: AbortSignal; readonly fetcher?: typeof fetch } = {},
-): Promise<CheckoutAdvice> {
+): Promise<AdvancedCheckoutResult> {
   const fetcher = options.fetcher ?? fetch;
-  const preferences = input.preferences ?? {};
   let response: Response;
   try {
     response = await fetcher("/api/checkout/advice", {
@@ -101,9 +125,7 @@ export async function requestAdvancedCheckoutAdvice(
         score: input.score,
         dartsAvailable: input.dartsAvailable,
         outRule: input.outRule,
-        ...(preferences.preferredDoubles?.length ? { preferredDoubles: preferences.preferredDoubles } : {}),
-        ...(preferences.preferredTrebles?.length ? { preferredTrebles: preferences.preferredTrebles } : {}),
-        ...(preferences.avoidBull ? { avoidBull: true } : {}),
+        personalize: input.personalize,
       }),
       signal: options.signal,
     });
@@ -119,7 +141,13 @@ export async function requestAdvancedCheckoutAdvice(
   }
   const parsed = successSchema.safeParse(payload);
   if (!parsed.success) throw new CheckoutAdviceClientError("invalid_response", response.status);
+  if (parsed.data.advice.score !== input.score || parsed.data.advice.dartsAvailable !== input.dartsAvailable) {
+    throw new CheckoutAdviceClientError("invalid_response", response.status);
+  }
   // The schema mirrors CheckoutAdvice field-for-field; the cast only restores
   // the domain's narrower segment/multiplier literal types.
-  return parsed.data.advice as CheckoutAdvice;
+  return {
+    advice: parsed.data.advice as CheckoutAdvice,
+    personalization: parsed.data.personalization,
+  };
 }

@@ -38,7 +38,7 @@ describe("generateAuthorizedCheckoutAdvice", () => {
       .toThrow(new CheckoutAdviceAccessError(403, "advanced_checkout_required"));
   });
 
-  it("carries the caller's preferences into the plan", () => {
+  it("carries server-derived preferences into the plan", () => {
     const advice = generateAuthorizedCheckoutAdvice(
       { ...input, score: 40, preferences: { preferredDoubles: [10] } },
       paid(),

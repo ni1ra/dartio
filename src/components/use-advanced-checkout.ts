@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { CheckoutAdvice, CheckoutPreferences, OutRule } from "@/domain";
+import type { CheckoutAdvice, OutRule } from "@/domain";
 import { requestAdvancedCheckoutAdvice } from "@/lib/product/checkout-advice-client";
+import type { CheckoutPersonalizationReceipt } from "@/lib/product/checkout-personalization";
 
 export interface AdvancedCheckoutPosition {
   readonly score: number;
@@ -13,16 +14,16 @@ export interface AdvancedCheckoutPosition {
 export interface AdvancedCheckoutState {
   /** Server-authorized advice for the current position, or null when unavailable. */
   readonly advice: CheckoutAdvice | null;
+  /** Aggregate server receipt for the consent decision used by this advice. */
+  readonly personalization: CheckoutPersonalizationReceipt | null;
   /** True while this position's request is in flight. */
   readonly pending: boolean;
 }
 
-function positionKey(position: AdvancedCheckoutPosition, preferences: CheckoutPreferences): string {
+function positionKey(position: AdvancedCheckoutPosition, personalize: boolean): string {
   return [
     position.score, position.dartsAvailable, position.outRule,
-    (preferences.preferredDoubles ?? []).join(","),
-    (preferences.preferredTrebles ?? []).join(","),
-    preferences.avoidBull ? "no-bull" : "",
+    personalize ? "history-on" : "history-off",
   ].join("|");
 }
 
@@ -39,30 +40,38 @@ function positionKey(position: AdvancedCheckoutPosition, preferences: CheckoutPr
 export function useAdvancedCheckout(
   position: AdvancedCheckoutPosition | null,
   enabled: boolean,
-  preferences: CheckoutPreferences = {},
+  personalize: boolean,
 ): AdvancedCheckoutState {
-  const [settled, setSettled] = useState<{ key: string; advice: CheckoutAdvice | null } | null>(null);
-  const key = position ? positionKey(position, preferences) : null;
+  const [settled, setSettled] = useState<{
+    key: string;
+    advice: CheckoutAdvice | null;
+    personalization: CheckoutPersonalizationReceipt | null;
+  } | null>(null);
+  const key = position ? positionKey(position, personalize) : null;
   const active = enabled && position !== null && key !== null;
 
   useEffect(() => {
     if (!active || !position || !key) return;
     const request = new AbortController();
     void requestAdvancedCheckoutAdvice(
-      { score: position.score, dartsAvailable: position.dartsAvailable, outRule: position.outRule, preferences },
+      { score: position.score, dartsAvailable: position.dartsAvailable, outRule: position.outRule, personalize },
       { signal: request.signal },
     )
-      .then((advice) => { if (!request.signal.aborted) setSettled({ key, advice }); })
+      .then((result) => { if (!request.signal.aborted) setSettled({ key, ...result }); })
       // A denial or outage is not an error the player needs to see: the basic
       // route is already on screen and remains correct. Recording the miss
       // against the key stops it looking like a request still in flight.
-      .catch(() => { if (!request.signal.aborted) setSettled({ key, advice: null }); });
+      .catch(() => { if (!request.signal.aborted) setSettled({ key, advice: null, personalization: null }); });
     return () => request.abort();
-    // `position` and `preferences` are compared by value through `key`;
-    // depending on the objects themselves would refire on every render.
+    // `position` and consent are compared by value through `key`; depending on
+    // the position object itself would refire on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, key]);
 
   const current = settled && settled.key === key ? settled : null;
-  return { advice: current?.advice ?? null, pending: active && current === null };
+  return {
+    advice: current?.advice ?? null,
+    personalization: current?.personalization ?? null,
+    pending: active && current === null,
+  };
 }
