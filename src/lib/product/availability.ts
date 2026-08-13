@@ -11,7 +11,9 @@ export const PRODUCT_AVAILABILITY = {
   // close are all live and production-verified. Held deliberately from Cycle 15
   // until the whole /friends promise was true rather than half of it.
   onlineMultiplayer: "implemented",
-  customPractice: "coming_soon",
+  // A small user-defined bed sequence is live; this does not imply a generic
+  // drill language or Club-authored programmes.
+  customPractice: "implemented",
   clubManagement: "coming_soon",
 } as const;
 

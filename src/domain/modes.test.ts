@@ -9,6 +9,8 @@ describe("stored mode names", () => {
     expect(modeName("checkoutLab")).toBe("Checkout Lab");
     expect(modeName("doublesMatrix")).toBe("Doubles Matrix");
     expect(modeName("scoringSprint")).toBe("Scoring Sprint");
+    expect(GAME_MODES.customPractice).toMatchObject({ name: "Custom Practice", status: "playable" });
+    expect(modeName("customPractice")).toBe("Custom Practice");
   });
 
   it("keeps a future stored id readable", () => {

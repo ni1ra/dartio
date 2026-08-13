@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { CricketMatch } from "@/components/cricket-match";
+import { CustomPracticeMatch } from "@/components/custom-practice-match";
 import { DrillMatch } from "@/components/drill-match";
-import { DRILLS, type DrillId } from "@/domain";
+import { DRILLS, encodeCustomPracticePath, parseCustomPracticePath, type DrillId } from "@/domain";
 import { RoomMatch } from "@/components/room-match";
 import { RoundMatch } from "@/components/round-match";
 import { ROUND_MODES, type RoundModeId } from "@/domain";
@@ -20,6 +22,13 @@ export default async function MatchPage({ searchParams }: { searchParams: Promis
   // the query: the room is the record, not the link that reached it.
   const room = params.room;
   if (typeof room === "string" && /^[A-Za-z0-9]{6}$/.test(room)) return <RoomMatch code={room.toUpperCase()} />;
+  const custom = params.custom;
+  if (custom !== undefined) {
+    if (typeof custom !== "string") notFound();
+    const targets = parseCustomPracticePath(custom);
+    if (!targets) notFound();
+    return <CustomPracticeMatch key={encodeCustomPracticePath(targets)} targets={targets} />;
+  }
   const drill = params.drill;
   if (typeof drill === "string" && drill in DRILLS) return <DrillMatch drill={drill as DrillId} />;
   const mode = params.mode;

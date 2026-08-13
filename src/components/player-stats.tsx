@@ -242,7 +242,7 @@ function doubleName(segment: number): string {
 
 /** History stores games and drills together, but only games should be called matches. */
 function replayKind(mode: string): "match" | "practice session" {
-  return Object.prototype.hasOwnProperty.call(DRILLS, mode) ? "practice session" : "match";
+  return Object.prototype.hasOwnProperty.call(DRILLS, mode) || mode === "customPractice" ? "practice session" : "match";
 }
 
 function formatDate(value: string): string {

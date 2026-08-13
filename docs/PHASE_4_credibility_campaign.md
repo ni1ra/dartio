@@ -49,6 +49,7 @@ custom practice, multiplayer under bad networks, and measurable release quality.
 - [ ] **Cycle 34 — Custom practice.** Turn the deliberately `coming_soon`
   custom-practice entitlement into a small, real rules-defined builder with
   versioned resume, replay/statistics truth, and no generic-rule duplication.
+  See `CYCLE_34_custom_practice.md`.
 - [ ] **Cycle 35 — Rooms under bad networks.** Exercise reconnect, duplicate
   delivery, delayed handover, terminal races, and recovery UI under controlled
   latency/loss while preserving the server's visit-level authority.

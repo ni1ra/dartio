@@ -80,7 +80,7 @@ test("public product claims match shipped availability", async ({ page }) => {
   const pro = page.locator(".pro-plan");
   await expect(pro.locator("li", { hasText: "Advanced checkout routes" })).toContainText("AVAILABLE");
   await expect(pro.locator("li", { hasText: "Deep statistics and online rooms" })).toContainText("AVAILABLE");
-  await expect(pro.locator("li", { hasText: "Custom practice paths" })).toContainText("COMING SOON");
+  await expect(pro.locator("li", { hasText: "Custom practice paths" })).toContainText("AVAILABLE");
   await expect(page.locator(".club-plan")).toContainText("Club management remains under active development.");
 
   await page.goto("/account", { waitUntil: "networkidle" });

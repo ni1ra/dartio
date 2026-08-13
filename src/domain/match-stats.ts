@@ -116,7 +116,7 @@ export interface CareerStats {
   /** Every completed session, including winnerless non-drill records. */
   readonly matchesPlayed: number;
   readonly competitiveMatches: number;
-  /** Sessions whose stored mode is one of Dartio's three known drills. */
+  /** Sessions whose stored mode is a fixed drill or custom-practice path. */
   readonly practiceSessions: number;
   readonly matchesWon: number;
   /** Wins divided by won + lost only; practice can never lower it. */
@@ -150,13 +150,17 @@ function isDrillMode(mode: string): mode is DrillId {
   return (DRILL_ORDER as readonly string[]).includes(mode);
 }
 
+function isPracticeMode(mode: string): boolean {
+  return isDrillMode(mode) || mode === "customPractice";
+}
+
 /**
  * Mode is authoritative for drills. The generic record boundary can carry a
  * winner on any shape-valid mode, but that cannot turn a practice ledger into a
  * competitive result.
  */
 function effectiveResult(match: StatMatch): MatchResult {
-  return isDrillMode(match.mode) ? "unscored" : match.result;
+  return isPracticeMode(match.mode) ? "unscored" : match.result;
 }
 
 /**
@@ -212,7 +216,7 @@ export function careerStats(matches: readonly StatMatch[]): CareerStats {
     if (isCompetitive(result)) competitiveMatches += 1;
     // A winnerless non-drill may be an abandoned match filed through the public
     // record boundary. It remains an unscored session, but it is not practice.
-    if (isDrillMode(match.mode)) practiceSessions += 1;
+    if (isPracticeMode(match.mode)) practiceSessions += 1;
     visits += match.turns.length;
     dartsThrown += matchDarts;
   }

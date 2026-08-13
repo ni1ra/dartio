@@ -352,11 +352,22 @@ const statsSchema = z.object({
   }
 
   const drillSessions = stats.deep.drills.reduce((total, drill) => total + drill.sessions, 0);
-  if (drillSessions !== stats.practiceSessions) {
+  const customPractice = stats.deep.modes.find(({ mode }) => mode === "customPractice");
+  const customSessions = customPractice?.played ?? 0;
+  if (drillSessions + customSessions !== stats.practiceSessions) {
     context.addIssue({
       code: "custom",
       path: ["deep", "drills"],
-      message: "Practice sessions must equal the three known drill totals",
+      message: "Practice sessions must equal fixed drills plus custom paths",
+    });
+  }
+  if (customPractice && (customPractice.won !== 0
+    || customPractice.lost !== 0
+    || customPractice.unscored !== customPractice.played)) {
+    context.addIssue({
+      code: "custom",
+      path: ["deep", "modes"],
+      message: "Custom practice is always an unscored session",
     });
   }
   for (const [index, drill] of stats.deep.drills.entries()) {

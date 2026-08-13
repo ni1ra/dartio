@@ -17,7 +17,7 @@ const PRO_ACCESS = {
   availability: {
     localScoring: "implemented", advancedAi: "implemented", advancedCheckout: "implemented",
     voiceInput: "implemented", history: "implemented", deepStats: "implemented",
-    customPractice: "coming_soon", onlineMultiplayer: "implemented", clubManagement: "coming_soon",
+    customPractice: "implemented", onlineMultiplayer: "implemented", clubManagement: "coming_soon",
   },
 } as const;
 

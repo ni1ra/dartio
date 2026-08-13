@@ -183,6 +183,25 @@ describe("career headline", () => {
       winPercentage: null,
     }]);
   });
+
+  it("classifies a custom path as unscored practice even if a generic winner leaks in", () => {
+    const stats = careerStats([statMatch({
+      mode: "customPractice",
+      result: "won",
+      outRule: null,
+      turns: [statTurn({ scoreBefore: 0, scoreAfter: 1 })],
+    })]);
+
+    expect(stats).toMatchObject({
+      matchesPlayed: 1,
+      competitiveMatches: 0,
+      practiceSessions: 1,
+      matchesWon: 0,
+      recentForm: [],
+      modes: [{ mode: "customPractice", played: 1, won: 0, lost: 0, unscored: 1 }],
+    });
+    expect(stats.drills.every(({ sessions }) => sessions === 0)).toBe(true);
+  });
 });
 
 describe("observed finishing beds", () => {
