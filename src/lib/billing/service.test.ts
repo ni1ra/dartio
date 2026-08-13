@@ -5,6 +5,7 @@ import {
   checkoutSessionParams,
   ensureStripeCustomer,
   hasRecoverableStripeSubscription,
+  isMissingStripeCustomer,
   mustRecoverExistingSubscription,
   PAST_DUE_GRACE_DAYS,
   paidPlanForPriceId,
@@ -104,6 +105,13 @@ describe("production billing policy", () => {
     expect(await ensureStripeCustomer(null, { async create() { return "cus_loser"; }, async claim() { return null; }, async read() { return "cus_winner"; }, async discard() { throw new Error("Stripe unavailable"); } })).toBe("cus_winner");
   });
   it("never starts checkout with an unpersisted customer", async () => await expect(ensureStripeCustomer(null, { async create() { return "cus_orphan"; }, async claim() { return null; }, async read() { return null; } })).rejects.toThrow("Unable to persist"));
+
+  it("recognizes only Stripe's missing-resource customer failure for a mode cutover", () => {
+    expect(isMissingStripeCustomer({ type: "StripeInvalidRequestError", code: "resource_missing" })).toBe(true);
+    expect(isMissingStripeCustomer({ type: "StripeInvalidRequestError", code: "parameter_invalid" })).toBe(false);
+    expect(isMissingStripeCustomer({ type: "StripeAPIError", code: "resource_missing" })).toBe(false);
+    expect(isMissingStripeCustomer(new Error("No such customer"))).toBe(false);
+  });
 
   it("requires a live Stripe customer with matching authenticated ownership metadata", () => {
     expect(stripeCustomerBelongsToUser({ deleted: true, id: "cus_1" } as Stripe.DeletedCustomer, "user-1")).toBe(false);

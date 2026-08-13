@@ -133,3 +133,12 @@ Provider activation progress, 2026-08-13:
   code in its own dialog before revealing that key; no key value has been read,
   logged, or copied. The real Checkout, signed Live entitlement, Portal lifecycle,
   available balance, and terminal bank payout therefore remain unclaimed.
+- A read-only Production count confirmed that the sole user already has the
+  Sandbox customer link expected from earlier proof. Checkout now treats only
+  Stripe's exact `resource_missing` response during a mode switch as a namespace
+  transition: it creates or reuses the mode-scoped idempotent customer, claims
+  the link with compare-and-swap, verifies canonical ownership, and leaves every
+  other provider failure visible. This also makes a Live-to-Sandbox rollback
+  self-healing instead of binding either environment to the other's customer ID.
+  The focused billing boundary passed 43 tests; the complete local unit suite
+  passed 1,037 tests with the one deliberately opt-in database proof skipped.
