@@ -10,8 +10,9 @@ leaking identity or payment data into the repository or logs.
 
 ## Contract
 
-- Stripe remains the only payment and payout authority. PayPal, Nordea, and a
-  custom money ledger are not added while the primary Stripe-to-bank route works.
+- Stripe remains the only payment and payout authority. PayPal, a second bank,
+  and a custom money ledger are not added while the verified Stripe-to-bank
+  route works.
 - Operator identity, address, phone, bank account, card data, verification
   documents, keys, cookies, and webhook secrets exist only in Stripe/Vercel's
   secure interfaces. They are never copied into source, docs, shell arguments,
@@ -38,9 +39,9 @@ leaking identity or payment data into the repository or logs.
 - [x] Read current Stripe primary documentation for account activation, Live
   Checkout/subscriptions, webhooks, refunds/cancellations, balances, and payouts;
   freeze the exact operational sequence and rollback.
-- [ ] Confirm the signed-in Stripe account is the Dartio integration's account;
+- [x] Confirm the signed-in Stripe account is the Dartio integration's account;
   inspect Live activation/capability/requirements status without exposing PII.
-- [ ] Complete provider-hosted business verification and connect the primary bank
+- [x] Complete provider-hosted business verification and connect the primary bank
   payout destination. Record only capability booleans and safe provider object
   IDs.
 - [x] Inventory Production billing environment names/scopes and current Sandbox
@@ -104,8 +105,7 @@ Primary-source and activation baseline, 2026-08-13:
   The provider-hosted flow reused the already verified operator identity, records
   Dartio's actual website and digital-subscription activity, uses free Radar
   Lite, classifies the product as electronically supplied services, and declines
-  the optional Climate contribution. Final submission waits only on the bank
-  destination and review.
+  the optional Climate contribution.
 - Vercel's billing environment was inventoried by name, target, type, and branch
   only. No value was printed. `STRIPE_MODE=sandbox` now exists as the global
   Preview default and for Production, so the mode guard can deploy before the
@@ -114,3 +114,22 @@ Primary-source and activation baseline, 2026-08-13:
   966 passed with one deliberately opt-in live rollback test skipped, TypeScript
   passed, full ESLint passed, the 23-page production build passed, and
   `git diff --check` passed.
+
+Provider activation progress, 2026-08-13:
+
+- Stripe marks the Dartio business verification complete and the payout profile
+  active. One provider-verified NOK bank destination is attached; no account
+  number, holder data, or identity field was copied into Dartio or this receipt.
+- Live product `prod_V3wiqVm9Rspv57` owns the public tax-inclusive Pro catalogue:
+  monthly `price_1U3ootLsMBe2Z56j5ouTYD1c` at EUR 7.99 and annual
+  `price_1U3ovtLsMBe2Z56j2zNv9wuz` at EUR 76.70. Club remains unavailable.
+- Live webhook endpoint `we_1U3p0fLsMBe2Z56jfY18HBh9` targets the canonical
+  Production route and listens only to Checkout completion plus subscription
+  create/update/delete. Its signing secret and both Live price IDs are installed
+  only in Vercel's sensitive Production environment.
+- Production deliberately remains on `STRIPE_MODE=sandbox` with the last
+  Sandbox server key until one new standard Live server key is created and
+  installed atomically. Stripe requires the operator's six-digit authenticator
+  code in its own dialog before revealing that key; no key value has been read,
+  logged, or copied. The real Checkout, signed Live entitlement, Portal lifecycle,
+  available balance, and terminal bank payout therefore remain unclaimed.

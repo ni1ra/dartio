@@ -24,6 +24,16 @@
   disagrees. Price IDs remain provider-owned opaque IDs; Stripe's own API refuses
   a price from another account or mode.
 - Stripe sandbox account: `acct_1TtxM1ALEz0P7O2h`. Pro prices are EUR 7.99 monthly (`price_1TtzgyALEz0P7O2hBlv1fWHW`) and EUR 76.70 annually (`price_1TtzgzALEz0P7O2h82O61RF7`); Club prices are EUR 24 monthly (`price_1Ttzh0ALEz0P7O2hOsw6eCEr`) and EUR 230.40 annually (`price_1Ttzh1ALEz0P7O2harPzXoGH`). All are test-mode, active, tax-inclusive catalog objects.
+- Stripe Live account `acct_1U3kLzLsMBe2Z56j` has complete business
+  verification, an active payout profile, and one verified NOK bank destination.
+  Live Pro product `prod_V3wiqVm9Rspv57` owns EUR 7.99 monthly price
+  `price_1U3ootLsMBe2Z56j5ouTYD1c` and EUR 76.70 annual price
+  `price_1U3ovtLsMBe2Z56j2zNv9wuz`, both active and tax-inclusive. Live webhook
+  `we_1U3p0fLsMBe2Z56jfY18HBh9` targets the canonical billing route and receives
+  only Checkout completion plus subscription create/update/delete. Live price
+  IDs and the signing secret are installed in sensitive Production variables;
+  the Live server key and `STRIPE_MODE=live` cutover remain pending provider 2FA,
+  so Production is still intentionally Sandbox-backed.
 - Voice: OpenAI transcription models are available; secrets stay in environment stores only.
 - GitHub repository `ni1ra/dartio` is connected to Vercel with production branch `main`.
 - Vercel has encrypted Production and Preview values for Neon database/Auth, Auth cookie secret, Pro and Club monthly/annual price IDs, `NEXT_PUBLIC_APP_URL`, Stripe integration/signing secrets, and `OPENAI_API_KEY`. This was verified by environment name and scope only; no secret value was printed.
@@ -62,16 +72,17 @@
 - The original sandbox webhook destination returned HTTP 500 to the successful Checkout's invoice events because it targets the old production alias, while Preview owns the Checkout identity/database. Dedicated Preview destination `we_1Tu1pFALEz0P7O2hQVsTftWI` is active at the stable Cycle 2 alias and listens only to `checkout.session.completed` plus the eight current `customer.subscription.*` events. Vercel has a sensitive branch-scoped signing-secret override for `cycle-2-identity-billing-voice`; the global Preview/Production secret was not changed.
 - Preview destination `we_1Tu1pFALEz0P7O2hQVsTftWI` processed two real Portal-cancellation `customer.subscription.updated` events with HTTP 200, zero failures, and 848–1305 ms response time on deployment `dpl_GvToqtNyNJCjzcGrYLDFVfZePqEV`. Neon stored both processed event IDs and exactly one owned Pro/trialing subscription row.
 - Deployment `dpl_G2u7bDCCuSCJMeaciPTkXjdwj6mG` proved explicit cancellation recovery and reprojection: reactivation cleared `cancel_at`; rescheduling stored `cancel_at=2026-07-31T02:42:12Z` while keeping `cancel_at_period_end=false`, status `trialing`, plan `pro`, and one subscription row.
-- GitHub release source: commit `46f3a4f7b885bf6474be1e644a3458084059d6b3`;
-  CI run [31658885004](https://github.com/ni1ra/dartio/actions/runs/31658885004)
+- GitHub release source: commit `e52c1f8671b728c04ed8cd556ce8bc661bf73118`;
+  CI run [31668637443](https://github.com/ni1ra/dartio/actions/runs/31668637443)
   passed typecheck, lint, unit, build, and the full browser matrix.
-- Current greenfield production deployment: `dpl_A27a2m3p8BsAs2MSSGsvRrZnErzZ`
+- Current greenfield production deployment: `dpl_2C7EGdcNAEAD87SZo7Q1sWyAFmWx`
   at `https://dartioopus46.vercel.app`, READY on the exact release SHA with no
   alias error. Auth, strict owner-only history/detail, rooms, paid AI, paid
-  voice, and the complete 395-run/4-skip browser matrix passed there on
+  voice, and the complete 455-run/4-skip browser matrix passed there on
   2026-08-13. The aggregate room-integrity audit also returned zero owner,
   version/turn, terminal-field, and orphan-signature anomalies without printing
-  identifiers or changing the database.
+  identifiers or changing the database. A bounded runtime audit found no error
+  clusters and no private application fields in sampled request logs.
 - Current Cycle 2 Auth/webhook preview deployment: `dpl_FfHXJZ9ZJJk7mWoDGiqieGx6LWCq` at `https://dartio-boreq0qif-niras-projects-868b6f5f.vercel.app`. It was redeployed on 2026-08-11 after Preview database-password rotation made its immutable predecessor stale; the stable branch alias retained its branch-scoped Stripe signing secret, picked up the current Preview `DATABASE_URL`, and then returned HTTP 200 for two signed sandbox subscription deliveries. Entitled X01 continuity/access-authority head `e3a80a4` passed GitHub verification run `29554449332`. Prior code Preview `dpl_AwDwqrqPYR8ufLdJUV5m91dQJLff` remains the rollback target for the Cycle 2 code.
 - Preview has a branch-scoped `NEXT_PUBLIC_APP_URL` override for `cycle-2-identity-billing-voice`, targeting its stable Vercel alias. The global Preview and Production values were not changed.
 - Paid features are authorized server-side only. `voice_always_on` gates `POST /api/voice/transcribe` before body parsing; `advanced_ai` gates one physical sample from `POST /api/ai/throw` for each level-9–20 dart while 1–8 stay local; `advanced_checkout` gates `POST /api/checkout/advice` for alternates, setup plans, and preference ranking while Free computes one route locally. All three read the server's own access snapshot and accept no client plan, access, or seed claim. The AI throw request is exactly `{ level, target }`: tactics and every mode rule remain in the client.
@@ -158,11 +169,11 @@
 - `pnpm test`
 - `pnpm build`
 - `pnpm test:browser:install` (once per machine)
-- `pnpm test:browser` — the Cycle 35 release has 399 checks across 390×844,
-  834×1112, and 1440×1000; 395 run and 4 skip by design, those being the sign-up
+- `pnpm test:browser` — the Cycle 36 release has 459 checks across 390×844,
+  834×1112, and 1440×1000; 455 run and 4 skip by design, those being the sign-up
   assertion at the two widths where sign-up is deliberately absent and the
   screenspace assertion at the two widths whose reservation it does not describe.
-  The exact merge repeated all 395 runnable checks against Production. Set
+  The exact merge repeated all 455 runnable checks against Production. Set
   `DARTIO_BASE_URL` to run against Preview or Production instead of a local build.
 - `pnpm db:generate` — writes the migration; it does not apply it
 - `DATABASE_URL=<branch-uri> pnpm exec drizzle-kit migrate` — applies pending migrations to one branch and reconciles the journal. Preview first, then main. The URI is passed only through a credential-safe in-memory wrapper, never as a positional argument or printed shell assignment. The repo has no `db:migrate` script because the URL is never the one in `.env.local` for production work
@@ -224,7 +235,10 @@ changed deliberately and one at a time, and each is recorded above.
 - Vercel retains prior ready production deployments.
 - Recoverable pre-greenfield production target: `dpl_2CiBPFdxJzJe6vYwu8vk4QEzLm4x`. It serves the legacy build and is rollback-only, never greenfield v1 proof.
 - Database changes require forward-safe migrations and an explicit escape path.
-- Stripe remains in sandbox until live transaction proof is explicitly authorized.
+- Production remains Sandbox-backed until the operator-authenticated Live key
+  cutover completes. The sub-NOK-100 proof purchase is explicitly authorized;
+  provider 2FA, signed Live entitlement, balance, and terminal payout are still
+  evidence gates rather than assumed outcomes.
 
 ## Phase 2 closure — 2026-07-31
 
@@ -239,9 +253,8 @@ changed deliberately and one at a time, and each is recorded above.
 - The regulation dartboard and three-viewport production visual proof passed; future board changes must rerun the same physical T20 and boundary suite.
 - Cycle 2 preview repeated the dartboard gate at exact 1440×1000, 834×1112, and 390×844 viewports: 3/3 independent contexts passed square/in-bounds geometry, 80 beds, 20 labels, zero horizontal overflow, and physical T20 → 60 / 441. Full-page tablet/mobile visual inspection also passed. Ultrawide review found and corrected a shell-centering cascade defect outside the board renderer; the corrected preview measured a centered 1472 px stage at `x=544` on a 2560 px viewport, retained a 600×600 board, and passed the full three-width matrix again with zero retries.
 - Figma library implementation is externally blocked by the current one-mode/View-seat limitation.
-- Phase 3 is closed. The active remainder is Phase 4: terminal Live Stripe bank
-  payout proof, room behaviour under degraded networks, and final
-  accessibility/performance/operational hardening plus credibility closure.
+- Phase 3 is closed. The active remainder is Phase 4: terminal Live Stripe
+  payment/bank-payout proof and final credibility closure.
   Cross-mode voice, personalized checkout evidence, custom practice, additional
   modes, server-backed friend rooms, continuous X01 voice, replay, deep
   statistics, resilience, and the full Sandbox Checkout/Portal/webhook lifecycle
