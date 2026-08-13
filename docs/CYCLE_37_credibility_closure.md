@@ -98,7 +98,7 @@ Live-cutover release preparation, 2026-08-13:
   `dpl_HfwydzpZTvtn2sQTAHfrVczV1jGf` is READY on that exact SHA with no alias
   error. It remains Sandbox-backed until the provider-authenticated Live key and
   `STRIPE_MODE=live` are installed together and a fresh deployment proves them.
-- This Cycle 37 branch's exact head
+- The pre-cutover evidence head
   `9a8f26ee5f1bdcd08d490cb92ffe08d7c756bc29` passed CI run `31671843422`
   including its browser job. Exact-head Preview deployment
   `dpl_9Y6NGcvTemZRtNGArtD2AmauQJBN` is READY, and the public-claim story passed
