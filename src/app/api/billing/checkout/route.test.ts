@@ -53,9 +53,10 @@ describe("POST /api/billing/checkout", () => {
     const where = vi.fn(() => ({ returning }));
     const set = vi.fn(() => ({ where }));
     const update = vi.fn(() => ({ set }));
+    const staleLocalSubscription = vi.fn().mockResolvedValue({ status: "trialing" });
     createDatabase.mockReturnValue({
       query: {
-        subscriptions: { findFirst: vi.fn().mockResolvedValue(null) },
+        subscriptions: { findFirst: staleLocalSubscription },
         users: { findFirst: vi.fn().mockResolvedValue({ stripeCustomerId: "cus_live" }) },
       },
       update,
@@ -82,6 +83,7 @@ describe("POST /api/billing/checkout", () => {
       { idempotencyKey: "dartio-customer-user-1" },
     );
     expect(update).toHaveBeenCalledOnce();
+    expect(staleLocalSubscription).not.toHaveBeenCalled();
     expect(stripeClient.checkout.sessions.create).toHaveBeenCalledOnce();
   });
 });
