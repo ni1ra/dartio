@@ -138,7 +138,9 @@ Provider activation progress, 2026-08-13:
   Stripe's exact `resource_missing` response during a mode switch as a namespace
   transition: it creates or reuses the mode-scoped idempotent customer, claims
   the link with compare-and-swap, verifies canonical ownership, and leaves every
-  other provider failure visible. This also makes a Live-to-Sandbox rollback
-  self-healing instead of binding either environment to the other's customer ID.
+  other provider failure visible. The recoverable-subscription check then reads
+  Stripe in that active namespace rather than blocking on a webhook projection
+  from the other mode. This also makes a Live-to-Sandbox rollback self-healing
+  instead of binding either environment to the other's customer or subscription.
   The focused billing boundary passed 43 tests; the complete local unit suite
   passed 1,037 tests with the one deliberately opt-in database proof skipped.
