@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Button, Surface } from "navi-ui";
 import { hasPaidMembership } from "@/lib/product/access-contract";
 import { useAccess } from "./access-provider";
-import { beginCheckout, openBillingPortal, type BillingInterval, type BillingPlan } from "./billing-client";
+import { beginCheckout, type BillingInterval, type BillingPlan } from "./billing-client";
 
 const authClient = createAuthClient();
 const prices = {
@@ -41,9 +41,14 @@ export function PricingExperience() {
     }
   }
 
+  /**
+   * Stripe in the active namespace decides whether this is Checkout or Portal.
+   * The local projection can still describe Sandbox during a reversible Live
+   * cutover, so it must never choose Portal on its own.
+   */
   async function manageMembership() {
     setCheckoutPlan("pro"); setError(null);
-    try { window.location.assign(await openBillingPortal()); }
+    try { window.location.assign(await beginCheckout("pro", interval)); }
     catch (problem) { setError(problem instanceof Error?problem.message:"Billing management is unavailable"); setCheckoutPlan(null); }
   }
 
@@ -103,7 +108,7 @@ export function PricingExperience() {
           ) : authenticated && access.status==="unavailable" ? (
             <Button variant="secondary" onClick={()=>void access.retry()} disabled={access.refreshing}>{access.refreshing?"Retrying membership check…":"Retry membership check"}</Button>
           ) : currentPaidMembership ? (
-            <Button onClick={()=>void manageMembership()} disabled={checkoutPlan!==null}>{checkoutPlan==="pro"?"Opening billing portal…":"Manage current membership"}</Button>
+            <Button onClick={() => void manageMembership()} disabled={checkoutPlan !== null}>{checkoutPlan === "pro" ? "Opening secure billing…" : "Manage current membership"}</Button>
           ) : authenticated ? (
             <Button onClick={() => void choosePlan("pro")} disabled={checkoutPlan !== null}>
               {checkoutPlan === "pro" ? "Opening secure checkout…" : `Start Pro · ${interval === "year" ? "annual" : "monthly"}`}
