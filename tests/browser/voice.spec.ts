@@ -262,7 +262,7 @@ test("room voice remains visit-atomic and locks capture while submission is in f
       const body = request.postDataJSON();
       submitted.push(body);
       await submission.promise;
-      room = { ...room, version: 1, turns: [{ turnNumber: 1, seat: 0, ...body.turn }] };
+      room = { ...room, version: 1, turns: [{ version: 1, turnNumber: 1, seat: 0, ...body.turn }] };
       await json(route, 200, { version: 1 });
       return;
     }

@@ -22,6 +22,25 @@ const seatSchema = z.object({
   role: z.enum(["owner", "player", "spectator"]),
 });
 
+const turnDartSchema = z.object({
+  ordinal: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  segment: z.number().int(),
+  multiplier: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+});
+
+const roomTurnSchema = z.object({
+  version: z.number().int().nonnegative(),
+  turnNumber: z.number().int().positive(),
+  seat: z.number().int().nonnegative(),
+  legNumber: z.number().int().positive(),
+  scoreBefore: z.number().int(),
+  scoreAfter: z.number().int(),
+  bust: z.boolean(),
+  dartsThrown: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  aggregateScore: z.number().int().optional(),
+  darts: z.array(turnDartSchema),
+});
+
 const stateSchema = z.object({
   code: z.string(),
   mode: z.string(),
@@ -33,13 +52,15 @@ const stateSchema = z.object({
   yourRole: z.enum(["owner", "player", "spectator"]).nullable().default(null),
   watching: z.number().int().min(0).default(0),
   seats: z.array(seatSchema),
-  turns: z.array(z.object({}).passthrough()),
+  // Additive fields are tolerated, but recovery needs the exact visit identity.
+  turns: z.array(roomTurnSchema),
 });
 
 const seatResultSchema = z.object({ code: z.string(), seat: z.number().int() }).strict();
 
 export type RoomStateView = z.infer<typeof stateSchema>;
 export type RoomSeatView = z.infer<typeof seatSchema>;
+export type RoomTurnView = z.infer<typeof roomTurnSchema>;
 
 export type RoomFailure =
   | "upgrade_required"
