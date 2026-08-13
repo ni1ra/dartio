@@ -1,3 +1,4 @@
+import { gotoDartio, reloadDartio } from "./navigation";
 import { expect, test } from "@playwright/test";
 
 /**
@@ -10,9 +11,9 @@ import { expect, test } from "@playwright/test";
 const CRICKET = "/play/match?mode=cricket&variant=standard&opponent=local";
 
 test.beforeEach(async ({ page }) => {
-  await page.goto(CRICKET, { waitUntil: "domcontentloaded" });
+  await gotoDartio(page, CRICKET);
   await page.evaluate(() => window.localStorage.removeItem("dartio:cricket-log:v2:local"));
-  await page.reload({ waitUntil: "networkidle" });
+  await reloadDartio(page);
 });
 
 test("renders a real Cricket board and marks a treble as three", async ({ page }) => {
@@ -44,7 +45,7 @@ test("inherits keyboard scoring, resume, and correction from the shared machiner
   await page.keyboard.press("t");
   await expect(page.locator(".cricket-board tbody tr").nth(1).locator("td").first()).toHaveText("⊗");
 
-  await page.reload({ waitUntil: "networkidle" });
+  await reloadDartio(page);
   await expect(page.locator(".match-notice")).toContainText("Resumed the match");
   await expect(page.locator(".cricket-board tbody tr").nth(1).locator("td").first()).toHaveText("⊗");
 
@@ -57,7 +58,7 @@ test("inherits keyboard scoring, resume, and correction from the shared machiner
 });
 
 test("tactics scores no points at all", async ({ page }) => {
-  await page.goto("/play/match?mode=cricket&variant=tactics&opponent=local", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?mode=cricket&variant=tactics&opponent=local");
   await page.getByRole("button", { name: "Treble 20, 60 points" }).click();
   await page.getByRole("button", { name: "Treble 20, 60 points" }).click();
   await expect(page.locator(".cricket-board tfoot th")).toHaveText("MARKS");

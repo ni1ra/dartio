@@ -1,3 +1,4 @@
+import { gotoDartio, reloadDartio } from "./navigation";
 import { expect, test } from "@playwright/test";
 
 /**
@@ -10,9 +11,9 @@ import { expect, test } from "@playwright/test";
 const MATCH = "/play/match?start=501&level=8&best=5&out=double&opponent=local";
 
 test.beforeEach(async ({ page }) => {
-  await page.goto(MATCH, { waitUntil: "domcontentloaded" });
+  await gotoDartio(page, MATCH);
   await page.evaluate(() => window.localStorage.removeItem("dartio:x01-log:v2:local"));
-  await page.reload({ waitUntil: "networkidle" });
+  await reloadDartio(page);
 });
 
 const score = (page: import("@playwright/test").Page) => page.locator(".score-player").first().locator("strong");
@@ -58,7 +59,7 @@ test("shows what has been typed and clears it on escape", async ({ page }) => {
 });
 
 test("does not capture typing meant for a form field", async ({ page }) => {
-  await page.goto("/friends", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/friends");
   const field = page.getByLabel("Room code");
   await field.fill("");
   await field.pressSequentially("OCHE20");

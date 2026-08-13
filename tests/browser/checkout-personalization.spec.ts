@@ -1,3 +1,4 @@
+import { gotoDartio, reloadDartio } from "./navigation";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { checkoutAdvice, type OutRule } from "../../src/domain";
 
@@ -47,9 +48,9 @@ async function json(route: Route, status: number, body: unknown) {
 }
 
 async function openFreshMatch(page: Page) {
-  await page.goto(MATCH, { waitUntil: "domcontentloaded" });
+  await gotoDartio(page, MATCH);
   await page.evaluate(() => window.localStorage.removeItem("dartio:x01-log:v2:local"));
-  await page.reload({ waitUntil: "networkidle" });
+  await reloadDartio(page);
 }
 
 async function moveOwnerTo169(page: Page) {
@@ -112,7 +113,7 @@ test("explicit consent personalizes a finish setup and resets on reload", async 
   ]);
 
   captured.length = 0;
-  await page.reload({ waitUntil: "networkidle" });
+  await reloadDartio(page);
   await expect(page.getByRole("button", { name: /Use my match history/ })).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByText("Off · your history stays unread.")).toBeVisible();
   await expect(page.locator(".checkout-leave strong")).toHaveText("40");

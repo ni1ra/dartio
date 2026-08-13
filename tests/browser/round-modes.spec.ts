@@ -1,3 +1,4 @@
+import { gotoDartio, reloadDartio } from "./navigation";
 import { expect, test } from "@playwright/test";
 
 /**
@@ -10,7 +11,7 @@ import { expect, test } from "@playwright/test";
 const total = (page: import("@playwright/test").Page) => page.locator(".round-totals strong").first();
 
 test.beforeEach(async ({ page }) => {
-  await page.goto("/practice", { waitUntil: "domcontentloaded" });
+  await gotoDartio(page, "/practice");
   await page.evaluate(() => {
     for (const key of Object.keys(window.localStorage)) {
       if (key.startsWith("dartio:round-log:")) window.localStorage.removeItem(key);
@@ -19,14 +20,14 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("the practice catalogue links every playable mode", async ({ page }) => {
-  await page.goto("/practice", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/practice");
   for (const name of ["Cricket", "Around the clock", "Shanghai", "Count-up", "Bob’s 27"]) {
     await expect(page.getByRole("link", { name: new RegExp(name, "i") })).toBeVisible();
   }
 });
 
 test("Around the Clock advances through its targets", async ({ page }) => {
-  await page.goto("/play/match?mode=aroundTheClock", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?mode=aroundTheClock");
   await expect(page.locator(".round-target")).toContainText("1");
 
   // Typed rather than tapped: the pad defaults to the treble bed, and this
@@ -38,7 +39,7 @@ test("Around the Clock advances through its targets", async ({ page }) => {
 });
 
 test("Shanghai scores only the round's number", async ({ page }) => {
-  await page.goto("/play/match?mode=shanghai", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?mode=shanghai");
   await page.getByRole("button", { name: "Treble 20, 60 points" }).click();
   await expect(total(page)).toHaveText("0");
 
@@ -48,12 +49,12 @@ test("Shanghai scores only the round's number", async ({ page }) => {
 });
 
 test("Count-Up counts everything and Bob's 27 starts on 27", async ({ page }) => {
-  await page.goto("/play/match?mode=countUp", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?mode=countUp");
   await expect(page.locator(".round-target")).toContainText("Everything counts");
   await page.getByRole("button", { name: "Treble 20, 60 points" }).click();
   await expect(total(page)).toHaveText("60");
 
-  await page.goto("/play/match?mode=bobs27", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?mode=bobs27");
   await expect(total(page)).toHaveText("27");
   await page.keyboard.press("1");
   await page.keyboard.press("d");
@@ -61,7 +62,7 @@ test("Count-Up counts everything and Bob's 27 starts on 27", async ({ page }) =>
 });
 
 test("a finished match stops offering to rewind itself", async ({ page }) => {
-  await page.goto("/play/match?mode=shanghai", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?mode=shanghai");
 
   // Shanghai is won outright by taking the single, double and treble of the round's
   // number in one visit, which makes it the shortest complete match in the product.
@@ -90,11 +91,11 @@ test("a finished match stops offering to rewind itself", async ({ page }) => {
 });
 
 test("a round mode resumes after a reload", async ({ page }) => {
-  await page.goto("/play/match?mode=countUp", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?mode=countUp");
   await page.getByRole("button", { name: "Treble 20, 60 points" }).click();
   await expect(total(page)).toHaveText("60");
 
-  await page.reload({ waitUntil: "networkidle" });
+  await reloadDartio(page);
   await expect(page.locator(".match-notice")).toContainText("Resumed the match");
   await expect(total(page)).toHaveText("60");
 });

@@ -1,3 +1,4 @@
+import { gotoDartio, reloadDartio } from "./navigation";
 import { expect, test } from "@playwright/test";
 
 /**
@@ -16,9 +17,9 @@ async function scoreVisit(page: import("@playwright/test").Page, ...beds: readon
 test.beforeEach(async ({ page }) => {
   // Cleared once, on the way in — not through addInitScript, which would run
   // again on the reload these tests depend on and wipe the log under them.
-  await page.goto(MATCH, { waitUntil: "domcontentloaded" });
+  await gotoDartio(page, MATCH);
   await page.evaluate(() => window.localStorage.removeItem("dartio:x01-log:v2:local"));
-  await page.reload({ waitUntil: "networkidle" });
+  await reloadDartio(page);
   await page.getByRole("tab", { name: "Each dart" }).click();
 });
 
@@ -27,7 +28,7 @@ test("a reload resumes the match exactly where it was left", async ({ page }) =>
   const first = page.locator(".score-player").first().locator("strong");
   await expect(first).toHaveText("321");
 
-  await page.reload({ waitUntil: "networkidle" });
+  await reloadDartio(page);
 
   await expect(page.locator(".match-notice")).toContainText("Resumed the match");
   await expect(page.locator(".score-player").first().locator("strong")).toHaveText("321");
@@ -63,7 +64,7 @@ test("starting a different match does not resume the stored one", async ({ page 
   await expect(page.locator(".score-player").first().locator("strong")).toHaveText("321");
 
   // Different starting score: the stored log belongs to a different match.
-  await page.goto("/play/match?start=301&level=8&best=5&out=double&opponent=local", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?start=301&level=8&best=5&out=double&opponent=local");
   await expect(page.locator(".match-notice")).toHaveCount(0);
   await expect(page.locator(".score-player").first().locator("strong")).toHaveText("301");
 });

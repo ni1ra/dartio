@@ -762,7 +762,7 @@ html[data-lp-motion] [data-reveal][data-inview] {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--accent-solid);
   color: var(--on-accent);
   font-size: 12px;
   font-weight: 800;

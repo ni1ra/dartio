@@ -1,3 +1,4 @@
+import { gotoDartio } from "./navigation";
 import { expect, test, type Page } from "@playwright/test";
 
 /**
@@ -50,7 +51,7 @@ async function throwVisit(page: Page) {
 }
 
 test("a match against the AI alternates turns instead of looping", async ({ page }) => {
-  await page.goto(MATCH, { waitUntil: "networkidle" });
+  await gotoDartio(page, MATCH);
   await page.locator(".dartboard").waitFor();
 
   const start = await board(page);

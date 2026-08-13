@@ -122,7 +122,7 @@ export async function recordMatch(
     // three statements already guarantee.
     await db.batch(statements as unknown as [(typeof statements)[number]]);
   } catch (cause) {
-    recordFailure("match.record_failed", cause, { userId, mode: record.mode, count: record.turns.length });
+    recordFailure("match.record_failed", cause, { mode: record.mode, count: record.turns.length });
     throw new MatchHistoryError({ cause });
   }
   return matchId;

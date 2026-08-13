@@ -1,3 +1,4 @@
+import { gotoDartio } from "./navigation";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 const EXACT_RECORD = {
@@ -163,7 +164,7 @@ test("loads an exact replay, keeps the board passive, and drives every frame acc
     await json(route, 200, replayPayload("exact"));
   });
 
-  await page.goto("/account/matches/exact", { waitUntil: "domcontentloaded" });
+  await gotoDartio(page, "/account/matches/exact");
   await expect(page.getByText("Reading the stored visits…")).toBeVisible();
   release();
 
@@ -235,7 +236,7 @@ test("loads an exact replay, keeps the board passive, and drives every frame acc
 test("keeps an aggregate visit marker-free and withholds its result until the final dart", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await mockReplay(page, "aggregate", AGGREGATE_RECORD);
-  await page.goto("/account/matches/aggregate", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/account/matches/aggregate");
 
   await expect(page.getByText("future-mode", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Landing unknown", { exact: true })).toBeVisible();
@@ -266,7 +267,7 @@ test("keeps an aggregate visit marker-free and withholds its result until the fi
 
 test("reveals an exact visit's bust only on the resolving dart", async ({ page }) => {
   await mockReplay(page, "exact-bust", EXACT_BUST_RECORD);
-  await page.goto("/account/matches/exact-bust", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/account/matches/exact-bust");
 
   await expect(page.locator(".replay-frame-facts")).toContainText("30 · pending visit");
   await expect(page.locator(".replay-bust")).toHaveCount(0);
@@ -277,7 +278,7 @@ test("reveals an exact visit's bust only on the resolving dart", async ({ page }
 
 test("a one-dart finish cannot enter a stuck playing state", async ({ page }) => {
   await mockReplay(page, "one-dart", ONE_DART_RECORD);
-  await page.goto("/account/matches/one-dart", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/account/matches/one-dart");
 
   const play = page.getByRole("button", { name: "Replay has one dart" });
   await expect(play).toBeDisabled();
@@ -288,7 +289,7 @@ test("a one-dart finish cannot enter a stuck playing state", async ({ page }) =>
 
 test("the active seat uses the new leg's stored opening score before its visit resolves", async ({ page }) => {
   await mockReplay(page, "leg-reset", LEG_RESET_RECORD);
-  await page.goto("/account/matches/leg-reset", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/account/matches/leg-reset");
 
   await expect(page.locator(".replay-scoreboard strong")).toHaveText("0");
   await page.getByRole("button", { name: "Next dart" }).click();
@@ -302,7 +303,7 @@ test("the active seat uses the new leg's stored opening score before its visit r
 
 test("a signed-out replay offers sign-in and a full-size route back", async ({ page }) => {
   await page.route("**/api/matches/private", (route) => json(route, 401, { error: "authentication_required" }));
-  await page.goto("/account/matches/private", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/account/matches/private");
 
   await expect(page.getByText("This record belongs behind your account.")).toBeVisible();
   await expect(page.getByRole("link", { name: "Sign in securely" })).toHaveAttribute("href", "/auth/sign-in");
@@ -313,7 +314,7 @@ test("a signed-out replay offers sign-in and a full-size route back", async ({ p
 
 test("a missing or unowned replay stays private and returns to the record", async ({ page }) => {
   await page.route("**/api/matches/missing", (route) => json(route, 404, { error: "match_not_found" }));
-  await page.goto("/account/matches/missing", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/account/matches/missing");
 
   await expect(page.getByText("That replay is not in your record.")).toBeVisible();
   await expect(page.getByText(/belong to another account/i)).toBeVisible();
@@ -328,7 +329,7 @@ test("a temporary read failure retries into the real replay", async ({ page }) =
       ? json(route, 503, { error: "match_history_unavailable" })
       : json(route, 200, replayPayload("retry"));
   });
-  await page.goto("/account/matches/retry", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/account/matches/retry");
 
   await expect(page.getByText("The record could not be read just now.")).toBeVisible();
   await page.getByRole("button", { name: "Try replay again" }).click();
@@ -363,7 +364,7 @@ test("recent history links directly into the matching replay", async ({ page }) 
   }] }));
   await page.route("**/api/matches/history-1", (route) => json(route, 200, replayPayload("history-1")));
 
-  await page.goto("/account", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/account");
   const replay = page.getByRole("link", { name: /replay x01 match from/i });
   await expect(replay).toHaveAttribute("href", "/account/matches/history-1");
   expect(await replay.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);

@@ -1,3 +1,4 @@
+import { gotoDartio } from "./navigation";
 import { expect, test } from "@playwright/test";
 
 /**
@@ -10,7 +11,7 @@ import { expect, test } from "@playwright/test";
 const MATCH = "/play/match?start=501&level=8&best=5&out=double";
 
 test("free play works and the paid surfaces say so", async ({ page }) => {
-  await page.goto(MATCH, { waitUntil: "networkidle" });
+  await gotoDartio(page, MATCH);
 
   await expect(page.getByText("Alternate routes, setup-visit plans, and preferred doubles come with Pro."))
     .toBeAttached();
@@ -28,7 +29,7 @@ test("free play works and the paid surfaces say so", async ({ page }) => {
 });
 
 test("an AI level above the free ceiling continues instead of blocking play", async ({ page }) => {
-  await page.goto("/play/match?start=501&level=15&best=5&out=double", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?start=501&level=15&best=5&out=double");
 
   // The canonical access snapshot refuses premium execution for an anonymous
   // player. The match must say so and keep playing locally at the free ceiling.

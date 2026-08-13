@@ -1,3 +1,4 @@
+import { gotoDartio } from "./navigation";
 import { expect, test } from "@playwright/test";
 
 /**
@@ -35,7 +36,7 @@ function contrast(foreground: readonly number[], background: readonly number[]):
 
 for (const theme of THEMES) {
   test(`${theme} keeps match text legible`, async ({ page }) => {
-    await page.goto("/play/match?start=501&level=8&best=5&out=double", { waitUntil: "networkidle" });
+    await gotoDartio(page, "/play/match?start=501&level=8&best=5&out=double");
     // Themes moved from inline buttons to a single-icon menu: open the
     // trigger, then pick the theme by its menu-item role and label.
     await page.locator(".theme-menu__trigger").first().click();
@@ -114,7 +115,7 @@ const ACCENT_SURFACES = [
 
 for (const [name, path, selector] of ACCENT_SURFACES) {
   test(`${name} keeps light text on the accent`, async ({ page }) => {
-    await page.goto(path, { waitUntil: "networkidle" });
+    await gotoDartio(page, path);
     const element = page.locator(selector).first();
     await expect(element, `${name} not found at ${path}`).toBeAttached();
 
@@ -150,7 +151,7 @@ test("Navi controls keep a visible selected state", async ({ page }) => {
   // Neon Auth's unlayered Tailwind preflight once stripped border, background,
   // and radius off every Navi component, leaving the setup control looking like
   // flat text. This asserts the selected option is still distinguishable.
-  await page.goto("/play", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play");
   const control = page.locator(".navi-segmented").first();
   await expect(control).toBeVisible();
 

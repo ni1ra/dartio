@@ -1,3 +1,4 @@
+import { gotoDartio, reloadDartio } from "./navigation";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 const MATCH = "/play/match?start=501&best=1&out=double&opponent=local";
@@ -170,7 +171,7 @@ async function openVoiceMatch(page: Page) {
 async function openVoiceSurface(page: Page, path: string) {
   await installMicrophone(page);
   await page.route("**/api/access", (route) => json(route, 200, PRO_ACCESS));
-  await page.goto(path, { waitUntil: "networkidle" });
+  await gotoDartio(page, path);
   await expect(page.getByRole("button", { name: "Hold to record a voice score" })).toBeVisible();
 }
 
@@ -268,7 +269,7 @@ test("room voice remains visit-atomic and locks capture while submission is in f
     }
     await json(route, 404, { error: "unexpected_room_request" });
   });
-  await page.goto("/play/match?room=OCHE42", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?room=OCHE42");
 
   for (let dartIndex = 0; dartIndex < 3; dartIndex += 1) {
     await speak(page);
@@ -315,22 +316,22 @@ test("room voice is offered only to the seated player whose turn is live", async
   };
   await page.route("**/api/rooms/OCHE42**", (route) => json(route, 200, room));
 
-  await page.goto("/play/match?room=OCHE42", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?room=OCHE42");
   await expect(page.getByRole("button", { name: "Hold to record a voice score" })).toBeDisabled();
 
   room = { ...room, yourSeat: null, yourRole: "spectator" };
-  await page.reload({ waitUntil: "networkidle" });
+  await reloadDartio(page);
   await expect(page.getByRole("button", { name: "Hold to record a voice score" })).toHaveCount(0);
 
   room = { ...room, status: "abandoned", yourSeat: 0, yourRole: "owner" };
-  await page.reload({ waitUntil: "networkidle" });
+  await reloadDartio(page);
   await expect(page.getByRole("button", { name: "Hold to record a voice score" })).toHaveCount(0);
 });
 
 test("voice access failure leaves non-X01 manual scoring ready", async ({ page }) => {
   await installMicrophone(page);
   await page.route("**/api/access", (route) => json(route, 503, { error: "access_unavailable" }));
-  await page.goto("/play/match?mode=cricket&variant=standard&opponent=local", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/play/match?mode=cricket&variant=standard&opponent=local");
 
   await expect(page.getByRole("heading", { name: "Voice access unavailable" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Retry access" })).toBeVisible();

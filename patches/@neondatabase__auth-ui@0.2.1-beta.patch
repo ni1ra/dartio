@@ -2,7 +2,7 @@ diff --git a/dist/index.mjs b/dist/index.mjs
 index ef6aacd9dc6950eb4230ee72ee4e8f4768cd6075..55e939a93a046476711caabe6b1a45fb6beefc8c 100644
 --- a/dist/index.mjs
 +++ b/dist/index.mjs
-@@ -20,7 +20,8 @@ import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
+@@ -20,5 +20,6 @@ import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
  import * as SelectPrimitive from "@radix-ui/react-select";
  import { UAParser } from "ua-parser-js";
  import { useAuthQuery } from "better-auth/client";
@@ -10,5 +10,5 @@ index ef6aacd9dc6950eb4230ee72ee4e8f4768cd6075..55e939a93a046476711caabe6b1a45fb
 +import { apiKeyClient } from "@better-auth/api-key/client";
 +import { anonymousClient, emailOTPClient, genericOAuthClient, magicLinkClient, multiSessionClient, oneTapClient, organizationClient, twoFactorClient, usernameClient } from "better-auth/client/plugins";
  import { createAuthClient } from "better-auth/react";
- import { Drawer } from "vaul";
- import { OTPInput, OTPInputContext } from "input-otp";
+@@ -7722,0 +7724 @@ function PasswordInput({ className, enableToggle, onChange, ...props }) {
++			"aria-label": isVisible ? "Hide password" : "Show password",

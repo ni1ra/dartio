@@ -1,3 +1,4 @@
+import { gotoDartio } from "./navigation";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 const PRO_ACCESS = {
@@ -114,7 +115,7 @@ async function mockHostedRoom(page: Page, {
     await json(route, 404, { error: "unexpected_room_request" });
   });
 
-  await page.goto("/friends", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/friends");
   await page.getByRole("button", { name: /open a room/i }).click();
   await expect(page.getByText("OCHE42", { exact: true })).toBeVisible();
 
@@ -131,7 +132,7 @@ async function mockHostedRoom(page: Page, {
  * a real lookup failing.
  */
 test("the join form no longer fakes a lookup", async ({ page }) => {
-  await page.goto("/friends", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/friends");
 
   const join = page.getByRole("button", { name: /join room/i });
   const watch = page.getByRole("button", { name: /watch instead/i });
@@ -146,7 +147,7 @@ test("the join form no longer fakes a lookup", async ({ page }) => {
 });
 
 test("hosting points at Pro rather than at a dead button", async ({ page }) => {
-  await page.goto("/friends", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/friends");
 
   // It used to read "Hosting is not open yet" and do nothing at all.
   await expect(page.getByRole("link", { name: /online rooms are pro/i })).toBeVisible();
@@ -154,7 +155,7 @@ test("hosting points at Pro rather than at a dead button", async ({ page }) => {
 });
 
 test("the page claims only what is built", async ({ page }) => {
-  await page.goto("/friends", { waitUntil: "networkidle" });
+  await gotoDartio(page, "/friends");
 
   const foundation = page.locator(".room-foundation");
   await expect(foundation).toContainText(/one shared record/i);

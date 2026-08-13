@@ -143,7 +143,7 @@ export async function createRoom(
         db.insert(matches).values({ id: matchId, roomId, mode: input.mode, status: "pending", options: input.options }),
         db.insert(players).values({ id: playerId, matchId, userId, seat: 0, displayName: input.displayName, isBot: false }),
       ] as never);
-      record("room.opened", { userId, mode: input.mode });
+      record("room.opened", { mode: input.mode });
       return { code, seat: 0 };
     } catch (cause) {
       // 23505 is a duplicate code and only a duplicate code: every other id here
@@ -304,7 +304,7 @@ export async function spectateRoom(
     }
     throw new RoomServiceError();
   }
-  record("room.spectated", { userId });
+  record("room.spectated");
   return { code: room.code, role: admitted.role };
 }
 
@@ -388,7 +388,7 @@ export async function handOverRoom(
     }
     throw new RoomServiceError();
   }
-  record("room.handed_over", { userId });
+  record("room.handed_over");
   return { code: room.code, hostSeat: moved.hostSeat };
 }
 
@@ -444,7 +444,7 @@ export async function closeRoom(
     if (current.status === "complete") throw new RoomError(409, "room_closed", "This room's match has already finished");
     throw new RoomServiceError();
   }
-  record("room.closed_by_host", { userId });
+  record("room.closed_by_host");
   return { alreadyClosed: false };
 }
 
@@ -516,7 +516,7 @@ export async function appendRoomTurn(
     `);
     claimed = result.rows[0];
   } catch (cause) {
-    recordFailure("room.turn_failed", cause, { userId, count: input.expectedVersion + 1 });
+    recordFailure("room.turn_failed", cause, { count: input.expectedVersion + 1 });
     throw new RoomServiceError({ cause });
   }
   if (!claimed) {
@@ -526,7 +526,7 @@ export async function appendRoomTurn(
     }
     // Worth counting rather than only refusing: a room producing these steadily
     // means two clients disagree about whose turn it is, not that people are fast.
-    record("room.version_conflict", { userId, count: input.expectedVersion }, "warn");
+    record("room.version_conflict", { count: input.expectedVersion }, "warn");
     throw new RoomError(409, "version_conflict", "Somebody else threw first — catch up and try again");
   }
 

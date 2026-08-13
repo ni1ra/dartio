@@ -1,6 +1,6 @@
 # Cycle 35 — Rooms Under Bad Networks
 
-Status: active on `codex/cycle-35-room-resilience`.
+Status: closed on Production on 2026-08-13.
 
 Cycle 24 made the server authoritative at visit granularity: the expected
 version, turn row, and exact darts commit atomically, while handover, close, and
@@ -48,7 +48,7 @@ room into a dart-by-dart offline game or hide uncertainty behind blind retries.
   handover, reconnect, and close-vs-finish browser stories at 390, 834, and 1440.
 - [x] Pass local unit/type/lint/build/browser and visual QA, then rebase onto the
   Cycle 34 merge without changing the verified product tree.
-- [ ] Pass exact-head Preview and CI, merge, repeat the canonical Production
+- [x] Pass exact-head Preview and CI, merge, repeat the canonical Production
   room/integrity/browser ladder, and archive the cycle.
 
 ## Safety and scope
@@ -100,3 +100,23 @@ Final local candidate, 2026-08-13:
   refusal recovery; 33 prior focused stories remained green and each new story
   passed at all three widths. The final full matrix passed 395 runnable checks
   with the four established layout skips.
+
+Release closure, 2026-08-13:
+
+- PR #40 froze exact head `37fa0bb9cebde0d0cac53e7eb8cf3b23cba5355d`.
+  GitHub run [31657914123](https://github.com/ni1ra/dartio/actions/runs/31657914123)
+  passed typecheck, lint, unit, build, and browser proof. Immutable Preview
+  deployment `dpl_3wMLFUnkjaD7unB41Yfo3rJ9KEtY` was READY on that same SHA.
+- The focused Preview room/resilience matrix passed 36/36. The full Preview
+  matrix passed 395/399 with only the four established layout skips.
+- PR #40 merged as `46f3a4f7b885bf6474be1e644a3458084059d6b3`.
+  Main run [31658885004](https://github.com/ni1ra/dartio/actions/runs/31658885004)
+  passed every application step, including its full browser proof.
+- Production deployment `dpl_A27a2m3p8BsAs2MSSGsvRrZnErzZ` was READY on the
+  exact merge SHA with the canonical alias assigned and no alias error. Auth,
+  owner-only history/detail, rooms, paid AI, paid voice, and the full Production
+  browser matrix all passed; the latter was 395/399 with four designed skips.
+- The aggregate-only Production room audit found zero canonical-owner,
+  version/turn, abandoned-field, complete-field, or open-field anomalies and
+  zero open or multi-user orphan signatures. No identifiers or credentials were
+  printed and no database row was changed.
