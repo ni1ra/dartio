@@ -3,10 +3,10 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { z } from "zod";
 import { createDatabase } from "@/db/client";
-import { subscriptions, users } from "@/db/schema";
+import { users } from "@/db/schema";
 import { PLAN_CATALOG } from "@/lib/billing/catalog";
 import { BillingPublicError, safeBillingError } from "@/lib/billing/errors";
-import { checkoutSessionParams, ensureStripeCustomer, hasRecoverableStripeSubscription, isMissingStripeCustomer, mustRecoverExistingSubscription, resolveCheckoutPriceId, stripeCustomerBelongsToUser } from "@/lib/billing/service";
+import { checkoutSessionParams, ensureStripeCustomer, hasRecoverableStripeSubscription, isMissingStripeCustomer, resolveCheckoutPriceId, stripeCustomerBelongsToUser } from "@/lib/billing/service";
 import { getBillingCheckoutEnv } from "@/lib/env/server";
 import { requireCurrentUser } from "@/lib/server/auth";
 
@@ -21,9 +21,6 @@ export async function POST(request: Request) {
     const requestKey = idempotencySchema.parse(request.headers.get("idempotency-key"));
     const env = getBillingCheckoutEnv();
     const db = createDatabase();
-    const existing = await db.query.subscriptions.findFirst({ where: eq(subscriptions.userId, user.id), columns: { status: true } });
-    if (mustRecoverExistingSubscription(existing?.status)) return NextResponse.json({ error: "A subscription already exists", recovery: "portal" }, { status: 409 });
-
     const stripe = new Stripe(env.STRIPE_SECRET_KEY);
     const provisioning = (expectedCustomerId: string | null) => ({
       async create() { return (await stripe.customers.create({ email: user.email, metadata: { userId: user.id } }, { idempotencyKey: `dartio-customer-${user.id}` })).id; },
@@ -54,6 +51,9 @@ export async function POST(request: Request) {
       customer = await stripe.customers.retrieve(customerId);
     }
     if (!stripeCustomerBelongsToUser(customer, user.id)) throw new BillingPublicError(409, "Billing account ownership requires support");
+    // Stripe is the subscription authority and this query is scoped by the
+    // active Live/Sandbox key. A local webhook projection may legitimately
+    // still describe the other namespace during a reversible mode cutover.
     const remoteSubscriptions = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 100 });
     if (hasRecoverableStripeSubscription(remoteSubscriptions.data)) {
       return NextResponse.json({ error: "A subscription already exists", recovery: "portal" }, { status: 409 });
