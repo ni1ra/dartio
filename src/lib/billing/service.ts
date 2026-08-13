@@ -43,6 +43,19 @@ export async function ensureStripeCustomer(existingCustomerId: string | null, pr
   return canonical;
 }
 
+/**
+ * Stripe keeps test-mode and live-mode objects in separate namespaces. During
+ * an intentional mode cutover, a previously stored customer therefore looks
+ * missing to the new key even though the identifier is structurally valid.
+ * This narrow predicate is used only around `customers.retrieve`; other Stripe
+ * failures must still surface instead of silently replacing account ownership.
+ */
+export function isMissingStripeCustomer(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { readonly type?: unknown; readonly code?: unknown };
+  return candidate.type === "StripeInvalidRequestError" && candidate.code === "resource_missing";
+}
+
 export function stripeCustomerBelongsToUser(customer: Stripe.Customer | Stripe.DeletedCustomer, userId: string): customer is Stripe.Customer {
   return !customer.deleted && customer.metadata.userId === userId;
 }
