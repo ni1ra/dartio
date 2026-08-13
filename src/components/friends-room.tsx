@@ -47,6 +47,9 @@ export function FriendsRoom() {
   const [room, setRoom] = useState<RoomStateView | null>(null);
   const [lost, setLost] = useState(false);
   const failures = useRef(0);
+  const refreshGeneration = useRef(0);
+  const refreshController = useRef<AbortController | null>(null);
+  const refreshInFlight = useRef(false);
 
   /*
    * Gated on the entitlement alone. PRODUCT_AVAILABILITY reads `implemented` as of
@@ -56,33 +59,48 @@ export function FriendsRoom() {
   const entitled = access.status === "ready" && hasAccessEntitlement(access.snapshot, "online_multiplayer");
   const joined = room?.code ?? null;
 
-  const refresh = useCallback(async (target: string, signal: AbortSignal) => {
+  const refresh = useCallback(async (target: string, supersede = false): Promise<RoomStateView | null> => {
+    if (!supersede && refreshInFlight.current) return null;
+    if (supersede) refreshController.current?.abort();
+    const controller = new AbortController();
+    const attempt = ++refreshGeneration.current;
+    refreshController.current = controller;
+    refreshInFlight.current = true;
     // Always read from 0: the lobby shows the whole table, not a delta.
-    const result = await readRoom(target, 0, { signal });
-    if (signal.aborted) return;
+    const result = await readRoom(target, 0, { signal: controller.signal });
+    if (controller.signal.aborted || attempt !== refreshGeneration.current) return null;
+    refreshController.current = null;
+    refreshInFlight.current = false;
     if (result.ok) {
       failures.current = 0;
+      setLost(false);
       setRoom(result.value);
-      return;
+      return result.value;
     }
     failures.current += 1;
     if (failures.current >= MAX_CONSECUTIVE_FAILURES) setLost(true);
+    return null;
   }, []);
 
   useEffect(() => {
     if (!joined || lost) return;
-    const controller = new AbortController();
-    const timer = window.setInterval(() => void refresh(joined, controller.signal), POLL_MS);
-    return () => { controller.abort(); window.clearInterval(timer); };
+    const timer = window.setInterval(() => void refresh(joined), POLL_MS);
+    return () => { window.clearInterval(timer); };
   }, [joined, lost, refresh]);
+
+  useEffect(() => () => {
+    refreshGeneration.current += 1;
+    refreshController.current?.abort();
+    refreshController.current = null;
+    refreshInFlight.current = false;
+  }, []);
 
   async function host() {
     setBusy("hosting"); setFailure(null);
     const result = await createRoom({ mode: "x01", options: { startingScore: 501, legsToWin: 3, setsToWin: 1, inRule: "straight", outRule: "double" } });
     setBusy("idle");
     if (!result.ok) { setFailure(result.failure); return; }
-    const controller = new AbortController();
-    await refresh(result.value.code, controller.signal);
+    await refresh(result.value.code, true);
   }
 
   async function join(event: React.FormEvent) {
@@ -91,8 +109,7 @@ export function FriendsRoom() {
     const result = await joinRoom(code);
     setBusy("idle");
     if (!result.ok) { setFailure(result.failure); return; }
-    const controller = new AbortController();
-    await refresh(result.value.code, controller.signal);
+    await refresh(result.value.code, true);
   }
 
   /** Same code, no seat: the room is entered as a watcher and the lobby shows it. */
@@ -101,8 +118,7 @@ export function FriendsRoom() {
     const result = await spectateRoom(code);
     setBusy("idle");
     if (!result.ok) { setFailure(result.failure); return; }
-    const controller = new AbortController();
-    await refresh(result.value.code, controller.signal);
+    await refresh(result.value.code, true);
   }
 
   return <div className="page-frame friends-page">
@@ -112,7 +128,15 @@ export function FriendsRoom() {
       <p>Open a room, send one short code, and everybody sits at the same table. The room keeps one shared record of the match, in one order, so two phones can never disagree about what was thrown.</p>
     </header>
 
-    {room ? <RoomLobby room={room} lost={lost} onLeave={() => { setRoom(null); setLost(false); failures.current = 0; }} onChanged={() => { const controller = new AbortController(); void refresh(room.code, controller.signal); }} />
+    {room ? <RoomLobby room={room} lost={lost} onLeave={() => {
+      refreshGeneration.current += 1;
+      refreshController.current?.abort();
+      refreshController.current = null;
+      refreshInFlight.current = false;
+      setRoom(null);
+      setLost(false);
+      failures.current = 0;
+    }} onChanged={() => refresh(room.code, true)} />
       : <div className="friends-actions">
         <Surface className="create-room">
           <span className="giant-number">01</span>
@@ -146,23 +170,84 @@ export function FriendsRoom() {
   </div>;
 }
 
-function RoomLobby({ room, lost, onLeave, onChanged }: { room: RoomStateView; lost: boolean; onLeave: () => void; onChanged: () => void }) {
+type PendingHostAction =
+  | { readonly kind: "close" }
+  | { readonly kind: "handover"; readonly targetSeat: number };
+
+function hostActionIsVisible(room: RoomStateView, action: PendingHostAction): boolean {
+  if (action.kind === "close") return room.status === "abandoned";
+  return room.yourRole !== "owner"
+    && room.seats.some((seat) => seat.seat === action.targetSeat && seat.role === "owner");
+}
+
+function RoomLobby({ room, lost, onLeave, onChanged }: {
+  room: RoomStateView;
+  lost: boolean;
+  onLeave: () => void;
+  onChanged: () => Promise<RoomStateView | null>;
+}) {
   const [failure, setFailure] = useState<RoomFailure | null>(null);
   const [acting, setActing] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [pendingAction, setPendingAction] = useState<PendingHostAction | null>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
   const hosting = room.yourRole === "owner";
 
-  /** Host verbs. The buttons only render for the host, so a refusal here is news. */
-  async function act(action: () => ReturnType<typeof closeRoom> | ReturnType<typeof handOverRoom>) {
+  /**
+   * A lost mutation response is outcome-unknown, not a refusal. Host controls stay
+   * locked until a fresh room read either shows the action or proves it absent.
+   */
+  async function act(
+    action: () => ReturnType<typeof closeRoom> | ReturnType<typeof handOverRoom>,
+    expected: PendingHostAction,
+  ) {
     if (acting) return;
     setActing(true);
+    setPendingAction(null);
+    setActionNotice(null);
     setFailure(null);
-    try {
-      const result = await action();
-      if (!result.ok) { setFailure(result.failure); return; }
-      onChanged();
-    } finally {
+    const result = await action();
+    const refusal = !result.ok && result.failure !== "rooms_unavailable"
+      ? result.failure
+      : null;
+
+    const snapshot = await onChanged();
+    if (snapshot && hostActionIsVisible(snapshot, expected)) {
       setActing(false);
+      setActionNotice(expected.kind === "close" ? "Room closure confirmed." : "Host handover confirmed.");
+      return;
     }
+    if (snapshot && refusal) {
+      // A refusal such as `not_the_host` is authoritative about this mutation,
+      // but the reread is what makes the displayed owner/terminal controls
+      // authoritative too. Never unlock stale host controls on the response alone.
+      setFailure(refusal);
+      setActing(false);
+      return;
+    }
+
+    setPendingAction(expected);
+    if (refusal) setFailure(refusal);
+    setActionNotice(refusal
+      ? "The room refused that host action, but Dartio cannot yet refresh who has authority. Host controls stay locked until you check the room."
+      : "Dartio cannot yet confirm whether that host action landed. Host controls stay locked until you check the room.");
+  }
+
+  async function checkPendingAction() {
+    if (!pendingAction || checking) return;
+    setChecking(true);
+    const snapshot = await onChanged();
+    setChecking(false);
+    if (!snapshot) return;
+    if (hostActionIsVisible(snapshot, pendingAction)) {
+      setPendingAction(null);
+      setActing(false);
+      setActionNotice(pendingAction.kind === "close" ? "Room closure confirmed." : "Host handover confirmed.");
+      return;
+    }
+    setPendingAction(null);
+    setActing(false);
+    setActionNotice("The room record shows that the previous host action was not applied. You can try again.");
   }
 
   return <Surface className="room-lobby">
@@ -173,7 +258,7 @@ function RoomLobby({ room, lost, onLeave, onChanged }: { room: RoomStateView; lo
       </div>
       <div className="room-lobby-actions">
         {hosting && room.status !== "complete" && room.status !== "abandoned" &&
-          <Button variant="ghost" disabled={acting} onClick={() => void act(() => closeRoom(room.code))}>Close room</Button>}
+          <Button variant="ghost" disabled={acting} onClick={() => void act(() => closeRoom(room.code), { kind: "close" })}>Close room</Button>}
         <Button variant="secondary" onClick={onLeave}>Leave lobby</Button>
       </div>
     </div>
@@ -186,17 +271,21 @@ function RoomLobby({ room, lost, onLeave, onChanged }: { room: RoomStateView; lo
         <b>{seat.displayName}{seat.isYou && <em> · you</em>}</b>
         <small>{seat.role}</small>
         {hosting && !seat.isYou && room.status !== "complete" && room.status !== "abandoned" &&
-          <Button variant="ghost" size="sm" disabled={acting} onClick={() => void act(() => handOverRoom(room.code, seat.seat))}>Make host</Button>}
+          <Button variant="ghost" size="sm" disabled={acting} onClick={() => void act(() => handOverRoom(room.code, seat.seat), { kind: "handover", targetSeat: seat.seat })}>Make host</Button>}
       </li>)}
     </ol>
     {failure && <p className="form-error" role="alert">{FAILURE_COPY[failure]}</p>}
+    {actionNotice && <p className={pendingAction ? "form-error" : "room-lobby-note"} role="status">{actionNotice}</p>}
+    {pendingAction && <div className="room-recovery-actions">
+      <Button onClick={() => void checkPendingAction()} disabled={checking}>{checking ? "Checking…" : "Check host action"}</Button>
+    </div>}
     {room.status === "abandoned" && <p className="room-lobby-note">The host closed this room. Nothing more will be thrown in it.</p>}
     {room.watching > 0 && <p className="room-lobby-note">{room.watching === 1 ? "One chair pulled up to watch." : `${room.watching} chairs pulled up to watch.`}</p>}
     {room.seats.length > 1
       ? <Link className="button-link button-link-lg" href={`/play/match?room=${room.code}`}>{room.yourRole === "spectator" ? "Watch the match" : "Go to the oche"}</Link>
       : <p className="room-lobby-note">Waiting for somebody to join. Send them the code — the match starts as soon as a second player sits down.</p>}
     {lost
-      ? <p className="form-error" role="alert">Lost contact with the room. Your seat is still held — reopen this page to pick it back up.</p>
+      ? <div className="room-recovery-actions"><p className="form-error" role="alert">Lost contact with the room. Your seat is still held and no old snapshot can replace the board.</p><Button variant="secondary" onClick={() => void onChanged()}>Reconnect lobby</Button></div>
       : <p className="room-lobby-note">The room is at version {room.version}. A visit filed against an older version is refused rather than silently overwriting somebody.</p>}
   </Surface>;
 }

@@ -28,13 +28,17 @@ const PRO_ACCESS = {
  * Gives the browser a deterministic authenticated room while leaving the real UI,
  * client schemas, mutations, refresh, and responsive layout in the story.
  */
-async function mockHostedRoom(page: Page, { finishingVisit = false } = {}) {
+async function mockHostedRoom(page: Page, {
+  finishingVisit = false,
+  loseHandoverResponse = false,
+  refuseHandoverAsStaleHost = false,
+} = {}) {
   let room = {
     code: "OCHE42",
     mode: "x01",
     options: { startingScore: finishingVisit ? 40 : 501, legsToWin: finishingVisit ? 1 : 3, setsToWin: 1, inRule: "straight", outRule: "double" },
     status: "active",
-    version: 0,
+    version: finishingVisit ? 1 : 0,
     yourSeat: 0,
     yourRole: "owner",
     watching: 1,
@@ -43,6 +47,7 @@ async function mockHostedRoom(page: Page, { finishingVisit = false } = {}) {
       { seat: 1, displayName: "Guest", isYou: false, role: "player" },
     ],
     turns: finishingVisit ? [{
+      version: 1,
       turnNumber: 1,
       seat: 0,
       legNumber: 1,
@@ -76,8 +81,7 @@ async function mockHostedRoom(page: Page, { finishingVisit = false } = {}) {
     }
     if (path === `/api/rooms/${room.code}/handover` && request.method() === "POST") {
       handoverBodies.push(request.postDataJSON());
-      await handoverGate;
-      room = {
+      const handedOver = {
         ...room,
         yourRole: "player",
         seats: [
@@ -85,6 +89,18 @@ async function mockHostedRoom(page: Page, { finishingVisit = false } = {}) {
           { ...room.seats[1]!, role: "owner" },
         ],
       };
+      if (loseHandoverResponse) {
+        room = handedOver;
+        await route.abort("connectionreset");
+        return;
+      }
+      if (refuseHandoverAsStaleHost) {
+        room = handedOver;
+        await json(route, 403, { error: "not_the_host" });
+        return;
+      }
+      await handoverGate;
+      room = handedOver;
       await json(route, 200, { code: room.code, hostSeat: 1 });
       return;
     }
@@ -164,6 +180,28 @@ test("the host can hand over once, without a second owner or narrow-screen overf
   await expect(page.getByRole("button", { name: /close room/i })).toHaveCount(0);
   expect(room.handoverBodies).toEqual([{ toSeat: 1 }]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("a lost handover response keeps host controls locked until the room confirms authority", async ({ page }) => {
+  const room = await mockHostedRoom(page, { loseHandoverResponse: true });
+  await page.getByRole("button", { name: /make host/i }).click();
+
+  await expect(page.locator(".room-seats small")).toHaveText(["player", "owner"]);
+  await expect(page.getByText("Host handover confirmed.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /make host/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /close room/i })).toHaveCount(0);
+  expect(room.handoverBodies).toEqual([{ toSeat: 1 }]);
+});
+
+test("a stale host refusal refreshes and confirms canonical authority", async ({ page }) => {
+  const room = await mockHostedRoom(page, { refuseHandoverAsStaleHost: true });
+  await page.getByRole("button", { name: /make host/i }).click();
+
+  await expect(page.locator(".room-seats small")).toHaveText(["player", "owner"]);
+  await expect(page.getByText("Host handover confirmed.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /make host/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /close room/i })).toHaveCount(0);
+  expect(room.handoverBodies).toEqual([{ toSeat: 1 }]);
 });
 
 test("closing withdraws every host action and the match scoring pad", async ({ page }) => {
