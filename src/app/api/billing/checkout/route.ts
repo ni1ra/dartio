@@ -6,7 +6,7 @@ import { createDatabase } from "@/db/client";
 import { subscriptions, users } from "@/db/schema";
 import { PLAN_CATALOG } from "@/lib/billing/catalog";
 import { BillingPublicError, safeBillingError } from "@/lib/billing/errors";
-import { checkoutSessionParams, ensureStripeCustomer, hasRecoverableStripeSubscription, mustRecoverExistingSubscription, resolveCheckoutPriceId, stripeCustomerBelongsToUser } from "@/lib/billing/service";
+import { checkoutSessionParams, ensureStripeCustomer, hasRecoverableStripeSubscription, isMissingStripeCustomer, mustRecoverExistingSubscription, resolveCheckoutPriceId, stripeCustomerBelongsToUser } from "@/lib/billing/service";
 import { getBillingCheckoutEnv } from "@/lib/env/server";
 import { requireCurrentUser } from "@/lib/server/auth";
 
@@ -25,13 +25,34 @@ export async function POST(request: Request) {
     if (mustRecoverExistingSubscription(existing?.status)) return NextResponse.json({ error: "A subscription already exists", recovery: "portal" }, { status: 409 });
 
     const stripe = new Stripe(env.STRIPE_SECRET_KEY);
-    const customerId = await ensureStripeCustomer(user.stripeCustomerId, {
+    const provisioning = (expectedCustomerId: string | null) => ({
       async create() { return (await stripe.customers.create({ email: user.email, metadata: { userId: user.id } }, { idempotencyKey: `dartio-customer-${user.id}` })).id; },
-      async claim(createdCustomerId) { return (await db.update(users).set({ stripeCustomerId: createdCustomerId, updatedAt: new Date() }).where(and(eq(users.id, user.id), isNull(users.stripeCustomerId))).returning({ stripeCustomerId: users.stripeCustomerId }))[0]?.stripeCustomerId ?? null; },
+      async claim(createdCustomerId: string) {
+        const expectedLink = expectedCustomerId === null
+          ? isNull(users.stripeCustomerId)
+          : eq(users.stripeCustomerId, expectedCustomerId);
+        return (await db.update(users).set({ stripeCustomerId: createdCustomerId, updatedAt: new Date() }).where(and(eq(users.id, user.id), expectedLink)).returning({ stripeCustomerId: users.stripeCustomerId }))[0]?.stripeCustomerId ?? null;
+      },
       async read() { return (await db.query.users.findFirst({ where: eq(users.id, user.id), columns: { stripeCustomerId: true } }))?.stripeCustomerId ?? null; },
-      async discard(createdCustomerId) { await stripe.customers.del(createdCustomerId); },
+      async discard(createdCustomerId: string) { await stripe.customers.del(createdCustomerId); },
     });
-    const customer = await stripe.customers.retrieve(customerId);
+
+    let customerId = user.stripeCustomerId;
+    let customer: Stripe.Customer | Stripe.DeletedCustomer;
+    if (customerId) {
+      try {
+        customer = await stripe.customers.retrieve(customerId);
+      } catch (error) {
+        if (!isMissingStripeCustomer(error)) throw error;
+        // Stripe idempotency keys are mode-scoped, so this creates (or reuses)
+        // exactly one customer in the newly active Live/Sandbox namespace.
+        customerId = await ensureStripeCustomer(null, provisioning(customerId));
+        customer = await stripe.customers.retrieve(customerId);
+      }
+    } else {
+      customerId = await ensureStripeCustomer(null, provisioning(null));
+      customer = await stripe.customers.retrieve(customerId);
+    }
     if (!stripeCustomerBelongsToUser(customer, user.id)) throw new BillingPublicError(409, "Billing account ownership requires support");
     const remoteSubscriptions = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 100 });
     if (hasRecoverableStripeSubscription(remoteSubscriptions.data)) {
