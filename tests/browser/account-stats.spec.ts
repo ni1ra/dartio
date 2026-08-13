@@ -13,7 +13,7 @@ const FREE_ACCESS = {
   availability: {
     localScoring: "implemented", advancedAi: "implemented", advancedCheckout: "implemented",
     voiceInput: "implemented", history: "implemented", deepStats: "implemented",
-    onlineMultiplayer: "implemented", customPractice: "coming_soon", clubManagement: "coming_soon",
+    onlineMultiplayer: "implemented", customPractice: "implemented", clubManagement: "coming_soon",
   },
 } as const;
 
@@ -159,7 +159,8 @@ test("Pro record separates sessions and exposes source-honest career depth", asy
   const membership = page.locator(".membership-status");
   await expect(membership).toContainText("Deep statistics");
   await expect(membership).toContainText("Online rooms");
-  await expect(membership).toContainText("Custom practice paths and Club management are still being built.");
+  await expect(membership).toContainText("Custom practice");
+  await expect(membership).toContainText("Club management is still being built.");
 
   const record = page.getByRole("region", { name: "Your record" });
   await expect(record.getByText("9 completed sessions")).toBeVisible();

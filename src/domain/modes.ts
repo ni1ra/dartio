@@ -8,6 +8,7 @@ export const GAME_MODES = {
   checkoutLab: { name: "Checkout Lab", status: "playable", options: ["attempts", "unit"] },
   doublesMatrix: { name: "Doubles Matrix", status: "playable", options: ["attempts", "unit"] },
   scoringSprint: { name: "Scoring Sprint", status: "playable", options: ["attempts", "unit"] },
+  customPractice: { name: "Custom Practice", status: "playable", options: ["rulesVersion", "targets", "hits"] },
 } as const;
 
 export type GameModeId = keyof typeof GAME_MODES;

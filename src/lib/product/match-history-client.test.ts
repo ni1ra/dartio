@@ -140,6 +140,60 @@ describe("reading career statistics", () => {
     await expect(fetchCareerStats({ fetcher: respond(200, unattributed) })).resolves.toEqual(unattributed);
   });
 
+  it("accepts custom practice outside the three fixed-drill progress cards", async () => {
+    const custom = {
+      ...stats,
+      matchesPlayed: 3,
+      practiceSessions: 2,
+      visits: 4,
+      dartsThrown: 9,
+      deep: {
+        ...stats.deep,
+        modes: [...stats.deep.modes, {
+          mode: "customPractice",
+          played: 1,
+          won: 0,
+          lost: 0,
+          unscored: 1,
+          visits: 1,
+          dartsThrown: 2,
+          winPercentage: null,
+        }],
+      },
+    };
+    await expect(fetchCareerStats({ fetcher: respond(200, custom) })).resolves.toEqual(custom);
+  });
+
+  it("rejects a custom path presented as a competitive result", async () => {
+    const custom = {
+      ...stats,
+      matchesPlayed: 3,
+      competitiveMatches: 2,
+      practiceSessions: 1,
+      matchesWon: 2,
+      visits: 4,
+      dartsThrown: 9,
+      deep: {
+        ...stats.deep,
+        recentForm: [
+          ...stats.deep.recentForm,
+          { completedAt: "2026-08-13T12:00:00.000Z", mode: "customPractice", result: "won" as const },
+        ],
+        modes: [...stats.deep.modes, {
+          mode: "customPractice",
+          played: 1,
+          won: 1,
+          lost: 0,
+          unscored: 0,
+          visits: 1,
+          dartsThrown: 2,
+          winPercentage: 100,
+        }],
+      },
+    };
+    await expect(fetchCareerStats({ fetcher: respond(200, custom) })).resolves.toBeNull();
+  });
+
   it("requires zero percentages when there is no denominator", async () => {
     const empty = {
       matchesPlayed: 0,

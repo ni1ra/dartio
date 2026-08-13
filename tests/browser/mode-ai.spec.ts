@@ -21,7 +21,7 @@ const PRO_ACCESS = {
     history: "implemented",
     deepStats: "implemented",
     onlineMultiplayer: "implemented",
-    customPractice: "coming_soon",
+    customPractice: "implemented",
     clubManagement: "coming_soon",
   },
 };
