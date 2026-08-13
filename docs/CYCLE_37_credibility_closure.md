@@ -99,11 +99,11 @@ Live-cutover release preparation, 2026-08-13:
   error. It remains Sandbox-backed until the provider-authenticated Live key and
   `STRIPE_MODE=live` are installed together and a fresh deployment proves them.
 - This Cycle 37 branch's exact head
-  `eebbc47e97fc941f1f7e920106e46b453e0f6d6e` passed CI run `31670824431`
+  `9a8f26ee5f1bdcd08d490cb92ffe08d7c756bc29` passed CI run `31671843422`
   including its browser job. Exact-head Preview deployment
-  `dpl_4EvzZKLxg7ewLJ71UFuqUv67ZUA3` is READY, and the public-claim story passed
-  3/3 there. PR #42 deliberately remains draft and open until the bank payout is
-  terminal.
+  `dpl_9Y6NGcvTemZRtNGArtD2AmauQJBN` is READY, and the public-claim story passed
+  3/3 there at 390x844, 834x1112, and 1440x1000. PR #42 deliberately remains
+  draft and open until the bank payout is terminal.
 
 Cycle 31's terminal Live payment/payout receipt remains the phase gate. This
 cycle stays active and the Phase 4 archive remains unclaimed until that bank
