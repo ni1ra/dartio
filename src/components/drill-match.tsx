@@ -6,6 +6,7 @@ import { Button, CommandDock, IconButton, Surface } from "navi-ui";
 import {
   appendDrillEvent,
   createDrillLog,
+  dart,
   drillDartEvent,
   drillMatchRecord,
   drillSummary,
@@ -24,6 +25,7 @@ import { useMatchKeyboard } from "./use-match-keyboard";
 import { useRecordMatch } from "./use-record-match";
 import { useScreenWakeLock } from "./use-screen-wake-lock";
 import { clearDrillMatch, loadDrillMatch, saveDrillMatch } from "@/lib/product/drill-store";
+import { VoiceControl } from "./voice-control";
 
 /**
  * One screen for all three drills.
@@ -136,6 +138,15 @@ export function DrillMatch({ drill }: { drill: DrillId }) {
 
     <Dartboard darts={game.currentDarts} disabled={disabled} onDart={addDart} />
     <DartInputPad disabled={disabled} onDart={addDart} />
+    <VoiceControl
+      revision={log.events.length}
+      disabled={disabled}
+      mode="drill"
+      onDart={(segment, multiplier) => addDart(dart(segment as Dart["segment"], multiplier))}
+      onTurnScore={() => undefined}
+      onUndo={undo}
+      onNextPlayer={() => undefined}
+    />
 
     {game.attempts.length > 0 && <ol className="drill-history">
       {[...game.attempts].reverse().slice(0, 8).map((attempt) => <li key={attempt.index} className={attempt.hit ? "took" : "missed"}>

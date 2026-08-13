@@ -9,3 +9,4 @@ export function resolveLiveVoiceConfiguration(
 
 export function hasPrivateNoStore(value: string | null | undefined): boolean;
 export function isExpectedTrebleTwentyVoiceSuccess(payload: unknown): boolean;
+export function classifyTrebleTwentyVoiceSuccess(payload: unknown): "expected" | "unexpected" | "malformed";

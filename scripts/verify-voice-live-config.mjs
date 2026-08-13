@@ -21,7 +21,12 @@ export function resolveLiveVoiceConfiguration(arguments_, environment) {
  * evidence, but cannot prove that the deployed provider returned logprobs.
  */
 export function isExpectedTrebleTwentyVoiceSuccess(payload) {
-  if (!isRecordWithKeys(payload, ["command", "confidence", "transcript"])) return false;
+  return classifyTrebleTwentyVoiceSuccess(payload) === "expected";
+}
+
+/** Separates provider variance from a malformed public response without logging either. */
+export function classifyTrebleTwentyVoiceSuccess(payload) {
+  if (!isRecordWithKeys(payload, ["command", "confidence", "transcript"])) return "malformed";
   if (
     typeof payload.transcript !== "string"
     || payload.transcript.trim() === ""
@@ -30,12 +35,37 @@ export function isExpectedTrebleTwentyVoiceSuccess(payload) {
     || payload.confidence <= 0
     || payload.confidence > 1
   ) {
-    return false;
+    return "malformed";
   }
-  return isRecordWithKeys(payload.command, ["multiplier", "segment", "type"])
-    && payload.command.type === "dart"
+  // A clean transcript can legitimately be outside Dartio's vocabulary. That
+  // is provider variance worth one bounded retry, not a malformed API body.
+  if (payload.command === null) return "unexpected";
+  if (!isValidVoiceCommand(payload.command)) return "malformed";
+  return payload.command.type === "dart"
     && payload.command.segment === 20
-    && payload.command.multiplier === 3;
+    && payload.command.multiplier === 3
+    ? "expected"
+    : "unexpected";
+}
+
+function isValidVoiceCommand(command) {
+  if (typeof command !== "object" || command === null || Array.isArray(command)) return false;
+  if (["undo", "next_player", "confirm", "cancel"].includes(command.type)) {
+    return isRecordWithKeys(command, ["type"]);
+  }
+  if (command.type === "turn_score") {
+    return isRecordWithKeys(command, ["score", "type"])
+      && Number.isInteger(command.score)
+      && command.score >= 0
+      && command.score <= 180;
+  }
+  if (command.type !== "dart" || !isRecordWithKeys(command, ["multiplier", "segment", "type"])) return false;
+  if (!Number.isInteger(command.segment) || ![1, 2, 3].includes(command.multiplier)) return false;
+  return command.segment === 0
+    ? command.multiplier === 1
+    : command.segment === 25
+      ? command.multiplier !== 3
+      : command.segment >= 1 && command.segment <= 20;
 }
 
 function isRecordWithKeys(value, expectedKeys) {

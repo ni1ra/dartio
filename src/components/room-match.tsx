@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CommandDock, Surface } from "navi-ui";
 import {
   applyDart,
+  dart,
   notation,
   replay,
   x01LogFromTurns,
@@ -19,6 +20,7 @@ import { completeRoomMatch, fileRoomTurn, readRoom, type RoomStateView } from "@
 import { DartInputPad } from "./dart-input-pad";
 import { Dartboard } from "./dartboard";
 import { useScreenWakeLock } from "./use-screen-wake-lock";
+import { VoiceControl } from "./voice-control";
 
 /**
  * An X01 match played inside a room.
@@ -55,6 +57,7 @@ export function RoomMatch({ code }: RoomMatchProps) {
   const [stale, setStale] = useState(false);
   const failures = useRef(0);
   const reported = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     const result = await readRoom(code, 0, signal ? { signal } : {});
@@ -102,7 +105,7 @@ export function RoomMatch({ code }: RoomMatchProps) {
   // A closed room takes no more darts even though the replayed game still says
   // "playing" — the server would refuse the visit; the inputs must not offer it.
   const closed = room?.status === "abandoned";
-  const yourTurn = game !== null && yourSeat !== null && !closed && game.status === "playing" && game.currentPlayer === yourSeat;
+  const yourTurn = game !== null && yourSeat !== null && !closed && !submitting && game.status === "playing" && game.currentPlayer === yourSeat;
   const finished = game?.status === "complete";
   useScreenWakeLock(phase === "playing" && yourSeat !== null && !closed && !finished);
 
@@ -125,7 +128,7 @@ export function RoomMatch({ code }: RoomMatchProps) {
     // A visit ends when the rules say it does — three darts, a finish, or a bust.
     if (state.turns.length === game.turns.length) { setPending(next); setMessage(`${notation(value)} · ${3 - next.length} left`); return; }
 
-    setPending([]);
+    setSubmitting(true);
     setMessage("Sending your visit…");
     const visit = state.turns[state.turns.length - 1]!;
     const result = await fileRoomTurn(code, {
@@ -147,15 +150,24 @@ export function RoomMatch({ code }: RoomMatchProps) {
       },
     });
 
-    if (result.ok) { setMessage("Visit sent."); await load(); return; }
+    if (result.ok) { setPending([]); setMessage("Visit sent."); await load(); setSubmitting(false); return; }
     if (result.failure === "version_conflict") {
       // Somebody threw while this visit was being entered. Their visit stands; this
       // one is re-entered against the room as it now is.
       setMessage("Somebody threw first — catching up. Throw that visit again.");
       await load();
+      setPending([]);
+      setSubmitting(false);
       return;
     }
     setMessage("That visit could not be sent. Nothing was scored.");
+    setSubmitting(false);
+  }
+
+  function undoPending() {
+    if (submitting || pending.length === 0) return;
+    setPending((current) => current.slice(0, -1));
+    setMessage("Last local dart taken back");
   }
 
   if (phase === "loading") return <div className="page-frame room-match"><p role="status">Joining the room…</p></div>;
@@ -188,7 +200,18 @@ export function RoomMatch({ code }: RoomMatchProps) {
         pad is purely an input surface, so it disappears when no future throw can
         be accepted instead of leaving a permanently disabled control behind. */}
     <Dartboard darts={pending} disabled={!yourTurn} onDart={(value) => void throwDart(value)} />
-    {!spectating && !closed && <DartInputPad disabled={!yourTurn} onDart={(value) => void throwDart(value)} />}
+    {!spectating && !closed && <>
+      <DartInputPad disabled={!yourTurn} onDart={(value) => void throwDart(value)} />
+      <VoiceControl
+        revision={(room.version * 4) + pending.length}
+        disabled={!yourTurn}
+        mode="room"
+        onDart={(segment, multiplier) => void throwDart(dart(segment as Dart["segment"], multiplier))}
+        onTurnScore={() => undefined}
+        onUndo={undoPending}
+        onNextPlayer={() => setMessage("Record every dart before ending the visit")}
+      />
+    </>}
 
     <CommandDock className="match-dock">
       <span aria-live="polite">{closed ? "The host closed this room. Nothing more will be thrown." : finished ? "Match complete." : spectating ? "You’re watching — visits land as they’re thrown." : message}</span>

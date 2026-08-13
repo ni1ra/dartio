@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
+  classifyTrebleTwentyVoiceSuccess,
   hasPrivateNoStore,
   isExpectedTrebleTwentyVoiceSuccess,
   resolveLiveVoiceConfiguration,
@@ -91,6 +92,17 @@ describe("the live voice response boundary", () => {
 
   it("accepts only a measured strict T20 result", () => {
     expect(isExpectedTrebleTwentyVoiceSuccess(success)).toBe(true);
+    expect(classifyTrebleTwentyVoiceSuccess(success)).toBe("expected");
+  });
+
+  it("allows one bounded retry only for a structurally valid unexpected command", () => {
+    expect(classifyTrebleTwentyVoiceSuccess({
+      ...success,
+      command: { type: "dart", segment: 1, multiplier: 1 },
+    })).toBe("unexpected");
+    expect(classifyTrebleTwentyVoiceSuccess({ ...success, command: null })).toBe("unexpected");
+    expect(classifyTrebleTwentyVoiceSuccess({ ...success, command: { type: "dart", segment: 25, multiplier: 3 } })).toBe("malformed");
+    expect(classifyTrebleTwentyVoiceSuccess({ ...success, command: { type: "turn_score", score: 181 } })).toBe("malformed");
   });
 
   it.each([

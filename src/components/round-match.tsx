@@ -6,7 +6,7 @@ import { Button, CommandDock, IconButton, Modal } from "navi-ui";
 import {
   aiTactics, applyRoundDart,
   appendRoundEvent, chooseRoundAim, createRoundLog, notation, replayRound, rewindRoundToVisit, ROUND_MODES,
-  liveRoundView, roundDartEvent, roundMatchRecord, undoLastRoundEvent,
+  dart, liveRoundView, roundDartEvent, roundMatchRecord, undoLastRoundEvent,
   type Dart, type RoundLog, type RoundModeId,
 } from "@/domain";
 import { seededRandom, throwAiDart } from "@/domain/ai-throw";
@@ -27,6 +27,7 @@ import { useRecordMatch } from "./use-record-match";
 import { OpponentAiAccessBanner, useOpponentAiAccess } from "./opponent-ai-access";
 import { describeAiFailure, describeAiRefresh, type AiRecovery } from "./opponent-ai-recovery";
 import { useScreenWakeLock } from "./use-screen-wake-lock";
+import { VoiceControl } from "./voice-control";
 
 /**
  * One screen for every round-based mode.
@@ -317,6 +318,15 @@ export function RoundMatch({ mode }: { mode: RoundModeId }) {
       </section>
       <aside className="match-side">
         <DartInputPad disabled={disabled} onDart={addDart} />
+        <VoiceControl
+          revision={log.events.length}
+          disabled={disabled || correction}
+          mode="round"
+          onDart={(segment, multiplier) => addDart(dart(segment as Dart["segment"], multiplier))}
+          onTurnScore={() => undefined}
+          onUndo={undo}
+          onNextPlayer={() => setMessage("Record every dart before ending the visit")}
+        />
       </aside>
     </div>
 
