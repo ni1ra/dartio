@@ -8,9 +8,8 @@ Nothing under `docs/` in this repository is authoritative any more, and no new
 document is written here. Phase and cycle documents, the control file, decisions,
 artifacts and archives are all in `navi-docs/dartio/`.
 
-**Agents:** read `navi-docs/global/AGENTS.md` first — it outranks this repository's own
-`AGENTS.md` wherever the two disagree. Then read `navi-docs/dartio/REPO_CONTROL.md`
-for the live queue before doing any work here.
+**Agents:** read `navi-docs/dartio/REPO_CONTROL.md` for the live queue and the
+standing rules before doing any work here.
 
 Local checkout, if it is missing:
 
