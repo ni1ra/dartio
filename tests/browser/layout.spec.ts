@@ -78,11 +78,23 @@ test("public product claims match shipped availability", async ({ page }) => {
   ).toBeVisible();
 
   await gotoDartio(page, "/pricing");
+  const free = page.locator(".free-plan");
   const pro = page.locator(".pro-plan");
+  const club = page.locator(".club-plan");
+  await expect(free.locator("li", { hasText: "Saved match history and dart-by-dart replay" })).toContainText("AVAILABLE");
+  await expect(pro.locator("li", { hasText: "Every AI level, 1 through 20" })).toContainText("AVAILABLE");
+  await expect(pro.locator("li", { hasText: "Push-to-talk voice scoring" })).toContainText("AVAILABLE");
+  await expect(pro.locator("li", { hasText: "Opt-in hands-free voice scoring" })).toContainText("AVAILABLE");
   await expect(pro.locator("li", { hasText: "Advanced checkout routes" })).toContainText("AVAILABLE");
   await expect(pro.locator("li", { hasText: "Deep statistics and online rooms" })).toContainText("AVAILABLE");
   await expect(pro.locator("li", { hasText: "Custom practice paths" })).toContainText("AVAILABLE");
-  await expect(page.locator(".club-plan")).toContainText("Club management remains under active development.");
+  await expect(pro).toContainText("Promotion codes accepted");
+  await expect(club.locator(".plan-signal")).toHaveText("COMING SOON");
+  await expect(club.getByRole("button", { name: "Club checkout is not open yet" })).toBeDisabled();
+  await expect(club).toContainText("No payment is taken.");
+  await expect(club).toContainText("Club management remains under active development.");
+  await expect(page.locator(".pricing-assurance")).toContainText("uses Stripe’s hosted page");
+  await expect(page.locator(".pricing-assurance")).toContainText("Club checkout is not open");
 
   await gotoDartio(page, "/account");
   await expect(page.getByText("Online rooms are live with Pro.", { exact: false })).toBeVisible();
@@ -116,7 +128,8 @@ test("a signed-out visitor is offered a way into an account from the nav", async
   ).toBeVisible();
 
   // The pending placeholder is transparent by design while the session resolves.
-  // If it is still there after networkidle, the visitor is looking at nothing.
+  // The shared navigation boundary waits for this client-owned authority state.
+  // Reassert it here because an invisible account action was the original defect.
   await expect(page.locator(".account-nav--pending")).toHaveCount(0);
 });
 

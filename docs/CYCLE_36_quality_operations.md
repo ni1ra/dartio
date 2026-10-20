@@ -1,6 +1,6 @@
 # Cycle 36 — Accessibility, Performance, and Operations
 
-Status: active on `codex/cycle-36-quality-operations`.
+Status: closed on 2026-08-13 through PR #41 and Production evidence.
 
 Cycle 36 measures the product players actually receive. It covers every public
 entry surface and every scoring family, closes the gaps the measurement finds,
@@ -88,7 +88,7 @@ budgets are what this gate can compare fairly.
 - [x] Remove identity and raw exception content from operational events while
   preserving fixed diagnostic categories.
 - [x] Pass the final local type/lint/unit/build/full-browser ladder and visual QA.
-- [ ] Pass exact-head Preview and CI, merge, then repeat the canonical
+- [x] Pass exact-head Preview and CI, merge, then repeat the canonical
   Production auth/history/rooms/AI/voice/full-browser and runtime-log audit.
 
 ## Evidence sources
@@ -218,5 +218,24 @@ Candidate gate, 2026-08-13:
   then passed, followed by the complete immutable-Preview matrix: 455 passed,
   four intentional skips, zero failures.
 
-Preview, CI, merge, and Production remain unclaimed until their exact commands
-and SHAs pass.
+Release closure, 2026-08-13:
+
+- Final PR head `a17fc3d4c34989c55a0dd03986c3c684df9bd77e` passed CI run
+  `31668118954`, deployed READY at immutable Preview
+  `https://dartio-bjf5wzjx3-niras-projects-868b6f5f.vercel.app`, and passed the
+  complete 455-run / four-skip browser matrix there with zero failures.
+- PR #41 merged as `e52c1f8671b728c04ed8cd556ce8bc661bf73118`.
+  Main CI run `31668637443` passed typecheck, lint, unit, build, and browser
+  proof. Production deployment `dpl_2C7EGdcNAEAD87SZo7Q1sWyAFmWx` is READY on
+  that exact SHA, and the canonical alias resolves to it without an alias error.
+- Production auth, strict owner-only history/detail/statistics, room authority,
+  aggregate room integrity, paid AI, and paid voice gates all passed. The room
+  audit reported zero owner, version/turn, terminal-field, and orphan-signature
+  anomalies. AI returned 25 independently scored darts for each of five
+  level-20 bed families; voice returned the checked T20 command with a finite,
+  non-zero confidence signal.
+- The complete canonical Production browser matrix passed 455 checks with the
+  four established layout skips and zero failures across 390x844, 834x1112,
+  and 1440x1000. A bounded deployment-scoped runtime audit found no error
+  clusters; sampled request logs contained only route/status/deployment/cache
+  metadata and no player identity, payload, transcript, or exception text.
